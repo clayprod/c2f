@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import logo from '@/assets/logo.png';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -35,11 +36,12 @@ const AppLayout = ({ children }: AppLayoutProps) => {
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="p-6 border-b border-border">
-            <Link to="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                <i className='bx bx-wallet text-primary-foreground text-lg'></i>
-              </div>
-              <span className="font-display font-bold text-xl text-foreground">c2Finance</span>
+            <Link to="/" className="flex items-center">
+              <img 
+                src={logo} 
+                alt="c2Finance" 
+                className="h-8 w-auto invert"
+              />
             </Link>
           </div>
 
