@@ -222,7 +222,7 @@ export default function IntegrationsPage() {
       ) : items.length === 0 ? (
         <div className="glass-card p-12 text-center">
           <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
-            <i className='bx bx-link text-3xl text-primary'></i>
+            <i className='bx bx-share text-3xl text-primary'></i>
           </div>
           <h3 className="font-display font-semibold text-lg mb-2">Nenhuma integracao</h3>
           <p className="text-muted-foreground mb-4">

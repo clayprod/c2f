@@ -1,7 +1,7 @@
 const logos = [
   { name: 'TechCorp', icon: 'bx-building' },
   { name: 'StartupX', icon: 'bx-rocket' },
-  { name: 'FinanceY', icon: 'bx-line-chart' },
+  { name: 'FinanceY', icon: 'bx-trending-up' },
   { name: 'CloudZ', icon: 'bx-cloud' },
   { name: 'DataHub', icon: 'bx-server' },
 ];

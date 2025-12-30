@@ -90,7 +90,7 @@ export default function InvestmentsPage() {
         <div className="glass-card p-5">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
-              <i className='bx bx-line-chart text-xl text-blue-500'></i>
+              <i className='bx bx-wallet text-xl text-blue-500'></i>
             </div>
             <span className="text-sm text-muted-foreground">Total Investido</span>
           </div>
@@ -130,7 +130,7 @@ export default function InvestmentsPage() {
 
       {investments.length === 0 ? (
         <div className="glass-card p-12 text-center">
-          <i className='bx bx-line-chart text-4xl text-muted-foreground mb-4'></i>
+          <i className='bx bx-trending-up text-4xl text-muted-foreground mb-4'></i>
           <h3 className="font-display font-semibold mb-2">Nenhum investimento cadastrado</h3>
           <p className="text-muted-foreground mb-6">Comece adicionando seu primeiro investimento</p>
           <Link href="/app/investments/new" className="btn-primary">

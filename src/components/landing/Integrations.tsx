@@ -14,7 +14,7 @@ const integrations = [
   {
     name: 'Pluggy',
     description: 'Conexão com bancos brasileiros',
-    icon: 'bx-plug',
+    icon: 'bx-share',
     color: 'from-blue-500 to-cyan-600',
   },
   {
@@ -31,7 +31,7 @@ const Integrations = () => {
       <div className="container-custom">
         <div className="text-center mb-16">
           <span className="badge-pill mb-4">
-            <i className='bx bx-plug'></i>
+            <i className='bx bx-share'></i>
             Integrações
           </span>
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4">

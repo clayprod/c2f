@@ -16,7 +16,15 @@
       "Bash(docker-compose build:*)",
       "Bash(docker run:*)",
       "Bash(docker-compose logs:*)",
-      "Bash(docker exec:*)"
+      "Bash(docker exec:*)",
+      "mcp__chrome-devtools__list_pages",
+      "mcp__chrome-devtools__navigate_page",
+      "mcp__chrome-devtools__list_network_requests",
+      "mcp__chrome-devtools__list_console_messages",
+      "mcp__chrome-devtools__take_screenshot",
+      "mcp__chrome-devtools__evaluate_script",
+      "mcp__chrome-devtools__handle_dialog",
+      "mcp__chrome-devtools__take_snapshot"
     ]
   }
 }

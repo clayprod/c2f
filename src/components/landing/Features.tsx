@@ -1,6 +1,6 @@
 const features = [
   {
-    icon: 'bx-line-chart',
+    icon: 'bx-trending-up',
     title: 'Dashboard Inteligente',
     description: 'Visualize receitas, despesas e saldo em tempo real com gráficos interativos.',
   },
@@ -20,7 +20,7 @@ const features = [
     description: 'Insights personalizados e ações sugeridas pela inteligência artificial.',
   },
   {
-    icon: 'bx-plug',
+    icon: 'bx-share',
     title: 'Integração Bancária',
     description: 'Conecte seus bancos via Pluggy/Open Finance (opcional).',
   },
@@ -56,7 +56,7 @@ const Features = () => {
               style={{ animationDelay: `${index * 0.1}s` }}
             >
               <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
-                <i className={`${feature.icon} text-2xl text-primary`}></i>
+                <i className={`bx ${feature.icon} text-2xl text-primary`}></i>
               </div>
               <h3 className="font-display font-semibold text-lg mb-2">{feature.title}</h3>
               <p className="text-muted-foreground text-sm leading-relaxed">{feature.description}</p>
