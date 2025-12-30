@@ -1,0 +1,17 @@
+---
+description: "USE WHEN mexendo em Dockerfile, docker-compose, GitHub Actions, GHCR e deploy automático."
+globs: ".github/workflows/**,Dockerfile*,docker/**,compose*.yml"
+alwaysApply: false
+---
+
+# CI/CD Docker + GHCR
+
+## Pipeline mínimo
+- lint + typecheck + tests
+- build
+- docker build
+- push ghcr (tag por SHA e tag estável quando fizer sentido)
+
+## Segurança
+- secrets só via GitHub Secrets/Environments
+- evitar print de env em logs

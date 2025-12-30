@@ -1,0 +1,25 @@
+---
+description: "USE WHEN implementando AI Advisor, chat/insights, recomendações, análises e ações sugeridas."
+alwaysApply: false
+---
+
+# AI Advisor (diferencial do SaaS)
+
+## Princípio
+O Advisor não é só chat: ele deve produzir recomendações e ações com estrutura.
+
+## Saídas estruturadas (obrigatório)
+Toda resposta do Advisor deve retornar:
+- summary: texto curto
+- insights[]: lista de achados (ex: 'gasto alto em restaurantes')
+- actions[]: ações sugeridas com tipo + payload (ex: create_transaction, adjust_budget, create_goal)
+- confidence: baixa/média/alta
+- citations: referências internas (ids de transações/contas/orçamentos usados)
+
+## Regras de segurança/privacidade
+- Não expor dados sensíveis no prompt (mascarar descrições quando possível).
+- Registrar auditoria das ações sugeridas/aplicadas (quem, quando, o que mudou).
+
+## Produto
+- Advisor deve respeitar limites do plano (features, volume, periodicidade).
+- Para planos pagos: habilitar análises avançadas (projeções, anomalias, alertas).

@@ -3,14 +3,14 @@ const steps = [
     number: '01',
     title: 'Planilhas e bagunça',
     description: 'Dados espalhados, sem visibilidade real do seu dinheiro.',
-    icon: 'bx-spreadsheet',
+    icon: 'bx-table',
     status: 'before',
   },
   {
     number: '02',
     title: 'Importação inteligente',
     description: 'Importe CSV, OFX ou conecte seus bancos automaticamente.',
-    icon: 'bx-import',
+    icon: 'bx-folder-open',
     status: 'progress',
   },
   {
@@ -24,7 +24,7 @@ const steps = [
     number: '04',
     title: 'Advisor com ações e alertas',
     description: 'IA que detecta anomalias e sugere ações concretas.',
-    icon: 'bx-bot',
+    icon: 'bx-brain',
     status: 'after',
   },
 ];

@@ -1,0 +1,19 @@
+# Pasta para logos do c2Finance
+
+Coloque os seguintes arquivos de logo nesta pasta:
+
+1. **logo-primary.png** - Logo principal "HELLO" estilizado (branco sobre fundo preto)
+   - Usado como logo padrão na aplicação
+   - Dimensões recomendadas: 240x80px ou proporcional
+
+2. **logo-light.png** - Logo branco/claro (para fundos escuros)
+   - Usado em temas escuros
+   - Dimensões recomendadas: 240x80px ou proporcional
+
+3. **logo-dark.png** - Logo preto/escuro (para fundos claros)
+   - Usado em temas claros
+   - Dimensões recomendadas: 240x80px ou proporcional
+
+Os componentes já estão configurados para usar esses logos automaticamente através do helper `src/lib/logo.ts`.
+
+

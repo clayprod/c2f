@@ -1,9 +1,9 @@
 const logos = [
-  { name: 'TechCorp', icon: 'bx-buildings' },
+  { name: 'TechCorp', icon: 'bx-building' },
   { name: 'StartupX', icon: 'bx-rocket' },
   { name: 'FinanceY', icon: 'bx-line-chart' },
   { name: 'CloudZ', icon: 'bx-cloud' },
-  { name: 'DataHub', icon: 'bx-data' },
+  { name: 'DataHub', icon: 'bx-server' },
 ];
 
 const LogoCloud = () => {

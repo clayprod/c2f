@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(claude mcp add:*)",
+      "Bash(curl:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(npm run build:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker logs:*)",
+      "Bash(npx supabase:*)",
+      "Bash(xxd:*)",
+      "Bash(powershell -Command \"$content = Get-Content .env -Raw -Encoding UTF8; $content = $content -replace ''^\\\\xEF\\\\xBB\\\\xBF'', ''''; [System.IO.File]::WriteAllText\\(''.env'', $content, [System.Text.UTF8Encoding]::new\\($false\\)\\)\")",
+      "Bash(docker-compose down:*)",
+      "Bash(docker-compose ps:*)",
+      "Bash(docker-compose build:*)",
+      "Bash(docker run:*)",
+      "Bash(docker-compose logs:*)",
+      "Bash(docker exec:*)"
+    ]
+  }
+}

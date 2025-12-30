@@ -1,0 +1,19 @@
+---
+description: "USE WHEN criando schema, migrations, políticas RLS, e queries no banco."
+alwaysApply: false
+---
+
+# Supabase / Postgres / RLS
+
+## Multi-tenant
+- Tudo deve ser isolado por user_id ou org_id (decida 1 padrão e aplique em tudo).
+- Tabelas com dados do usuário devem ter owner_id/org_id.
+
+## RLS
+- RLS habilitado por padrão em todas as tabelas do domínio do usuário.
+- Policies completas: SELECT/INSERT/UPDATE/DELETE.
+- Nunca usar service role no runtime do client.
+
+## Performance
+- Índices para colunas de filtro frequente (owner_id, date, category_id, account_id).
+- Evitar N+1 e queries duplicadas em dashboard; considerar views/materializações.

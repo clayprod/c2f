@@ -44,7 +44,7 @@ const Demo = () => {
           {/* Video Placeholder */}
           <div className="order-1 lg:order-2">
             <div className="glass-card p-2 relative group cursor-pointer">
-              <div className="aspect-video bg-gradient-to-br from-muted to-card rounded-xl overflow-hidden relative">
+              <div className="aspect-video bg-gradient-to-br from-muted to-card rounded-xl overflow-hidden relative max-h-[400px]">
                 {/* Mock video thumbnail */}
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center group-hover:scale-110 transition-transform backdrop-blur-sm border border-primary/30">

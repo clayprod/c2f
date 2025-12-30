@@ -1,6 +1,9 @@
+'use client';
+
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import logo from '@/assets/logo.png';
+import Link from 'next/link';
+import { getLogo } from '@/lib/logo';
+import Image from 'next/image';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -17,11 +20,15 @@ const Navbar = () => {
       <div className="container-custom">
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
-          <Link to="/" className="flex items-center">
-            <img 
-              src={logo} 
-              alt="c2Finance" 
-              className="h-8 md:h-10 w-auto invert"
+          <Link href="/" className="flex items-center">
+            <Image
+              src={getLogo('auto')}
+              alt="c2Finance"
+              width={120}
+              height={40}
+              className="h-8 md:h-10 w-auto"
+              style={{ objectFit: 'contain' }}
+              priority
             />
           </Link>
 
@@ -41,12 +48,12 @@ const Navbar = () => {
           {/* Desktop CTAs */}
           <div className="hidden md:flex items-center gap-4">
             <Link
-              to="/login"
+              href="/login"
               className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium"
             >
               Entrar
             </Link>
-            <Link to="/signup" className="btn-primary text-sm py-2 px-5">
+            <Link href="/signup" className="btn-primary text-sm py-2 px-5">
               Começar grátis
             </Link>
           </div>
@@ -76,12 +83,12 @@ const Navbar = () => {
               ))}
               <div className="flex flex-col gap-3 pt-4 border-t border-border/50">
                 <Link
-                  to="/login"
+                  href="/login"
                   className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium py-2"
                 >
                   Entrar
                 </Link>
-                <Link to="/signup" className="btn-primary text-sm py-2.5 text-center">
+                <Link href="/signup" className="btn-primary text-sm py-2.5 text-center">
                   Começar grátis
                 </Link>
               </div>

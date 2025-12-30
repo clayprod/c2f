@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 
 const CTA = () => {
   return (
@@ -18,12 +18,12 @@ const CTA = () => {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link to="/signup" className="btn-primary text-base w-full sm:w-auto">
+            <Link href="/signup" className="btn-primary w-full sm:w-auto">
               <i className='bx bx-rocket'></i>
               Começar grátis
             </Link>
-            <a href="mailto:suporte@c2finance.com" className="btn-secondary text-base w-full sm:w-auto">
-              <i className='bx bx-support'></i>
+            <a href="mailto:suporte@c2finance.com" className="btn-secondary w-full sm:w-auto">
+              <i className='bx bx-headphone'></i>
               Falar com suporte
             </a>
           </div>

@@ -2,13 +2,13 @@ const integrations = [
   {
     name: 'Stripe',
     description: 'Pagamentos e cobranças recorrentes',
-    icon: 'bx-credit-card',
+    icon: 'bx-card',
     color: 'from-violet-500 to-purple-600',
   },
   {
     name: 'Supabase',
     description: 'Banco de dados seguro e escalável',
-    icon: 'bx-data',
+    icon: 'bx-server',
     color: 'from-emerald-500 to-green-600',
   },
   {
@@ -20,7 +20,7 @@ const integrations = [
   {
     name: 'n8n',
     description: 'Automações e workflows opcionais',
-    icon: 'bx-git-branch',
+    icon: 'bx-code-alt',
     color: 'from-orange-500 to-red-600',
   },
 ];
@@ -48,7 +48,7 @@ const Integrations = () => {
               <div
                 className={`w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br ${integration.color} flex items-center justify-center group-hover:scale-110 transition-transform`}
               >
-                <i className={`bx ${integration.icon} text-2xl text-white`}></i>
+                <i className={`${integration.icon} text-2xl text-white`}></i>
               </div>
               <h3 className="font-display font-semibold mb-1">{integration.name}</h3>
               <p className="text-muted-foreground text-xs">{integration.description}</p>

@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 
 const Hero = () => {
   return (
@@ -14,7 +14,7 @@ const Hero = () => {
           {/* Badge */}
           <div className="fade-in-up stagger-1 mb-6">
             <span className="badge-pill">
-              <i className='bx bx-bot'></i>
+              <i className='bx bx-brain'></i>
               AI-Powered Financial Control
             </span>
           </div>
@@ -33,11 +33,11 @@ const Hero = () => {
 
           {/* CTAs */}
           <div className="fade-in-up stagger-4 flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
-            <Link to="/signup" className="btn-primary text-base w-full sm:w-auto">
+            <Link href="/signup" className="btn-primary w-full sm:w-auto">
               <i className='bx bx-rocket'></i>
               Começar grátis
             </Link>
-            <a href="#demo" className="btn-secondary text-base w-full sm:w-auto">
+            <a href="#demo" className="btn-secondary w-full sm:w-auto">
               <i className='bx bx-play-circle'></i>
               Ver demo
             </a>
@@ -53,7 +53,7 @@ const Hero = () => {
         {/* Hero Visual */}
         <div className="fade-in-up stagger-6 mt-16 md:mt-20 relative">
           <div className="glass-card p-2 md:p-4 mx-auto max-w-5xl">
-            <div className="bg-card rounded-xl overflow-hidden aspect-video relative">
+            <div className="bg-card rounded-xl overflow-hidden aspect-video relative max-h-[600px]">
               {/* Mock Dashboard Preview */}
               <div className="absolute inset-0 bg-gradient-to-br from-card via-card to-muted/50 p-4 md:p-8">
                 <div className="flex gap-4 h-full">

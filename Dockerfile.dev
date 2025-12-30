@@ -1,0 +1,25 @@
+# Dockerfile para desenvolvimento com hot reload
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Instalar dependências
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+# Copiar código fonte
+COPY . .
+
+# Expor porta
+EXPOSE 3000
+
+# Variáveis de ambiente para desenvolvimento
+ENV NODE_ENV=development
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+
+# Comando para desenvolvimento com hot reload
+CMD ["npm", "run", "dev"]
+
+

@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 
 const plans = [
   {
@@ -58,7 +58,7 @@ const Pricing = () => {
       <div className="container-custom">
         <div className="text-center mb-16">
           <span className="badge-pill mb-4">
-            <i className='bx bx-purchase-tag'></i>
+            <i className='bx bx-tag'></i>
             Preços
           </span>
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
@@ -104,7 +104,7 @@ const Pricing = () => {
               </ul>
 
               <Link
-                to="/signup"
+                href="/signup"
                 className={`w-full text-center ${plan.popular ? 'btn-primary' : 'btn-secondary'}`}
               >
                 {plan.cta}

@@ -1,4 +1,6 @@
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
+import Image from 'next/image';
+import { getLogo } from '@/lib/logo';
 
 const footerLinks = {
   produto: [
@@ -28,24 +30,29 @@ const Footer = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           {/* Logo */}
           <div className="col-span-2 md:col-span-1">
-            <Link to="/" className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                <i className='bx bx-wallet text-primary-foreground text-lg'></i>
-              </div>
-              <span className="font-display font-bold text-xl text-foreground">c2Finance</span>
+            <Link href="/" className="flex items-center mb-4">
+              <Image
+                src={getLogo('auto')}
+                alt="c2Finance" 
+                width={120}
+                height={40}
+                className="h-8 w-auto"
+                style={{ objectFit: 'contain' }}
+                priority
+              />
             </Link>
             <p className="text-muted-foreground text-sm mb-4">
               Controle financeiro inteligente com AI Advisor.
             </p>
             <div className="flex gap-4">
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                <i className='bx bxl-twitter text-xl'></i>
+              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors" aria-label="Twitter">
+                <i className='bxl bx-twitter text-xl'></i>
               </a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                <i className='bx bxl-linkedin text-xl'></i>
+              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors" aria-label="LinkedIn">
+                <i className='bxl bx-linkedin text-xl'></i>
               </a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                <i className='bx bxl-instagram text-xl'></i>
+              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors" aria-label="Instagram">
+                <i className='bxl bx-instagram text-xl'></i>
               </a>
             </div>
           </div>

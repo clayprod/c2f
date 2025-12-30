@@ -1,0 +1,162 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { getUserId } from '@/lib/auth';
+import { transactionSchema } from '@/lib/validation/schemas';
+import { createErrorResponse } from '@/lib/errors';
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const userId = await getUserId();
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { id } = params;
+    const supabase = await createClient();
+    
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*, accounts(*), categories(*)')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single();
+
+    if (error) throw error;
+    if (!data) {
+      return NextResponse.json({ error: 'Transaction not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ data });
+  } catch (error) {
+    const errorResponse = createErrorResponse(error);
+    return NextResponse.json(
+      { error: errorResponse.error },
+      { status: errorResponse.statusCode }
+    );
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const userId = await getUserId();
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { id } = params;
+    const body = await request.json();
+    const validated = transactionSchema.partial().parse(body);
+
+    const supabase = await createClient();
+    
+    // Verify ownership
+    const { data: existing } = await supabase
+      .from('transactions')
+      .select('id')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single();
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Transaction not found' }, { status: 404 });
+    }
+
+    // Prepare update data
+    const updateData: any = {};
+    if (validated.account_id !== undefined) updateData.account_id = validated.account_id;
+    if (validated.category_id !== undefined) updateData.category_id = validated.category_id;
+    if (validated.posted_at !== undefined) updateData.posted_at = validated.posted_at;
+    if (validated.description !== undefined) updateData.description = validated.description;
+    if (validated.amount_cents !== undefined) {
+      let amount = validated.amount_cents / 100;
+      if (validated.type === 'expense' && amount > 0) {
+        amount = -amount;
+      } else if (validated.type === 'income' && amount < 0) {
+        amount = Math.abs(amount);
+      }
+      updateData.amount = amount;
+    }
+    if (validated.currency !== undefined) updateData.currency = validated.currency;
+    if (validated.notes !== undefined) updateData.notes = validated.notes;
+    // Extended fields
+    if (validated.is_recurring !== undefined) updateData.is_recurring = validated.is_recurring;
+    if (validated.recurrence_rule !== undefined) updateData.recurrence_rule = validated.recurrence_rule;
+    if (validated.installment_number !== undefined) updateData.installment_number = validated.installment_number;
+    if (validated.installment_total !== undefined) updateData.installment_total = validated.installment_total;
+
+    const { data, error } = await supabase
+      .from('transactions')
+      .update(updateData)
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select('*, accounts(*), categories(*)')
+      .single();
+
+    if (error) throw error;
+
+    return NextResponse.json({ data });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'ZodError') {
+      return NextResponse.json(
+        { error: 'Validation error', details: error },
+        { status: 400 }
+      );
+    }
+    const errorResponse = createErrorResponse(error);
+    return NextResponse.json(
+      { error: errorResponse.error },
+      { status: errorResponse.statusCode }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const userId = await getUserId();
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { id } = params;
+    const supabase = await createClient();
+    
+    // Verify ownership
+    const { data: existing } = await supabase
+      .from('transactions')
+      .select('id')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single();
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Transaction not found' }, { status: 404 });
+    }
+
+    const { error } = await supabase
+      .from('transactions')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userId);
+
+    if (error) throw error;
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    const errorResponse = createErrorResponse(error);
+    return NextResponse.json(
+      { error: errorResponse.error },
+      { status: errorResponse.statusCode }
+    );
+  }
+}
+
+
