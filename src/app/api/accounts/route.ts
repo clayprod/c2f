@@ -1,26 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientFromRequest } from '@/lib/supabase/server';
 import { getUserId } from '@/lib/auth';
 import { accountSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = await createClient();
+    const { supabase } = createClientFromRequest(request);
     const { data, error } = await supabase
       .from('accounts')
       .select('*')
       .eq('user_id', userId)
+      .neq('type', 'credit_card')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
 
-    return NextResponse.json({ data });
+    // Convert current_balance (NUMERIC) to balance_cents (BIGINT) for API response
+    const transformedData = (data || []).map((account: any) => ({
+      ...account,
+      balance_cents: Math.round((account.current_balance || 0) * 100),
+    }));
+
+    return NextResponse.json({ data: transformedData });
   } catch (error) {
     const errorResponse = createErrorResponse(error);
     return NextResponse.json(
@@ -32,7 +39,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -40,13 +47,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validated = accountSchema.parse(body);
 
-    const supabase = await createClient();
+    const { supabase } = createClientFromRequest(request);
     const { data, error } = await supabase
       .from('accounts')
       .insert({
         name: validated.name,
         type: validated.type,
-        current_balance: validated.balance_cents / 100, // Convert cents to reais
+        current_balance: validated.balance_cents / 100, // Convert cents to NUMERIC (reais)
         currency: validated.currency,
         institution: validated.institution,
         user_id: userId,
@@ -56,7 +63,13 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json({ data }, { status: 201 });
+    // Convert current_balance (NUMERIC) to balance_cents (BIGINT) for API response
+    const transformedData = {
+      ...data,
+      balance_cents: Math.round((data.current_balance || 0) * 100),
+    };
+
+    return NextResponse.json({ data: transformedData }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.name === 'ZodError') {
       return NextResponse.json(

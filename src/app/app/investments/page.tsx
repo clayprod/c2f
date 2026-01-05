@@ -2,6 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import TransactionForm from '@/components/transactions/TransactionForm';
+import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 interface Investment {
   id: string;
@@ -12,15 +22,95 @@ interface Investment {
   current_value_cents: number;
   status: string;
   purchase_date: string;
+  account_id?: string;
+  category_id?: string;
 }
 
 export default function InvestmentsPage() {
   const [investments, setInvestments] = useState<Investment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showSellDialog, setShowSellDialog] = useState(false);
+  const [selectedInvestment, setSelectedInvestment] = useState<Investment | null>(null);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [sellLoading, setSellLoading] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchInvestments();
   }, []);
+
+  useEffect(() => {
+    if (showSellDialog) {
+      fetchData();
+    }
+  }, [showSellDialog]);
+
+  const fetchData = async () => {
+    try {
+      const [accountsRes, categoriesRes] = await Promise.all([
+        fetch('/api/accounts'),
+        fetch('/api/categories'),
+      ]);
+      const accountsData = await accountsRes.json();
+      const categoriesData = await categoriesRes.json();
+      if (accountsData.data) setAccounts(accountsData.data);
+      if (categoriesData.data) setCategories(categoriesData.data);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    }
+  };
+
+  const handleSellClick = (investment: Investment) => {
+    setSelectedInvestment(investment);
+    setShowSellDialog(true);
+  };
+
+  const handleSellTransaction = async (data: any) => {
+    if (!selectedInvestment) return;
+
+    try {
+      setSellLoading(true);
+      // Create transaction
+      const response = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erro ao criar transação');
+      }
+
+      // Update investment status to 'sold'
+      const updateResponse = await fetch(`/api/investments/${selectedInvestment.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'sold',
+          current_value_cents: data.amount_cents ? Math.abs(data.amount_cents) : selectedInvestment.current_value_cents,
+        }),
+      });
+
+      if (!updateResponse.ok) {
+        throw new Error('Erro ao atualizar status do investimento');
+      }
+
+      setShowSellDialog(false);
+      setSelectedInvestment(null);
+      // Reload investments
+      fetchInvestments();
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Erro ao processar venda",
+        description: error.message || "Ocorreu um erro ao tentar processar a venda do investimento",
+      });
+    } finally {
+      setSellLoading(false);
+    }
+  };
 
   const fetchInvestments = async () => {
     try {
@@ -178,7 +268,7 @@ export default function InvestmentsPage() {
                   </Link>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4 text-sm">
+                <div className="grid grid-cols-3 gap-4 text-sm mb-4">
                   <div>
                     <p className="text-muted-foreground">Investido</p>
                     <p className="font-semibold">
@@ -200,10 +290,46 @@ export default function InvestmentsPage() {
                     </p>
                   </div>
                 </div>
+
+                {investment.status === 'active' && (
+                  <Button
+                    onClick={() => handleSellClick(investment)}
+                    className="w-full"
+                    variant="outline"
+                  >
+                    <i className='bx bx-money'></i>
+                    Vender
+                  </Button>
+                )}
               </div>
             );
           })}
         </div>
+      )}
+
+      {/* Sell Dialog */}
+      {selectedInvestment && (
+        <Dialog open={showSellDialog} onOpenChange={setShowSellDialog}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Vender Investimento</DialogTitle>
+            </DialogHeader>
+            <TransactionForm
+              open={showSellDialog}
+              onOpenChange={setShowSellDialog}
+              onSubmit={handleSellTransaction}
+              accounts={accounts}
+              categories={categories}
+              transaction={{
+                account_id: selectedInvestment.account_id || '',
+                category_id: selectedInvestment.category_id || '',
+                posted_at: format(new Date(), 'yyyy-MM-dd'),
+                description: `Venda: ${selectedInvestment.name}`,
+                amount: '',
+              }}
+            />
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

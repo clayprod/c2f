@@ -24,13 +24,20 @@ interface TransactionTableProps {
   onEdit: (transaction: Transaction) => void;
   onDelete: (id: string) => void;
   loading?: boolean;
+  sorting?: {
+    sortBy: 'posted_at' | 'amount';
+    sortOrder: 'asc' | 'desc';
+  };
+  onSortChange?: (sorting: { sortBy: 'posted_at' | 'amount'; sortOrder: 'asc' | 'desc' }) => void;
 }
 
 export default function TransactionTable({ 
   transactions, 
   onEdit, 
   onDelete,
-  loading = false 
+  loading = false,
+  sorting = { sortBy: 'posted_at', sortOrder: 'desc' },
+  onSortChange
 }: TransactionTableProps) {
   const formatCurrency = (value: number | string) => {
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
@@ -42,6 +49,33 @@ export default function TransactionTable({
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('pt-BR');
+  };
+
+  const handleSort = (column: 'posted_at' | 'amount') => {
+    if (!onSortChange) return;
+    
+    if (sorting.sortBy === column) {
+      // Toggle order if same column
+      onSortChange({
+        sortBy: column,
+        sortOrder: sorting.sortOrder === 'asc' ? 'desc' : 'asc',
+      });
+    } else {
+      // New column, default to desc
+      onSortChange({
+        sortBy: column,
+        sortOrder: 'desc',
+      });
+    }
+  };
+
+  const SortIcon = ({ column }: { column: 'posted_at' | 'amount' }) => {
+    if (sorting.sortBy !== column) {
+      return <i className='bx bx-sort text-muted-foreground/50'></i>;
+    }
+    return sorting.sortOrder === 'asc' 
+      ? <i className='bx bx-sort-up text-primary'></i>
+      : <i className='bx bx-sort-down text-primary'></i>;
   };
 
   if (loading) {
@@ -71,8 +105,24 @@ export default function TransactionTable({
               <th className="text-left py-4 px-6 text-sm font-medium text-muted-foreground">Descrição</th>
               <th className="text-left py-4 px-6 text-sm font-medium text-muted-foreground">Categoria</th>
               <th className="text-left py-4 px-6 text-sm font-medium text-muted-foreground">Conta</th>
-              <th className="text-left py-4 px-6 text-sm font-medium text-muted-foreground">Data</th>
-              <th className="text-right py-4 px-6 text-sm font-medium text-muted-foreground">Valor</th>
+              <th 
+                className={`text-left py-4 px-6 text-sm font-medium text-muted-foreground ${onSortChange ? 'cursor-pointer hover:text-foreground transition-colors select-none' : ''}`}
+                onClick={() => handleSort('posted_at')}
+              >
+                <div className="flex items-center gap-2">
+                  Data
+                  {onSortChange && <SortIcon column="posted_at" />}
+                </div>
+              </th>
+              <th 
+                className={`text-right py-4 px-6 text-sm font-medium text-muted-foreground ${onSortChange ? 'cursor-pointer hover:text-foreground transition-colors select-none' : ''}`}
+                onClick={() => handleSort('amount')}
+              >
+                <div className="flex items-center justify-end gap-2">
+                  Valor
+                  {onSortChange && <SortIcon column="amount" />}
+                </div>
+              </th>
               <th className="text-center py-4 px-6 text-sm font-medium text-muted-foreground">Ações</th>
             </tr>
           </thead>

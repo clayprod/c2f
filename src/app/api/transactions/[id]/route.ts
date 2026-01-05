@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getUserId } from '@/lib/auth';
 import { transactionSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
+import { z } from 'zod';
 
 export async function GET(
   request: NextRequest,
@@ -29,7 +30,13 @@ export async function GET(
       return NextResponse.json({ error: 'Transaction not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ data });
+    // Convert amount (NUMERIC) to amount_cents (BIGINT) for API response
+    const transformedData = {
+      ...data,
+      amount_cents: Math.round((data.amount || 0) * 100),
+    };
+
+    return NextResponse.json({ data: transformedData });
   } catch (error) {
     const errorResponse = createErrorResponse(error);
     return NextResponse.json(
@@ -51,7 +58,27 @@ export async function PATCH(
 
     const { id } = params;
     const body = await request.json();
-    const validated = transactionSchema.partial().parse(body);
+
+    // Create a partial transaction schema for PATCH request
+    const partialTransactionSchema = z.object({
+      account_id: z.string().uuid('ID da conta inválido').optional(),
+      category_id: z.string().uuid('ID da categoria inválido').optional().or(z.literal('')).transform(val => val || undefined).optional(),
+      posted_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (use YYYY-MM-DD)').optional(),
+      description: z.string().min(1, 'Descrição é obrigatória').optional(),
+      amount_cents: z.number().int('Valor deve ser em centavos (número inteiro)').optional(),
+      currency: z.string().default('BRL').optional(),
+      notes: z.string().optional().or(z.literal('')).transform(val => val || undefined).optional(),
+      type: z.enum(['income', 'expense']).optional(),
+      source: z.enum(['manual', 'pluggy', 'import']).default('manual').optional(),
+      provider_tx_id: z.string().optional(),
+      is_recurring: z.boolean().default(false).optional(),
+      recurrence_rule: z.string().optional().or(z.literal('')).transform(val => val || undefined).optional(),
+      contribution_frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).optional(),
+      installment_number: z.number().int().positive().optional(),
+      installment_total: z.number().int().positive().optional(),
+    });
+
+    const validated = partialTransactionSchema.parse(body);
 
     const supabase = await createClient();
     
@@ -100,7 +127,13 @@ export async function PATCH(
 
     if (error) throw error;
 
-    return NextResponse.json({ data });
+    // Convert amount (NUMERIC) to amount_cents (BIGINT) for API response
+    const transformedData = {
+      ...data,
+      amount_cents: Math.round((data.amount || 0) * 100),
+    };
+
+    return NextResponse.json({ data: transformedData });
   } catch (error) {
     if (error instanceof Error && error.name === 'ZodError') {
       return NextResponse.json(
@@ -158,5 +191,7 @@ export async function DELETE(
     );
   }
 }
+
+
 
 

@@ -24,7 +24,21 @@
       "mcp__chrome-devtools__take_screenshot",
       "mcp__chrome-devtools__evaluate_script",
       "mcp__chrome-devtools__handle_dialog",
-      "mcp__chrome-devtools__take_snapshot"
+      "mcp__chrome-devtools__take_snapshot",
+      "Bash(wc:*)",
+      "Bash(docker-compose:*)",
+      "Bash(grep:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run type-check:*)",
+      "Bash(\"https://ndlqyqfxvlalootwdjxv.supabase.co/rest/v1/rpc/exec_sql\" )",
+      "Bash(PGPASSWORD='Hgcn2hpn**12' psql:*)",
+      "Bash(node run-migration.mjs:*)",
+      "mcp__chrome-devtools__fill",
+      "mcp__chrome-devtools__click",
+      "Bash(npm run dev:*)",
+      "Bash(timeout /t 5 /nobreak)",
+      "Bash(test:*)",
+      "Bash(node -e:*)"
     ]
   }
 }

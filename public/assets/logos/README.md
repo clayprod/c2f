@@ -31,3 +31,6 @@ const logo = getLogo('dark');
 - `src/components/landing/Navbar.tsx` - Navegação da landing page
 
 
+
+
+

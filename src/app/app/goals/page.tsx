@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { Switch } from '@/components/ui/switch';
 
 interface Goal {
   id: string;
@@ -15,11 +16,14 @@ interface Goal {
   priority: string;
   icon: string;
   color: string;
+  image_url?: string;
+  image_position?: string;
 }
 
 export default function GoalsPage() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCompleted, setShowCompleted] = useState(true);
 
   useEffect(() => {
     fetchGoals();
@@ -46,6 +50,25 @@ export default function GoalsPage() {
     }).format(cents / 100);
   };
 
+  const handleMarkAsCompleted = async (goalId: string) => {
+    try {
+      const response = await fetch(`/api/goals/${goalId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'completed' }),
+      });
+
+      if (response.ok) {
+        // Refresh goals list
+        fetchGoals();
+      } else {
+        console.error('Error marking goal as completed');
+      }
+    } catch (error) {
+      console.error('Error marking goal as completed:', error);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
@@ -69,6 +92,7 @@ export default function GoalsPage() {
 
   const activeGoals = goals.filter(g => g.status === 'active');
   const completedGoals = goals.filter(g => g.status === 'completed');
+  const displayedGoals = showCompleted ? goals : activeGoals;
   const totalTarget = activeGoals.reduce((sum, g) => sum + g.target_amount_cents, 0);
   const totalCurrent = activeGoals.reduce((sum, g) => sum + g.current_amount_cents, 0);
 
@@ -79,10 +103,19 @@ export default function GoalsPage() {
           <h1 className="font-display text-2xl md:text-3xl font-bold">Objetivos</h1>
           <p className="text-muted-foreground">Crie metas e poupe com "caixinhas"</p>
         </div>
-        <Link href="/app/goals/new" className="btn-primary">
-          <i className='bx bx-plus'></i>
-          Novo Objetivo
-        </Link>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer hover:bg-muted/80">
+            <Switch
+              checked={showCompleted}
+              onCheckedChange={setShowCompleted}
+            />
+            <span>Mostrar concluídos</span>
+          </label>
+          <Link href="/app/goals/new" className="btn-primary">
+            <i className='bx bx-plus'></i>
+            Novo Objetivo
+          </Link>
+        </div>
       </div>
 
       {/* Summary */}
@@ -101,7 +134,7 @@ export default function GoalsPage() {
           <div className="glass-card p-5">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
-                <i className='bx bx-coin-stack text-xl text-green-500'></i>
+                <i className='bx bx-coin text-xl text-green-500'></i>
               </div>
               <span className="text-sm text-muted-foreground">Total Poupado</span>
             </div>
@@ -111,7 +144,7 @@ export default function GoalsPage() {
           <div className="glass-card p-5">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
-                <i className='bx bx-target-lock text-xl text-blue-500'></i>
+                <i className='bx bx-bullseye text-xl text-blue-500'></i>
               </div>
               <span className="text-sm text-muted-foreground">Meta Total</span>
             </div>
@@ -134,85 +167,137 @@ export default function GoalsPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {activeGoals.length > 0 && (
+          {displayedGoals.length > 0 && (
             <div>
-              <h2 className="font-display font-semibold mb-4">Objetivos Ativos</h2>
+              <h2 className="font-display font-semibold mb-4">
+                {showCompleted ? 'Todos os Objetivos' : 'Objetivos Ativos'}
+              </h2>
               <div className="grid gap-4">
-                {activeGoals.map((goal) => (
-                  <div key={goal.id} className="glass-card p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-4 flex-1">
-                        <div
-                          className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
-                          style={{ backgroundColor: `${goal.color}20`, color: goal.color }}
-                        >
-                          {goal.icon}
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="font-display font-semibold text-lg mb-1">{goal.name}</h3>
-                          {goal.description && (
-                            <p className="text-sm text-muted-foreground mb-2">{goal.description}</p>
-                          )}
-                          {goal.target_date && (
-                            <p className="text-sm text-muted-foreground">
-                              Meta: {new Date(goal.target_date).toLocaleDateString('pt-BR')}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <Link
-                        href={`/app/goals/${goal.id}`}
-                        className="text-primary hover:underline text-sm"
-                      >
-                        Ver detalhes
-                      </Link>
-                    </div>
-
-                    <div className="mb-4">
-                      <div className="flex items-center justify-between text-sm mb-2">
-                        <span className="text-muted-foreground">Progresso</span>
-                        <span className="font-medium">
-                          {formatCurrency(goal.current_amount_cents)} / {formatCurrency(goal.target_amount_cents)}
-                        </span>
-                      </div>
-                      <div className="w-full bg-muted/20 rounded-full h-3">
-                        <div
-                          className="bg-primary rounded-full h-3 transition-all"
-                          style={{ width: `${Math.min(goal.progress_percentage || 0, 100)}%` }}
+                {displayedGoals.map((goal) => (
+                  <div key={goal.id} className="glass-card overflow-hidden">
+                    {goal.image_url ? (
+                      <div className="relative h-48 overflow-hidden">
+                        <img
+                          src={goal.image_url}
+                          alt={goal.name}
+                          className="w-full h-full object-cover"
+                          style={{ objectPosition: goal.image_position || 'center' }}
                         />
+                        <div className="absolute inset-0 bg-gradient-to-t from-background/90 to-transparent" />
+                        <div className="absolute bottom-0 left-0 right-0 p-6">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3 flex-1">
+                              <div
+                                className="w-10 h-10 rounded-lg flex items-center justify-center text-xl backdrop-blur-sm"
+                                style={{ backgroundColor: `${goal.color}80`, color: 'white' }}
+                              >
+                                {goal.icon}
+                              </div>
+                              <div className="bg-black/50 px-3 py-2 rounded backdrop-blur-sm inline-block">
+                                <h3 className="font-display font-semibold text-lg mb-1 text-white">{goal.name}</h3>
+                                {goal.target_date && (
+                                  <p className="text-sm text-gray-200">
+                                    Meta: {new Date(goal.target_date).toLocaleDateString('pt-BR')}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              {goal.status === 'active' && (
+                                <button
+                                  onClick={() => handleMarkAsCompleted(goal.id)}
+                                  className="text-green-600 hover:text-green-700 text-sm bg-background/80 px-3 py-1 rounded backdrop-blur-sm flex items-center gap-1"
+                                  title="Marcar como concluído"
+                                >
+                                  <i className='bx bx-check-circle'></i>
+                                  Concluir
+                                </button>
+                              )}
+                              <Link
+                                href={`/app/goals/${goal.id}`}
+                                className="text-primary hover:underline text-sm bg-background/80 px-3 py-1 rounded backdrop-blur-sm"
+                              >
+                                Ver detalhes
+                              </Link>
+                              <Link
+                                href={`/app/goals/${goal.id}`}
+                                className="text-primary hover:underline text-sm bg-background/80 px-3 py-1 rounded backdrop-blur-sm"
+                              >
+                                Editar
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {goal.progress_percentage?.toFixed(1) || 0}% concluído
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+                    ) : (
+                      <div className="p-6">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center gap-4 flex-1">
+                            <div
+                              className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
+                              style={{ backgroundColor: `${goal.color}20`, color: goal.color }}
+                            >
+                              {goal.icon}
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="font-display font-semibold text-lg mb-1">{goal.name}</h3>
+                              {goal.description && (
+                                <p className="text-sm text-muted-foreground mb-2">{goal.description}</p>
+                              )}
+                              {goal.target_date && (
+                                <p className="text-sm text-muted-foreground">
+                                  Meta: {new Date(goal.target_date).toLocaleDateString('pt-BR')}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            {goal.status === 'active' && (
+                              <button
+                                onClick={() => handleMarkAsCompleted(goal.id)}
+                                className="text-green-600 hover:text-green-700 text-sm flex items-center gap-1"
+                                title="Marcar como concluído"
+                              >
+                                <i className='bx bx-check-circle'></i>
+                                Concluir
+                              </button>
+                            )}
+                            <Link
+                              href={`/app/goals/${goal.id}`}
+                              className="text-primary hover:underline text-sm"
+                            >
+                              Ver detalhes
+                            </Link>
+                            <Link
+                              href={`/app/goals/${goal.id}`}
+                              className="text-primary hover:underline text-sm"
+                            >
+                              Editar
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
-          {completedGoals.length > 0 && (
-            <div>
-              <h2 className="font-display font-semibold mb-4">Objetivos Concluídos</h2>
-              <div className="grid gap-4">
-                {completedGoals.map((goal) => (
-                  <div key={goal.id} className="glass-card p-6 opacity-75">
-                    <div className="flex items-center gap-4">
-                      <div
-                        className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
-                        style={{ backgroundColor: `${goal.color}20`, color: goal.color }}
-                      >
-                        {goal.icon}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-display font-semibold">{goal.name}</h3>
-                          <span className={`badge-pill text-xs ${getStatusColor(goal.status)}`}>
-                            Concluído
+                    <div className="p-6 pt-0">
+                      {goal.description && goal.image_url && (
+                        <p className="text-sm text-muted-foreground mb-4">{goal.description}</p>
+                      )}
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between text-sm mb-2">
+                          <span className="text-muted-foreground">Progresso</span>
+                          <span className="font-medium">
+                            {formatCurrency(goal.current_amount_cents)} / {formatCurrency(goal.target_amount_cents)}
                           </span>
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          {formatCurrency(goal.current_amount_cents)} / {formatCurrency(goal.target_amount_cents)}
+                        <div className="w-full bg-muted/20 rounded-full h-3">
+                          <div
+                            className="bg-primary rounded-full h-3 transition-all"
+                            style={{ width: `${Math.min(goal.progress_percentage || 0, 100)}%` }}
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {goal.progress_percentage?.toFixed(1) || 0}% concluído
                         </p>
                       </div>
                     </div>
@@ -226,4 +311,3 @@ export default function GoalsPage() {
     </div>
   );
 }
-

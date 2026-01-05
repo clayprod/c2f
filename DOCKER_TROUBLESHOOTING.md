@@ -70,3 +70,6 @@ A aplicação funciona perfeitamente sem Docker para desenvolvimento local, com 
 - ⚠️ Docker Desktop com problema no WSL (solução aplicada)
 
 
+
+
+

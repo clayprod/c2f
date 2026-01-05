@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { getLogo } from '@/lib/logo';
 import Image from 'next/image';
+import AdvisorDialog from './AdvisorDialog';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -14,7 +15,9 @@ interface AppLayoutProps {
 interface UserProfile {
   full_name: string | null;
   email: string;
+  avatar_url: string | null;
   plan: 'free' | 'pro' | 'business';
+  role?: string;
 }
 
 const planLabels: Record<string, { label: string; color: string }> = {
@@ -27,24 +30,61 @@ const menuItems = [
   { icon: 'bx-home', label: 'Dashboard', path: '/app' },
   { icon: 'bx-swap-horizontal', label: 'Transações', path: '/app/transactions' },
   { icon: 'bx-wallet', label: 'Contas', path: '/app/accounts' },
-  { icon: 'bx-category', label: 'Categorias', path: '/app/categories' },
+  { icon: 'bx-credit-card', label: 'Cartões', path: '/app/credit-cards' },
+  { icon: 'bx-categories', label: 'Categorias', path: '/app/categories' },
   { icon: 'bx-wallet-alt', label: 'Orçamentos', path: '/app/budgets' },
-  { icon: 'bx-credit-card', label: 'Dívidas', path: '/app/debts' },
+  { icon: 'bx-file', label: 'Dívidas', path: '/app/debts' },
   { icon: 'bx-trending-up', label: 'Investimentos', path: '/app/investments' },
+  { icon: 'bx-home-alt', label: 'Patrimônio', path: '/app/assets' },
   { icon: 'bx-bullseye', label: 'Objetivos', path: '/app/goals' },
-  { icon: 'bx-brain', label: 'Advisor', path: '/app/advisor' },
+  { icon: 'bx-bar-chart', label: 'Relatórios', path: '/app/reports' },
   { icon: 'bx-share', label: 'Integrações', path: '/app/integrations' },
 ];
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [showScrollUp, setShowScrollUp] = useState(false);
+  const [showScrollDown, setShowScrollDown] = useState(false);
+  const [advisorOpen, setAdvisorOpen] = useState(false);
+  const menuListRef = useRef<HTMLUListElement>(null);
   const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
     fetchUserProfile();
   }, []);
+
+  useEffect(() => {
+    const checkScroll = () => {
+      const list = menuListRef.current;
+      if (!list) return;
+
+      const { scrollTop, scrollHeight, clientHeight } = list;
+      const hasOverflow = scrollHeight > clientHeight;
+      
+      setShowScrollUp(hasOverflow && scrollTop > 10);
+      setShowScrollDown(hasOverflow && scrollTop < scrollHeight - clientHeight - 10);
+    };
+
+    // Aguardar um pouco para garantir que o DOM está renderizado
+    const timeoutId = setTimeout(() => {
+      checkScroll();
+    }, 100);
+
+    const list = menuListRef.current;
+    if (list) {
+      list.addEventListener('scroll', checkScroll);
+      // Verificar também quando a janela redimensiona
+      window.addEventListener('resize', checkScroll);
+      
+      return () => {
+        clearTimeout(timeoutId);
+        list.removeEventListener('scroll', checkScroll);
+        window.removeEventListener('resize', checkScroll);
+      };
+    }
+  }, [menuItems, sidebarOpen]);
 
   const fetchUserProfile = async () => {
     try {
@@ -56,14 +96,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
         const [profileResult, subscriptionResult] = await Promise.all([
           supabase
             .from('profiles')
-            .select('full_name, email')
+            .select('full_name, email, avatar_url, role')
             .eq('id', user.id)
             .single(),
           supabase
             .from('billing_subscriptions')
             .select('plan_id, status')
             .eq('user_id', user.id)
-            .single()
+            .maybeSingle()
         ]);
 
         const profile = profileResult.data;
@@ -79,12 +119,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
           setUserProfile({
             full_name: profile.full_name,
             email: profile.email || user.email || '',
+            avatar_url: profile.avatar_url,
             plan,
+            role: profile.role,
           });
         } else {
           setUserProfile({
             full_name: null,
             email: user.email || '',
+            avatar_url: null,
             plan,
           });
         }
@@ -99,6 +142,22 @@ export default function AppLayout({ children }: AppLayoutProps) {
     await supabase.auth.signOut();
     router.push('/login');
     router.refresh();
+  };
+
+  const scrollMenu = (direction: 'up' | 'down') => {
+    const list = menuListRef.current;
+    if (!list) return;
+
+    const scrollAmount = 100; // pixels por clique
+    const currentScroll = list.scrollTop;
+    const newScroll = direction === 'up' 
+      ? currentScroll - scrollAmount 
+      : currentScroll + scrollAmount;
+
+    list.scrollTo({
+      top: newScroll,
+      behavior: 'smooth'
+    });
   };
 
   return (
@@ -116,22 +175,47 @@ export default function AppLayout({ children }: AppLayoutProps) {
         }`}
       >
         <div className="flex flex-col h-full">
-          <div className="p-6 border-b border-border">
+          <div className="h-16 border-b border-border flex items-center px-6">
             <Link href="/" className="flex items-center">
               <Image
                 src={getLogo('auto')}
-                alt="c2Finance" 
-                width={120}
-                height={32}
-                className="h-8 w-auto"
+                alt="c2Finance"
+                width={150}
+                height={40}
+                className="h-10 w-auto"
                 style={{ objectFit: 'contain' }}
                 priority
               />
             </Link>
           </div>
 
-          <nav className="flex-1 p-4">
-            <ul className="space-y-2">
+          <nav className="p-4 flex-1 overflow-hidden relative">
+            {/* Botão scroll up */}
+            {showScrollUp && (
+              <button
+                onClick={() => scrollMenu('up')}
+                className="absolute top-6 right-4 z-10 w-8 h-8 rounded-full bg-card border border-border/50 flex items-center justify-center text-primary hover:bg-primary/10 hover:border-primary/50 transition-all shadow-lg"
+                aria-label="Rolar para cima"
+              >
+                <i className="bx bx-chevron-up text-lg"></i>
+              </button>
+            )}
+
+            {/* Botão scroll down */}
+            {showScrollDown && (
+              <button
+                onClick={() => scrollMenu('down')}
+                className="absolute bottom-6 right-4 z-10 w-8 h-8 rounded-full bg-card border border-border/50 flex items-center justify-center text-primary hover:bg-primary/10 hover:border-primary/50 transition-all shadow-lg"
+                aria-label="Rolar para baixo"
+              >
+                <i className="bx bx-chevron-down text-lg"></i>
+              </button>
+            )}
+
+            <ul
+              ref={menuListRef}
+              className="space-y-2 h-full overflow-y-auto max-h-[calc(100vh-200px)] scrollbar-hide"
+            >
               {menuItems.map((item) => {
                 const isActive = pathname === item.path;
                 return (
@@ -150,14 +234,38 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   </li>
                 );
               })}
+              {/* Admin menu - only for admins */}
+              {userProfile?.role === 'admin' && (
+                <li>
+                  <Link
+                    href="/app/admin"
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                      pathname === '/app/admin'
+                        ? 'bg-amber-500/10 text-amber-500'
+                        : 'text-amber-500/70 hover:bg-amber-500/10 hover:text-amber-500'
+                    }`}
+                  >
+                    <i className="bx bx-shield text-xl"></i>
+                    <span className="font-medium">Admin</span>
+                  </Link>
+                </li>
+              )}
             </ul>
           </nav>
 
-          <div className="p-4 border-t border-border">
+          <div className="p-4 border-t border-border mt-auto">
             <div className="flex items-center gap-3 px-4 py-3">
-              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                <i className='bx bx-user text-primary text-xl'></i>
-              </div>
+              {userProfile?.avatar_url ? (
+                <img
+                  src={userProfile.avatar_url}
+                  alt={userProfile.full_name || 'Usuário'}
+                  className="w-10 h-10 rounded-full object-cover flex-shrink-0 border border-border"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                  <i className='bx bx-user text-primary text-xl'></i>
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="font-medium text-sm truncate">
@@ -194,14 +302,46 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <i className='bx bx-menu text-2xl'></i>
           </button>
 
-          <div className="flex-1" />
-
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-1">
+            <div className="p-[1px] rounded-md transition-all duration-300 group"
+                 style={{
+                   background: 'linear-gradient(to right, #9333ea, #3b82f6)',
+                   boxShadow: '0 0 0 0 rgba(147, 51, 234, 0)',
+                 }}
+                 onMouseEnter={(e) => {
+                   e.currentTarget.style.boxShadow = '0 0 10px 2px rgba(147, 51, 234, 0.5)';
+                 }}
+                 onMouseLeave={(e) => {
+                   e.currentTarget.style.boxShadow = '0 0 0 0 rgba(147, 51, 234, 0)';
+                 }}>
+              <button
+                onClick={() => setAdvisorOpen(true)}
+                className="px-3 py-1 rounded-md flex items-center gap-2 bg-background text-sm transition-all duration-300"
+              >
+                <i
+                  className='bx bx-brain text-base'
+                  style={{
+                    background: 'linear-gradient(to right, #9333ea, #3b82f6)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                  }}
+                ></i>
+                <span
+                  className="hidden sm:inline font-medium"
+                  style={{
+                    background: 'linear-gradient(to right, #9333ea, #3b82f6)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                  }}
+                >Advisor I.A</span>
+              </button>
+            </div>
+            <div className="flex-1" />
             <button className="relative p-2 text-muted-foreground hover:text-foreground transition-colors">
               <i className='bx bx-bell text-xl'></i>
               <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />
             </button>
-            <Link 
+            <Link
               href="/app/settings"
               className="p-2 text-muted-foreground hover:text-foreground transition-colors"
               title="Configurações"
@@ -213,6 +353,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
         <main className="flex-1 p-4 lg:p-6 overflow-auto">{children}</main>
       </div>
+
+      <AdvisorDialog open={advisorOpen} onOpenChange={setAdvisorOpen} />
     </div>
   );
 }

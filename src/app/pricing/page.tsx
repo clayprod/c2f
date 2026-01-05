@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import Link from 'next/link';
 import Navbar from '@/components/landing/Navbar';
 import Footer from '@/components/landing/Footer';
@@ -32,10 +34,14 @@ const plans = [
       { text: 'Dashboard avançado', included: true },
       { text: 'Importação CSV + OFX', included: true },
       { text: 'Advisor ilimitado', included: true },
-      { text: 'Suporte prioritário', included: true },
-      { text: 'Orçamentos e metas', included: true },
+      { text: 'Orçamentos e Projeções', included: true },
+      { text: 'Dívidas', included: true },
+      { text: 'Investimentos', included: true },
+      { text: 'Patrimônio', included: true },
+      { text: 'Objetivos', included: true },
       { text: 'Relatórios detalhados', included: true },
       { text: 'Categorias personalizadas', included: true },
+      { text: 'Suporte prioritário', included: true },
       { text: 'Integração bancária', included: false },
     ],
     cta: 'Assinar Pro',
@@ -153,5 +159,8 @@ export default function PricingPage() {
     </div>
   );
 }
+
+
+
 
 

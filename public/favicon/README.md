@@ -26,3 +26,6 @@ O favicon já está configurado no `src/app/layout.tsx` através dos metadados.
 O Next.js automaticamente serve arquivos estáticos da pasta `public/`, então os favicons devem estar na raiz de `public/`.
 
 
+
+
+

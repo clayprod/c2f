@@ -17,3 +17,6 @@ Coloque os seguintes arquivos de logo nesta pasta:
 Os componentes já estão configurados para usar esses logos automaticamente através do helper `src/lib/logo.ts`.
 
 
+
+
+

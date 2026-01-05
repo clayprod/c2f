@@ -4,6 +4,10 @@ import { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { Checkbox } from '@/components/ui/checkbox';
+import { getLogo } from '@/lib/logo';
+import Image from 'next/image';
+import { useToast } from '@/hooks/use-toast';
 
 function LoginForm() {
   const [email, setEmail] = useState('');
@@ -12,6 +16,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams?.get('next') || '/app';
+  const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +34,11 @@ function LoginForm() {
       router.push(next);
       router.refresh();
     } catch (error: any) {
-      alert(error.message || 'Erro ao fazer login');
+      toast({
+        variant: "destructive",
+        title: "Falha na autenticação",
+        description: error.message || "Credenciais inválidas. Verifique seu email e senha.",
+      });
     } finally {
       setLoading(false);
     }
@@ -77,7 +86,7 @@ function LoginForm() {
 
         <div className="flex items-center justify-between text-sm">
           <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" className="rounded border-border" />
+            <Checkbox id="remember" />
             <span className="text-muted-foreground">Lembrar de mim</span>
           </label>
           <a href="#" className="text-primary hover:underline">
@@ -91,7 +100,7 @@ function LoginForm() {
       </form>
 
       <div className="mt-6 text-center text-sm text-muted-foreground">
-        Nao tem uma conta?{' '}
+        Não tem uma conta?{' '}
         <Link href="/signup" className="text-primary hover:underline font-medium">
           Criar conta
         </Link>
@@ -120,11 +129,16 @@ export default function LoginPage() {
       </div>
 
       <div className="w-full max-w-md relative z-10">
-        <Link href="/" className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-            <i className='bx bx-wallet text-primary-foreground text-xl'></i>
-          </div>
-          <span className="font-display font-bold text-2xl text-foreground">c2Finance</span>
+        <Link href="/" className="flex items-center justify-center mb-8">
+          <Image
+            src={getLogo('auto')}
+            alt="c2Finance"
+            width={120}
+            height={40}
+            className="h-8 md:h-10 w-auto"
+            style={{ objectFit: 'contain' }}
+            priority
+          />
         </Link>
 
         <Suspense fallback={<LoginFormFallback />}>
@@ -132,7 +146,7 @@ export default function LoginPage() {
         </Suspense>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          Ao entrar, voce concorda com nossos{' '}
+          Ao entrar, você concorda com nossos{' '}
           <a href="#" className="text-primary hover:underline">
             Termos de Uso
           </a>{' '}

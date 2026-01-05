@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import TopBanner from '@/components/landing/TopBanner';
 import Navbar from '@/components/landing/Navbar';
 import Hero from '@/components/landing/Hero';
@@ -33,5 +35,8 @@ export default function HomePage() {
     </div>
   );
 }
+
+
+
 
 

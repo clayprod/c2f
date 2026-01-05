@@ -52,6 +52,24 @@ export async function PATCH(
     if (body.type !== undefined) updateData.type = body.type;
     if (body.icon !== undefined) updateData.icon = body.icon;
     if (body.color !== undefined) updateData.color = body.color;
+    if (body.is_active !== undefined) {
+      // If trying to deactivate, check if category has active budgets
+      if (body.is_active === false) {
+        const { count: budgetCount } = await supabase
+          .from('budgets')
+          .select('*', { count: 'exact', head: true })
+          .eq('category_id', params.id)
+          .eq('user_id', userId);
+        
+        if (budgetCount && budgetCount > 0) {
+          return NextResponse.json(
+            { error: 'Não é possível inativar uma categoria que possui orçamentos associados' },
+            { status: 400 }
+          );
+        }
+      }
+      updateData.is_active = body.is_active;
+    }
 
     const { data, error } = await supabase
       .from('categories')
@@ -86,15 +104,35 @@ export async function DELETE(
     const supabase = await createClient();
 
     // Check if category has transactions
-    const { count } = await supabase
+    const { count: transactionCount } = await supabase
       .from('transactions')
       .select('*', { count: 'exact', head: true })
       .eq('category_id', params.id)
       .eq('user_id', userId);
 
-    if (count && count > 0) {
+    // Check if category has budgets
+    const { count: budgetCount } = await supabase
+      .from('budgets')
+      .select('*', { count: 'exact', head: true })
+      .eq('category_id', params.id)
+      .eq('user_id', userId);
+
+    if (transactionCount && transactionCount > 0) {
       return NextResponse.json(
-        { error: 'Não é possível excluir uma categoria que possui transações' },
+        { 
+          error: 'Não é possível excluir uma categoria que possui transações',
+          details: { transactionCount, budgetCount: budgetCount || 0 }
+        },
+        { status: 400 }
+      );
+    }
+
+    if (budgetCount && budgetCount > 0) {
+      return NextResponse.json(
+        { 
+          error: 'Não é possível excluir uma categoria que possui orçamentos associados',
+          details: { transactionCount: transactionCount || 0, budgetCount }
+        },
         { status: 400 }
       );
     }

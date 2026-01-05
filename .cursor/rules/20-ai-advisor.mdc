@@ -8,6 +8,15 @@ alwaysApply: false
 ## Princípio
 O Advisor não é só chat: ele deve produzir recomendações e ações com estrutura.
 
+## Configuração Global (via Superadmin)
+- Modelo de IA: Configurável entre Groq e OpenAI no painel admin
+- Nome do modelo: Especificar modelo exato (ex: llama-3.1-70b-versatile, gpt-4, gpt-3.5-turbo)
+- Prompts customizáveis:
+  - `advisor_prompt`: Prompt para chat do advisor (uso livre)
+  - `insights_prompt`: Prompt para geração de insights diários (uso limitado)
+- Chaves de API: Groq e OpenAI configuráveis no painel admin
+- Fallback: Se não configurado no banco, usar env vars e prompts padrão
+
 ## Saídas estruturadas (obrigatório)
 Toda resposta do Advisor deve retornar:
 - summary: texto curto
@@ -16,10 +25,30 @@ Toda resposta do Advisor deve retornar:
 - confidence: baixa/média/alta
 - citations: referências internas (ids de transações/contas/orçamentos usados)
 
+## Regras de Negócio - Limites de Uso
+
+### Advisor Chat (Uso Livre)
+- **Sem limite de requisições**: Usuários podem usar o chat do advisor livremente
+- Disponível para todos os planos
+- Usa `advisor_prompt` configurado no global_settings
+
+### Advisor Insights (Uso Limitado)
+- **Limite: 1 insight por dia por usuário** (para economizar tokens)
+- Verificar se já existe insight gerado hoje antes de criar novo:
+  - Query: `SELECT * FROM advisor_insights WHERE user_id = ? AND DATE(created_at) = CURRENT_DATE`
+  - Se existir, retornar erro informando que já foi gerado hoje
+- Usa `insights_prompt` configurado no global_settings
+- Gerar automaticamente ou sob demanda (via endpoint específico)
+- Aplicar limite independente do plano (todos os planos têm limite de 1/dia)
+
 ## Regras de segurança/privacidade
 - Não expor dados sensíveis no prompt (mascarar descrições quando possível).
 - Registrar auditoria das ações sugeridas/aplicadas (quem, quando, o que mudou).
+- Usar chaves de API do banco apenas para usuários com plano pago.
+- Fallback para env vars se chaves do banco não estiverem configuradas.
 
 ## Produto
 - Advisor deve respeitar limites do plano (features, volume, periodicidade).
 - Para planos pagos: habilitar análises avançadas (projeções, anomalias, alertas).
+- Insights diários: sempre limitados a 1/dia independente do plano (regra de economia de tokens).
+- Chat do advisor: sempre ilimitado para todos os planos.

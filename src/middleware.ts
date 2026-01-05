@@ -17,10 +17,17 @@ export async function middleware(request: NextRequest) {
           return request.cookies.get(name)?.value;
         },
         set(name: string, value: string, options: any) {
+          const cookieOptions = {
+            ...options,
+            maxAge: options?.maxAge || 60 * 60 * 24 * 30, // 30 dias por padrão
+            sameSite: 'lax' as const,
+            path: '/',
+            httpOnly: false, // Supabase precisa acessar cookies no client-side
+          };
           request.cookies.set({
             name,
             value,
-            ...options,
+            ...cookieOptions,
           });
           response = NextResponse.next({
             request: {
@@ -30,14 +37,19 @@ export async function middleware(request: NextRequest) {
           response.cookies.set({
             name,
             value,
-            ...options,
+            ...cookieOptions,
           });
         },
         remove(name: string, options: any) {
+          const cookieOptions = {
+            ...options,
+            maxAge: 0,
+            path: '/',
+          };
           request.cookies.set({
             name,
             value: '',
-            ...options,
+            ...cookieOptions,
           });
           response = NextResponse.next({
             request: {
@@ -47,7 +59,7 @@ export async function middleware(request: NextRequest) {
           response.cookies.set({
             name,
             value: '',
-            ...options,
+            ...cookieOptions,
           });
         },
       },
@@ -69,6 +81,23 @@ export async function middleware(request: NextRequest) {
     const redirectUrl = new URL('/login', request.url);
     redirectUrl.searchParams.set('next', request.nextUrl.pathname);
     return NextResponse.redirect(redirectUrl);
+  }
+
+  // Verificar rota admin
+  const isAdminRoute = request.nextUrl.pathname.startsWith('/app/admin');
+  
+  if (isAdminRoute && session) {
+    // Check if user is admin
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single();
+
+    if (!profile || profile.role !== 'admin') {
+      // Redirect non-admins to dashboard
+      return NextResponse.redirect(new URL('/app', request.url));
+    }
   }
 
   // Se é rota protegida e há sessão, permitir acesso

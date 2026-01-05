@@ -47,7 +47,7 @@ export default function IntegrationsPage() {
       console.error('Error fetching items:', error);
       toast({
         title: 'Erro',
-        description: 'Nao foi possivel carregar as integracoes',
+        description: 'Não foi possível carregar as integrações',
         variant: 'destructive',
       });
     } finally {
@@ -109,7 +109,7 @@ export default function IntegrationsPage() {
 
       toast({
         title: 'Sincronizacao iniciada',
-        description: 'Os dados estao sendo atualizados',
+        description: 'Os dados estão sendo atualizados',
       });
 
       // Refresh items after a delay
@@ -184,8 +184,8 @@ export default function IntegrationsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl md:text-3xl font-bold">Integracoes</h1>
-          <p className="text-muted-foreground">Conecte suas contas bancarias via Open Finance</p>
+          <h1 className="font-display text-2xl md:text-3xl font-bold">Integrações</h1>
+          <p className="text-muted-foreground">Conecte suas contas bancárias via Open Finance</p>
         </div>
         {canConnect && (
           <Button onClick={handleConnect} className="btn-primary">
@@ -226,7 +226,7 @@ export default function IntegrationsPage() {
           </div>
           <h3 className="font-display font-semibold text-lg mb-2">Nenhuma integracao</h3>
           <p className="text-muted-foreground mb-4">
-            Conecte suas contas bancarias para importar transacoes automaticamente.
+            Conecte suas contas bancárias para importar transações automaticamente.
           </p>
           {canConnect && (
             <Button onClick={handleConnect} className="btn-primary">
@@ -297,7 +297,7 @@ export default function IntegrationsPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <i className='bx bx-transfer'></i>
-                      <span>{lastSync.transactions_synced || 0} transacoes</span>
+                      <span>{lastSync.transactions_synced || 0} transações</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <i className='bx bx-time'></i>
@@ -328,8 +328,8 @@ export default function IntegrationsPage() {
               <i className='bx bx-sync text-blue-500'></i>
             </div>
             <div>
-              <h4 className="font-medium text-sm">Automatico</h4>
-              <p className="text-xs text-muted-foreground">Transacoes importadas automaticamente todos os dias</p>
+              <h4 className="font-medium text-sm">Automático</h4>
+              <p className="text-xs text-muted-foreground">Transações importadas automaticamente todos os dias</p>
             </div>
           </div>
           <div className="flex items-start gap-3">
@@ -338,7 +338,7 @@ export default function IntegrationsPage() {
             </div>
             <div>
               <h4 className="font-medium text-sm">Privado</h4>
-              <p className="text-xs text-muted-foreground">Voce controla quais dados compartilhar</p>
+              <p className="text-xs text-muted-foreground">Você controla quais dados compartilhar</p>
             </div>
           </div>
         </div>

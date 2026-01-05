@@ -6,11 +6,16 @@ import TransactionTable, { Transaction as TransactionTableType } from '@/compone
 import TransactionForm, { Transaction as TransactionFormType } from '@/components/transactions/TransactionForm';
 import ImportModal from '@/components/transactions/ImportModal';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 
 interface Account {
   id: string;
   name: string;
+  type?: string;
+  icon?: string;
+  color?: string;
+  last_four_digits?: string;
 }
 
 interface Category {
@@ -22,20 +27,42 @@ interface Category {
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<TransactionTableType[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [creditCards, setCreditCards] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  // Initialize with default date range (last 3 months)
+  const getDefaultDateRange = () => {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    const startDate = new Date(today);
+    startDate.setMonth(startDate.getMonth() - 3 + 1);
+    startDate.setDate(1);
+    startDate.setHours(0, 0, 0, 0);
+    return {
+      fromDate: startDate.toISOString().split('T')[0],
+      toDate: today.toISOString().split('T')[0],
+    };
+  };
+
+  const defaultDates = getDefaultDateRange();
   const [filters, setFilters] = useState<FilterState>({
     search: '',
     accountId: '',
     categoryId: '',
     type: '',
-    fromDate: '',
-    toDate: '',
+    fromDate: defaultDates.fromDate,
+    toDate: defaultDates.toDate,
+    isRecurring: 'all',
+    isInstallment: 'all',
   });
   const [pagination, setPagination] = useState({
     offset: 0,
-    limit: 50,
+    limit: 10,
     count: 0,
+  });
+  const [sorting, setSorting] = useState({
+    sortBy: 'posted_at' as 'posted_at' | 'amount',
+    sortOrder: 'desc' as 'asc' | 'desc',
   });
   const [formOpen, setFormOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -44,12 +71,19 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     fetchAccounts();
+    fetchCreditCards();
     fetchCategories();
   }, []);
 
   useEffect(() => {
     fetchTransactions();
-  }, [filters, pagination.offset]);
+  }, [filters, pagination.offset, pagination.limit, sorting]);
+
+  // Reset offset when sorting changes
+  const handleSortChange = (newSorting: { sortBy: 'posted_at' | 'amount'; sortOrder: 'asc' | 'desc' }) => {
+    setSorting(newSorting);
+    setPagination(prev => ({ ...prev, offset: 0 }));
+  };
 
   const fetchAccounts = async () => {
     try {
@@ -58,6 +92,16 @@ export default function TransactionsPage() {
       setAccounts(data.data || []);
     } catch (error) {
       console.error('Error fetching accounts:', error);
+    }
+  };
+
+  const fetchCreditCards = async () => {
+    try {
+      const res = await fetch('/api/credit-cards');
+      const data = await res.json();
+      setCreditCards(data.data || []);
+    } catch (error) {
+      console.error('Error fetching credit cards:', error);
     }
   };
 
@@ -81,8 +125,16 @@ export default function TransactionsPage() {
       if (filters.type) params.append('type', filters.type);
       if (filters.fromDate) params.append('from_date', filters.fromDate);
       if (filters.toDate) params.append('to_date', filters.toDate);
+      if (filters.isRecurring && filters.isRecurring !== 'all') {
+        params.append('is_recurring', filters.isRecurring === 'recurring' ? 'true' : 'false');
+      }
+      if (filters.isInstallment && filters.isInstallment !== 'all') {
+        params.append('is_installment', filters.isInstallment === 'installment' ? 'true' : 'false');
+      }
       params.append('limit', pagination.limit.toString());
       params.append('offset', pagination.offset.toString());
+      params.append('sort_by', sorting.sortBy);
+      params.append('sort_order', sorting.sortOrder);
 
       const res = await fetch(`/api/transactions?${params.toString()}`);
       const data = await res.json();
@@ -92,8 +144,8 @@ export default function TransactionsPage() {
     } catch (error) {
       console.error('Error fetching transactions:', error);
       toast({
-        title: 'Erro',
-        description: 'Não foi possível carregar as transações',
+        title: 'Falha ao carregar transações',
+        description: 'Não foi possível carregar as transações. Verifique sua conexão e tente novamente.',
         variant: 'destructive',
       });
     } finally {
@@ -123,8 +175,8 @@ export default function TransactionsPage() {
       setFormOpen(false);
     } catch (error: any) {
       toast({
-        title: 'Erro',
-        description: error.message,
+        title: 'Falha ao criar transação',
+        description: error.message || 'Não foi possível criar a transação. Verifique os dados e tente novamente.',
         variant: 'destructive',
       });
     }
@@ -155,8 +207,8 @@ export default function TransactionsPage() {
       setEditingTransaction(undefined);
     } catch (error: any) {
       toast({
-        title: 'Erro',
-        description: error.message,
+        title: 'Falha ao atualizar transação',
+        description: error.message || 'Não foi possível atualizar a transação. Verifique os dados e tente novamente.',
         variant: 'destructive',
       });
     }
@@ -185,8 +237,8 @@ export default function TransactionsPage() {
       fetchTransactions();
     } catch (error: any) {
       toast({
-        title: 'Erro',
-        description: error.message,
+        title: 'Falha ao excluir transação',
+        description: error.message || 'Não foi possível excluir a transação. Tente novamente.',
         variant: 'destructive',
       });
     }
@@ -247,33 +299,60 @@ export default function TransactionsPage() {
         onEdit={handleEdit}
         onDelete={handleDeleteTransaction}
         loading={loading}
+        sorting={sorting}
+        onSortChange={handleSortChange}
       />
 
       {pagination.count > 0 && (
-        <div className="flex items-center justify-between glass-card p-4">
-          <p className="text-sm text-muted-foreground">
-            Mostrando {pagination.offset + 1} - {Math.min(pagination.offset + pagination.limit, pagination.count)} de {pagination.count} transações
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPagination(prev => ({ ...prev, offset: Math.max(0, prev.offset - prev.limit) }))}
-              disabled={pagination.offset === 0}
-            >
-              Anterior
-            </Button>
-            <span className="px-4 py-2 text-sm text-muted-foreground">
-              Página {currentPage} de {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPagination(prev => ({ ...prev, offset: prev.offset + prev.limit }))}
-              disabled={pagination.offset + pagination.limit >= pagination.count}
-            >
-              Próximo
-            </Button>
+        <div className="glass-card p-4 space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <p className="text-sm text-muted-foreground">
+              Mostrando {pagination.offset + 1} - {Math.min(pagination.offset + pagination.limit, pagination.count)} de {pagination.count} transações
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label htmlFor="items-per-page" className="text-sm text-muted-foreground">
+                  Itens por página:
+                </label>
+                <Select
+                  value={pagination.limit.toString()}
+                  onValueChange={(value) => {
+                    setPagination(prev => ({ ...prev, limit: parseInt(value), offset: 0 }));
+                  }}
+                >
+                  <SelectTrigger id="items-per-page" className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPagination(prev => ({ ...prev, offset: Math.max(0, prev.offset - prev.limit) }))}
+                  disabled={pagination.offset === 0}
+                >
+                  Anterior
+                </Button>
+                <span className="px-4 py-2 text-sm text-muted-foreground">
+                  Página {currentPage} de {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPagination(prev => ({ ...prev, offset: prev.offset + prev.limit }))}
+                  disabled={pagination.offset + pagination.limit >= pagination.count}
+                >
+                  Próximo
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -287,6 +366,7 @@ export default function TransactionsPage() {
         onSubmit={editingTransaction ? handleUpdateTransaction : handleCreateTransaction}
         transaction={editingTransaction}
         accounts={accounts}
+        creditCards={creditCards}
         categories={categories}
       />
 

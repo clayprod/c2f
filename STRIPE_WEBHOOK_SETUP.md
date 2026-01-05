@@ -89,3 +89,6 @@ Após configurar, você pode testar:
 Este secret é usado para validar que os webhooks realmente vêm do Stripe e não de um atacante.
 
 
+
+
+

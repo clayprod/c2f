@@ -3,10 +3,34 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { DatePicker } from '@/components/ui/date-picker';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { format } from 'date-fns';
+import { pt } from 'date-fns/locale';
+import { useToast } from '@/hooks/use-toast';
+
+const categoryColors = [
+  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+  '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1',
+  '#a855f7', '#f43f5e', '#14b8a6', '#64748b',
+];
+
+const categoryIcons = [
+  '🏠', '🚗', '🍕', '🛒', '💊', '📚', '🎬', '✈️', '💇', '🏥',
+  '💼', '🎁', '📱', '⚡', '💧', '🔥', '🎯', '💰', '💳', '📈',
+  '🏦', '💎', '🎨', '🎭', '🎪', '🏆', '⭐', '🌟', '💫', '🔐',
+  '🛠️', '📊', '📋', '✂️', '🧹', '🍽️', '☕', '🍺', '🎮', '🎸',
+];
 
 export default function NewGoalPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isDraggingImage, setIsDraggingImage] = useState(false);
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -16,11 +40,180 @@ export default function NewGoalPage() {
     status: 'active',
     priority: 'medium',
     icon: '🎯',
-    color: '#6b7280',
+    color: '#3b82f6',
+    image_url: '',
+    image_position: 'center',
     notes: '',
+    include_in_budget: true,
+    contribution_frequency: 'monthly',
+    monthly_contribution_cents: '',
   });
 
-  const iconOptions = ['🎯', '💰', '🏠', '🚗', '✈️', '💍', '🎓', '💻', '📱', '🎮', '🏖️', '💎'];
+  const processImageFile = async (file: File) => {
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        variant: "destructive",
+        title: "Tipo de arquivo inválido",
+        description: "Por favor, selecione um arquivo de imagem",
+      });
+      return;
+    }
+
+    // Validate file size (10MB max)
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        variant: "destructive",
+        title: "Imagem muito grande",
+        description: "O tamanho máximo permitido é 10MB",
+      });
+      return;
+    }
+
+    try {
+      setUploadingImage(true);
+      const formDataToUpload = new FormData();
+      formDataToUpload.append('file', file);
+      formDataToUpload.append('folder', 'goals');
+      formDataToUpload.append('public', 'false');
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formDataToUpload,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erro ao fazer upload da imagem');
+      }
+
+      const result = await response.json();
+      setFormData({ ...formData, image_url: result.url });
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Erro ao fazer upload da imagem",
+        description: error.message || "Ocorreu um erro ao tentar fazer upload da imagem",
+      });
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await processImageFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDragging(true);
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  };
+
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only set dragging to false if we're leaving the drop zone entirely
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    if (!file.type.startsWith('image/')) {
+      toast({
+        variant: "destructive",
+        title: "Tipo de arquivo inválido",
+        description: "Por favor, selecione um arquivo de imagem",
+      });
+      return;
+    }
+
+    await processImageFile(file);
+  };
+
+  const handleRemoveImage = () => {
+    setFormData({ ...formData, image_url: '', image_position: 'center' });
+    setImagePreview(null);
+  };
+
+  const handleImageMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!imagePreview && !formData.image_url) return;
+    setIsDraggingImage(true);
+    e.preventDefault();
+  };
+
+  const handleImageMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDraggingImage || (!imagePreview && !formData.image_url)) return;
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    
+    // Clamp values between 0 and 100
+    const clampedX = Math.max(0, Math.min(100, x));
+    const clampedY = Math.max(0, Math.min(100, y));
+    
+    const position = `${Math.round(clampedX)}% ${Math.round(clampedY)}%`;
+    setFormData({ ...formData, image_position: position });
+  };
+
+  const handleImageMouseUp = () => {
+    setIsDraggingImage(false);
+  };
+
+  // Convert old position format to percentage if needed
+  const getImagePosition = () => {
+    const pos = formData.image_position || 'center';
+    // If it's already in percentage format, return it
+    if (pos.includes('%')) {
+      return pos;
+    }
+    // Convert old format to percentage
+    const positionMap: Record<string, string> = {
+      'top left': '0% 0%',
+      'top center': '50% 0%',
+      'top right': '100% 0%',
+      'center left': '0% 50%',
+      'center': '50% 50%',
+      'center right': '100% 50%',
+      'bottom left': '0% 100%',
+      'bottom center': '50% 100%',
+      'bottom right': '100% 100%',
+    };
+    return positionMap[pos] || '50% 50%';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +227,14 @@ export default function NewGoalPage() {
           ...formData,
           target_amount_cents: Math.round(parseFloat(formData.target_amount_cents) * 100),
           current_amount_cents: Math.round(parseFloat(formData.current_amount_cents || '0') * 100),
+          monthly_contribution_cents: formData.monthly_contribution_cents
+            ? Math.round(parseFloat(formData.monthly_contribution_cents) * 100)
+            : undefined,
+          contribution_frequency: formData.include_in_budget && formData.contribution_frequency
+            ? formData.contribution_frequency
+            : undefined,
+          image_url: formData.image_url || undefined,
+          image_position: formData.image_position || 'center',
         }),
       });
 
@@ -44,7 +245,11 @@ export default function NewGoalPage() {
 
       router.push('/app/goals');
     } catch (error: any) {
-      alert(error.message || 'Erro ao criar objetivo');
+      toast({
+        variant: "destructive",
+        title: "Erro ao criar objetivo",
+        description: error.message || "Ocorreu um erro ao tentar criar o objetivo",
+      });
     } finally {
       setLoading(false);
     }
@@ -105,54 +310,81 @@ export default function NewGoalPage() {
 
           <div>
             <label className="block text-sm font-medium mb-2">Data Objetivo</label>
-            <input
-              type="date"
-              value={formData.target_date}
-              onChange={(e) => setFormData({ ...formData, target_date: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            <DatePicker
+              date={formData.target_date ? new Date(formData.target_date) : undefined}
+              setDate={(date) => {
+                if (date) {
+                  const formattedDate = format(date, 'yyyy-MM-dd');
+                  setFormData({ ...formData, target_date: formattedDate });
+                }
+              }}
+              placeholder="Selecione a data objetivo"
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-2">Prioridade</label>
-            <select
+            <Select
               value={formData.priority}
-              onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              onValueChange={(value) => setFormData({ ...formData, priority: value })}
             >
-              <option value="low">Baixa</option>
-              <option value="medium">Média</option>
-              <option value="high">Alta</option>
-            </select>
+              <SelectTrigger className="w-full bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low">Baixa</SelectItem>
+                <SelectItem value="medium">Média</SelectItem>
+                <SelectItem value="high">Alta</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-2">Status</label>
-            <select
+            <Select
               value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              onValueChange={(value) => setFormData({ ...formData, status: value })}
             >
-              <option value="active">Ativo</option>
-              <option value="paused">Pausado</option>
-              <option value="cancelled">Cancelado</option>
-            </select>
+              <SelectTrigger className="w-full bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Ativo</SelectItem>
+                <SelectItem value="paused">Pausado</SelectItem>
+                <SelectItem value="cancelled">Cancelado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-2">Cor</label>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {categoryColors.map((color) => (
+              <button
+                key={color}
+                type="button"
+                className={`w-10 h-10 rounded-lg border-2 transition-all ${
+                  formData.color === color ? 'border-foreground scale-110' : 'border-transparent'
+                }`}
+                style={{ backgroundColor: color }}
+                onClick={() => setFormData({ ...formData, color })}
+              />
+            ))}
           </div>
         </div>
 
         <div>
           <label className="block text-sm font-medium mb-2">Ícone</label>
-          <div className="flex gap-2 flex-wrap">
-            {iconOptions.map((icon) => (
+          <div className="flex flex-wrap gap-2 mt-2 max-h-32 overflow-y-auto">
+            {categoryIcons.map((icon) => (
               <button
                 key={icon}
                 type="button"
-                onClick={() => setFormData({ ...formData, icon })}
-                className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center text-2xl transition-all ${
-                  formData.icon === icon
-                    ? 'border-primary bg-primary/10'
-                    : 'border-border hover:border-primary/50'
+                className={`w-8 h-8 rounded border-2 text-lg transition-transform ${
+                  formData.icon === icon ? 'border-foreground scale-110' : 'border-muted'
                 }`}
+                onClick={() => setFormData({ ...formData, icon })}
               >
                 {icon}
               </button>
@@ -161,21 +393,83 @@ export default function NewGoalPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">Cor</label>
-          <div className="flex gap-2 items-center">
-            <input
-              type="color"
-              value={formData.color}
-              onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-              className="w-16 h-12 rounded-xl border border-border cursor-pointer"
-            />
-            <input
-              type="text"
-              value={formData.color}
-              onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-              className="flex-1 px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder="#6b7280"
-            />
+          <label className="block text-sm font-medium mb-2">Imagem de Capa</label>
+          <div className="space-y-3">
+            {imagePreview || formData.image_url ? (
+              <div className="space-y-3">
+                <div 
+                  className="relative overflow-hidden rounded-xl border border-border cursor-move select-none"
+                  style={{ height: '192px' }}
+                  onMouseDown={handleImageMouseDown}
+                  onMouseMove={handleImageMouseMove}
+                  onMouseUp={handleImageMouseUp}
+                  onMouseLeave={handleImageMouseUp}
+                >
+                  <img
+                    src={imagePreview || formData.image_url || ''}
+                    alt="Preview"
+                    className="w-full h-full object-cover transition-all pointer-events-none"
+                    style={{ objectPosition: getImagePosition() }}
+                    draggable={false}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="absolute top-2 right-2 bg-destructive text-destructive-foreground p-2 rounded-full hover:bg-destructive/90 transition-colors z-10"
+                    disabled={uploadingImage}
+                  >
+                    <i className='bx bx-x text-lg'></i>
+                  </button>
+                  {isDraggingImage && (
+                    <div className="absolute inset-0 bg-primary/10 border-2 border-primary border-dashed flex items-center justify-center z-0">
+                      <div className="text-primary text-sm font-medium">
+                        <i className='bx bx-move text-2xl'></i>
+                        <p className="mt-1">Arraste para ajustar</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground text-center">
+                  Clique e arraste na imagem para ajustar a posição
+                </div>
+              </div>
+            ) : (
+              <div
+                onDragEnter={handleDragEnter}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200 ${
+                  isDragging
+                    ? 'border-primary bg-primary/20 scale-[1.02] shadow-lg shadow-primary/20'
+                    : 'border-border hover:border-primary/60 hover:bg-muted/30 bg-muted/20'
+                }`}
+              >
+                <label className="flex flex-col items-center justify-center pt-5 pb-6 w-full h-full cursor-pointer">
+                  <div className="flex flex-col items-center justify-center">
+                    <i className={`bx bx-image-add text-4xl mb-2 transition-all ${isDragging ? 'text-primary scale-110' : 'text-muted-foreground'}`}></i>
+                    <p className="text-sm mb-1 transition-colors">
+                      <span className={`font-semibold ${isDragging ? 'text-primary' : 'text-foreground'}`}>Clique para fazer upload</span>
+                      <span className="text-muted-foreground"> ou </span>
+                      <span className={`font-semibold ${isDragging ? 'text-primary' : 'text-foreground'}`}>arraste e solte</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">PNG, JPG, GIF ou WEBP (máx. 10MB)</p>
+                  </div>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    disabled={uploadingImage}
+                  />
+                </label>
+              </div>
+            )}
+            {uploadingImage && (
+              <div className="text-sm text-muted-foreground text-center">
+                <i className='bx bx-loader-alt bx-spin'></i> Fazendo upload...
+              </div>
+            )}
           </div>
         </div>
 
@@ -199,6 +493,60 @@ export default function NewGoalPage() {
             rows={2}
             placeholder="Notas adicionais..."
           />
+        </div>
+
+        <div className="border-t pt-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <Checkbox
+              id="include_in_budget"
+              checked={formData.include_in_budget}
+              onCheckedChange={(checked) => setFormData({ ...formData, include_in_budget: checked === true })}
+            />
+            <label htmlFor="include_in_budget" className="text-sm font-medium cursor-pointer">
+              Incluir no orçamento
+            </label>
+          </div>
+
+          {formData.include_in_budget && (
+            <div className="grid md:grid-cols-2 gap-4 pl-6 border-l-2 border-primary/30">
+              <div>
+                <label className="block text-sm font-medium mb-2">Frequência de Aporte *</label>
+                <Select
+                  value={formData.contribution_frequency}
+                  onValueChange={(value) => setFormData({ ...formData, contribution_frequency: value })}
+                  required={formData.include_in_budget}
+                >
+                  <SelectTrigger className="w-full bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                    <SelectValue placeholder="Selecione a frequência" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">Diário</SelectItem>
+                    <SelectItem value="weekly">Semanal</SelectItem>
+                    <SelectItem value="biweekly">Quinzenal</SelectItem>
+                    <SelectItem value="monthly">Mensal</SelectItem>
+                    <SelectItem value="quarterly">Trimestral</SelectItem>
+                    <SelectItem value="yearly">Anual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Valor Mensal do Aporte (R$)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.monthly_contribution_cents}
+                  onChange={(e) => setFormData({ ...formData, monthly_contribution_cents: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  placeholder="0.00"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Valor mensal calculado automaticamente baseado na frequência, ou defina manualmente
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-4">

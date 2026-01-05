@@ -1,24 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientFromRequest } from '@/lib/supabase/server';
 import { getUserId } from '@/lib/auth';
 import { goalContributionSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = await createClient();
+    const { id } = await params;
+    const { supabase } = createClientFromRequest(request);
     const { data, error } = await supabase
       .from('goal_contributions')
       .select('*, transactions(*)')
-      .eq('goal_id', params.id)
+      .eq('goal_id', id)
       .eq('user_id', userId)
       .order('contribution_date', { ascending: false });
 
@@ -36,21 +37,22 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { id } = await params;
     const body = await request.json();
     const validated = goalContributionSchema.parse({
       ...body,
-      goal_id: params.id,
+      goal_id: id,
     });
 
-    const supabase = await createClient();
+    const { supabase } = createClientFromRequest(request);
 
     // Create contribution
     const { data: contribution, error: contributionError } = await supabase
@@ -69,7 +71,7 @@ export async function POST(
     const { data: goal } = await supabase
       .from('goals')
       .select('current_amount_cents, target_amount_cents, status')
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('user_id', userId)
       .single();
 
@@ -94,7 +96,7 @@ export async function POST(
           status: newStatus,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', params.id)
+        .eq('id', id)
         .eq('user_id', userId);
     }
 

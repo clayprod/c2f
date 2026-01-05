@@ -24,3 +24,6 @@ O favicon já está configurado no `src/app/layout.tsx` através dos metadados. 
 Após adicionar o arquivo `favicon.ico` na pasta `public/`, ele será automaticamente usado pelo navegador.
 
 
+
+
+

@@ -96,3 +96,6 @@ Todas as variáveis obrigatórias estão configuradas. O sistema está pronto pa
 - **Pluggy**: `/api/pluggy/*` (vários endpoints)
 
 
+
+
+

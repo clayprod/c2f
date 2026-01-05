@@ -23,7 +23,13 @@ export async function GET(
 
     if (error) throw error;
 
-    return NextResponse.json({ data });
+    // Convert current_balance (NUMERIC) to balance_cents (BIGINT) for API response
+    const transformedData = {
+      ...data,
+      balance_cents: Math.round((data.current_balance || 0) * 100),
+    };
+
+    return NextResponse.json({ data: transformedData });
   } catch (error) {
     const errorResponse = createErrorResponse(error);
     return NextResponse.json(
@@ -67,7 +73,13 @@ export async function PATCH(
 
     if (error) throw error;
 
-    return NextResponse.json({ data });
+    // Convert current_balance (NUMERIC) to balance_cents (BIGINT) for API response
+    const transformedData = {
+      ...data,
+      balance_cents: Math.round((data.current_balance || 0) * 100),
+    };
+
+    return NextResponse.json({ data: transformedData });
   } catch (error) {
     const errorResponse = createErrorResponse(error);
     return NextResponse.json(

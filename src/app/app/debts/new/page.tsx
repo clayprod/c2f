@@ -3,10 +3,16 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { DatePicker } from '@/components/ui/date-picker';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { format } from 'date-fns';
+import { pt } from 'date-fns/locale';
+import { useToast } from '@/hooks/use-toast';
 
 export default function NewDebtPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -18,6 +24,9 @@ export default function NewDebtPage() {
     status: 'active',
     priority: 'medium',
     notes: '',
+    payment_frequency: '',
+    payment_amount_cents: '',
+    installment_count: '',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -25,14 +34,45 @@ export default function NewDebtPage() {
     setLoading(true);
 
     try {
+      // Validate installment calculation if status is 'negociada'
+      if (formData.status === 'negociada') {
+        const paymentAmount = parseFloat(formData.payment_amount_cents) * 100;
+        const installmentCount = parseInt(formData.installment_count || '0');
+        const totalAmount = parseFloat(formData.total_amount_cents) * 100;
+        const totalFromInstallments = paymentAmount * installmentCount;
+
+        if (totalFromInstallments > totalAmount) {
+          const confirmAdjust = confirm(
+            `O valor total das parcelas (${(totalFromInstallments / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}) é maior que o valor da dívida (${(totalAmount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}). Deseja ajustar o valor total da dívida para ${(totalFromInstallments / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}?`
+          );
+
+          if (confirmAdjust) {
+            formData.total_amount_cents = (totalFromInstallments / 100).toFixed(2);
+          }
+        }
+      }
+
       const response = await fetch('/api/debts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...formData,
+          name: formData.name,
+          description: formData.description || undefined,
+          creditor_name: formData.creditor_name || undefined,
           total_amount_cents: Math.round(parseFloat(formData.total_amount_cents) * 100),
           paid_amount_cents: Math.round(parseFloat(formData.paid_amount_cents || '0') * 100),
-          interest_rate: parseFloat(formData.interest_rate || '0'),
+          interest_rate_monthly: parseFloat(formData.interest_rate || '0'),
+          due_date: formData.due_date || undefined,
+          status: formData.status,
+          priority: formData.priority,
+          notes: formData.notes || undefined,
+          payment_frequency: formData.status === 'negociada' ? formData.payment_frequency : undefined,
+          payment_amount_cents: formData.status === 'negociada' && formData.payment_amount_cents
+            ? Math.round(parseFloat(formData.payment_amount_cents) * 100)
+            : undefined,
+          installment_count: formData.status === 'negociada' && formData.installment_count
+            ? parseInt(formData.installment_count)
+            : undefined,
         }),
       });
 
@@ -43,7 +83,11 @@ export default function NewDebtPage() {
 
       router.push('/app/debts');
     } catch (error: any) {
-      alert(error.message || 'Erro ao criar dívida');
+      toast({
+        variant: "destructive",
+        title: "Erro ao criar dívida",
+        description: error.message || "Ocorreu um erro ao tentar criar a dívida",
+      });
     } finally {
       setLoading(false);
     }
@@ -129,40 +173,54 @@ export default function NewDebtPage() {
 
           <div>
             <label className="block text-sm font-medium mb-2">Data de Vencimento</label>
-            <input
-              type="date"
-              value={formData.due_date}
-              onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            <DatePicker
+              date={formData.due_date ? new Date(formData.due_date) : undefined}
+              setDate={(date) => {
+                if (date) {
+                  const formattedDate = format(date, 'yyyy-MM-dd');
+                  setFormData({ ...formData, due_date: formattedDate });
+                }
+              }}
+              placeholder="Selecione a data de vencimento"
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-2">Status</label>
-            <select
+            <Select
               value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              onValueChange={(value) => setFormData({ ...formData, status: value })}
             >
-              <option value="active">Ativa</option>
-              <option value="paid">Paga</option>
-              <option value="overdue">Vencida</option>
-              <option value="negotiating">Negociando</option>
-            </select>
+              <SelectTrigger className="w-full bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Ativa</SelectItem>
+                <SelectItem value="paid">Paga</SelectItem>
+                <SelectItem value="overdue">Vencida</SelectItem>
+                <SelectItem value="paga">Paga</SelectItem>
+                <SelectItem value="negociando">Negociando</SelectItem>
+                <SelectItem value="negociada">Negociada</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-2">Prioridade</label>
-            <select
+            <Select
               value={formData.priority}
-              onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              onValueChange={(value) => setFormData({ ...formData, priority: value })}
             >
-              <option value="low">Baixa</option>
-              <option value="medium">Média</option>
-              <option value="high">Alta</option>
-              <option value="urgent">Urgente</option>
-            </select>
+              <SelectTrigger className="w-full bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low">Baixa</SelectItem>
+                <SelectItem value="medium">Média</SelectItem>
+                <SelectItem value="high">Alta</SelectItem>
+                <SelectItem value="urgent">Urgente</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -187,6 +245,61 @@ export default function NewDebtPage() {
             placeholder="Notas adicionais..."
           />
         </div>
+
+        {formData.status === 'negociada' && (
+          <div className="border-t pt-6 space-y-4">
+            <h3 className="font-semibold mb-4">Informações de Negociação</h3>
+            <div className="grid md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Frequência de Pagamento *</label>
+                <Select
+                  value={formData.payment_frequency}
+                  onValueChange={(value) => setFormData({ ...formData, payment_frequency: value })}
+                  required={formData.status === 'negociada'}
+                >
+                  <SelectTrigger className="w-full bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                    <SelectValue placeholder="Selecione a frequência" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">Diário</SelectItem>
+                    <SelectItem value="weekly">Semanal</SelectItem>
+                    <SelectItem value="biweekly">Quinzenal</SelectItem>
+                    <SelectItem value="monthly">Mensal</SelectItem>
+                    <SelectItem value="quarterly">Trimestral</SelectItem>
+                    <SelectItem value="yearly">Anual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Valor de Pagamento Periódico (R$) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.payment_amount_cents}
+                  onChange={(e) => setFormData({ ...formData, payment_amount_cents: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  placeholder="0.00"
+                  required={formData.status === 'negociada'}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Número de Parcelas *</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={formData.installment_count}
+                  onChange={(e) => setFormData({ ...formData, installment_count: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  placeholder="0"
+                  required={formData.status === 'negociada'}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-4">
           <button type="submit" className="btn-primary" disabled={loading}>

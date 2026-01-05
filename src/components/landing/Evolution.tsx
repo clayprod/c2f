@@ -17,7 +17,7 @@ const steps = [
     number: '03',
     title: 'Dashboard e categorias',
     description: 'Visualize tudo categorizado, com gráficos claros.',
-    icon: 'bx-pie-chart-alt-2',
+    icon: 'bx-pie-chart-alt',
     status: 'progress',
   },
   {

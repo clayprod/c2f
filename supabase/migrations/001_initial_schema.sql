@@ -15,23 +15,23 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 -- 2. Categories table
 CREATE TABLE IF NOT EXISTS public.categories (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  owner_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
   icon TEXT DEFAULT '📁',
   color TEXT DEFAULT '#6b7280',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(owner_id, name, type)
+  UNIQUE(user_id, name, type)
 );
 
 -- 3. Accounts table
 CREATE TABLE IF NOT EXISTS public.accounts (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  owner_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
   name TEXT NOT NULL,
   type TEXT NOT NULL CHECK (type IN ('checking', 'savings', 'credit', 'investment')),
-  balance_cents BIGINT DEFAULT 0 NOT NULL,
+  current_balance NUMERIC DEFAULT 0,
   currency TEXT DEFAULT 'BRL',
   institution TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -41,12 +41,12 @@ CREATE TABLE IF NOT EXISTS public.accounts (
 -- 4. Transactions table
 CREATE TABLE IF NOT EXISTS public.transactions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  owner_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
   account_id UUID REFERENCES public.accounts(id) ON DELETE CASCADE NOT NULL,
   category_id UUID REFERENCES public.categories(id) ON DELETE SET NULL,
   posted_at DATE NOT NULL,
   description TEXT NOT NULL,
-  amount_cents BIGINT NOT NULL,
+  amount NUMERIC NOT NULL,
   currency TEXT DEFAULT 'BRL',
   notes TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -56,19 +56,21 @@ CREATE TABLE IF NOT EXISTS public.transactions (
 -- 5. Budgets table
 CREATE TABLE IF NOT EXISTS public.budgets (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  owner_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
   category_id UUID REFERENCES public.categories(id) ON DELETE CASCADE NOT NULL,
-  month DATE NOT NULL,
-  limit_cents BIGINT NOT NULL,
+  year INTEGER NOT NULL,
+  month INTEGER NOT NULL CHECK (month >= 1 AND month <= 12),
+  amount_planned NUMERIC DEFAULT 0,
+  amount_actual NUMERIC DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(owner_id, category_id, month)
+  UNIQUE(user_id, category_id, year, month)
 );
 
 -- 6. Advisor Insights table
 CREATE TABLE IF NOT EXISTS public.advisor_insights (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  owner_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
   summary TEXT NOT NULL,
   insights JSONB DEFAULT '[]'::jsonb,
   actions JSONB DEFAULT '[]'::jsonb,
@@ -102,7 +104,7 @@ CREATE TABLE IF NOT EXISTS public.billing_subscriptions (
 -- 9. Imports table
 CREATE TABLE IF NOT EXISTS public.imports (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  owner_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
   file_url TEXT,
   dedupe_hash TEXT,
@@ -112,15 +114,15 @@ CREATE TABLE IF NOT EXISTS public.imports (
 );
 
 -- Indexes for performance
-CREATE INDEX IF NOT EXISTS idx_accounts_owner_id ON public.accounts(owner_id);
-CREATE INDEX IF NOT EXISTS idx_categories_owner_id ON public.categories(owner_id);
-CREATE INDEX IF NOT EXISTS idx_transactions_owner_id ON public.transactions(owner_id);
-CREATE INDEX IF NOT EXISTS idx_transactions_posted_at ON public.transactions(owner_id, posted_at);
+CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON public.accounts(user_id);
+CREATE INDEX IF NOT EXISTS idx_categories_user_id ON public.categories(user_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON public.transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_posted_at ON public.transactions(user_id, posted_at);
 CREATE INDEX IF NOT EXISTS idx_transactions_account_id ON public.transactions(account_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_category_id ON public.transactions(category_id);
-CREATE INDEX IF NOT EXISTS idx_budgets_owner_id ON public.budgets(owner_id);
-CREATE INDEX IF NOT EXISTS idx_advisor_insights_owner_id ON public.advisor_insights(owner_id);
-CREATE INDEX IF NOT EXISTS idx_imports_owner_id ON public.imports(owner_id);
+CREATE INDEX IF NOT EXISTS idx_budgets_user_id ON public.budgets(user_id);
+CREATE INDEX IF NOT EXISTS idx_advisor_insights_user_id ON public.advisor_insights(user_id);
+CREATE INDEX IF NOT EXISTS idx_imports_user_id ON public.imports(user_id);
 
 -- Enable RLS
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -154,16 +156,16 @@ DROP POLICY IF EXISTS "Users can update own categories" ON public.categories;
 DROP POLICY IF EXISTS "Users can delete own categories" ON public.categories;
 
 CREATE POLICY "Users can view own categories" ON public.categories
-  FOR SELECT USING (owner_id = auth.uid());
+  FOR SELECT USING (user_id = auth.uid() OR user_id IS NULL);
 
 CREATE POLICY "Users can insert own categories" ON public.categories
-  FOR INSERT WITH CHECK (owner_id = auth.uid());
+  FOR INSERT WITH CHECK (user_id = auth.uid());
 
 CREATE POLICY "Users can update own categories" ON public.categories
-  FOR UPDATE USING (owner_id = auth.uid());
+  FOR UPDATE USING (user_id = auth.uid());
 
 CREATE POLICY "Users can delete own categories" ON public.categories
-  FOR DELETE USING (owner_id = auth.uid());
+  FOR DELETE USING (user_id = auth.uid());
 
 -- RLS Policies for accounts
 DROP POLICY IF EXISTS "Users can view own accounts" ON public.accounts;
@@ -172,16 +174,16 @@ DROP POLICY IF EXISTS "Users can update own accounts" ON public.accounts;
 DROP POLICY IF EXISTS "Users can delete own accounts" ON public.accounts;
 
 CREATE POLICY "Users can view own accounts" ON public.accounts
-  FOR SELECT USING (owner_id = auth.uid());
+  FOR SELECT USING (user_id = auth.uid());
 
 CREATE POLICY "Users can insert own accounts" ON public.accounts
-  FOR INSERT WITH CHECK (owner_id = auth.uid());
+  FOR INSERT WITH CHECK (user_id = auth.uid());
 
 CREATE POLICY "Users can update own accounts" ON public.accounts
-  FOR UPDATE USING (owner_id = auth.uid());
+  FOR UPDATE USING (user_id = auth.uid());
 
 CREATE POLICY "Users can delete own accounts" ON public.accounts
-  FOR DELETE USING (owner_id = auth.uid());
+  FOR DELETE USING (user_id = auth.uid());
 
 -- RLS Policies for transactions
 DROP POLICY IF EXISTS "Users can view own transactions" ON public.transactions;
@@ -190,16 +192,16 @@ DROP POLICY IF EXISTS "Users can update own transactions" ON public.transactions
 DROP POLICY IF EXISTS "Users can delete own transactions" ON public.transactions;
 
 CREATE POLICY "Users can view own transactions" ON public.transactions
-  FOR SELECT USING (owner_id = auth.uid());
+  FOR SELECT USING (user_id = auth.uid());
 
 CREATE POLICY "Users can insert own transactions" ON public.transactions
-  FOR INSERT WITH CHECK (owner_id = auth.uid());
+  FOR INSERT WITH CHECK (user_id = auth.uid());
 
 CREATE POLICY "Users can update own transactions" ON public.transactions
-  FOR UPDATE USING (owner_id = auth.uid());
+  FOR UPDATE USING (user_id = auth.uid());
 
 CREATE POLICY "Users can delete own transactions" ON public.transactions
-  FOR DELETE USING (owner_id = auth.uid());
+  FOR DELETE USING (user_id = auth.uid());
 
 -- RLS Policies for budgets
 DROP POLICY IF EXISTS "Users can view own budgets" ON public.budgets;
@@ -208,16 +210,16 @@ DROP POLICY IF EXISTS "Users can update own budgets" ON public.budgets;
 DROP POLICY IF EXISTS "Users can delete own budgets" ON public.budgets;
 
 CREATE POLICY "Users can view own budgets" ON public.budgets
-  FOR SELECT USING (owner_id = auth.uid());
+  FOR SELECT USING (user_id = auth.uid());
 
 CREATE POLICY "Users can insert own budgets" ON public.budgets
-  FOR INSERT WITH CHECK (owner_id = auth.uid());
+  FOR INSERT WITH CHECK (user_id = auth.uid());
 
 CREATE POLICY "Users can update own budgets" ON public.budgets
-  FOR UPDATE USING (owner_id = auth.uid());
+  FOR UPDATE USING (user_id = auth.uid());
 
 CREATE POLICY "Users can delete own budgets" ON public.budgets
-  FOR DELETE USING (owner_id = auth.uid());
+  FOR DELETE USING (user_id = auth.uid());
 
 -- RLS Policies for advisor_insights
 DROP POLICY IF EXISTS "Users can view own advisor insights" ON public.advisor_insights;
@@ -225,13 +227,13 @@ DROP POLICY IF EXISTS "Users can insert own advisor insights" ON public.advisor_
 DROP POLICY IF EXISTS "Users can delete own advisor insights" ON public.advisor_insights;
 
 CREATE POLICY "Users can view own advisor insights" ON public.advisor_insights
-  FOR SELECT USING (owner_id = auth.uid());
+  FOR SELECT USING (user_id = auth.uid());
 
 CREATE POLICY "Users can insert own advisor insights" ON public.advisor_insights
-  FOR INSERT WITH CHECK (owner_id = auth.uid());
+  FOR INSERT WITH CHECK (user_id = auth.uid());
 
 CREATE POLICY "Users can delete own advisor insights" ON public.advisor_insights
-  FOR DELETE USING (owner_id = auth.uid());
+  FOR DELETE USING (user_id = auth.uid());
 
 -- RLS Policies for billing_customers
 DROP POLICY IF EXISTS "Users can view own billing customer" ON public.billing_customers;
@@ -268,16 +270,16 @@ DROP POLICY IF EXISTS "Users can update own imports" ON public.imports;
 DROP POLICY IF EXISTS "Users can delete own imports" ON public.imports;
 
 CREATE POLICY "Users can view own imports" ON public.imports
-  FOR SELECT USING (owner_id = auth.uid());
+  FOR SELECT USING (user_id = auth.uid());
 
 CREATE POLICY "Users can insert own imports" ON public.imports
-  FOR INSERT WITH CHECK (owner_id = auth.uid());
+  FOR INSERT WITH CHECK (user_id = auth.uid());
 
 CREATE POLICY "Users can update own imports" ON public.imports
-  FOR UPDATE USING (owner_id = auth.uid());
+  FOR UPDATE USING (user_id = auth.uid());
 
 CREATE POLICY "Users can delete own imports" ON public.imports
-  FOR DELETE USING (owner_id = auth.uid());
+  FOR DELETE USING (user_id = auth.uid());
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -340,5 +342,7 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+
 
 

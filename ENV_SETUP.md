@@ -59,3 +59,6 @@ O arquivo `.env` já está no `.gitignore` e não será versionado.
 5. Teste o AI Advisor: `/api/advisor/chat`
 
 
+
+
+

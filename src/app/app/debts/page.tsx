@@ -20,15 +20,35 @@ interface Debt {
 export default function DebtsPage() {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [priorityFilter, setPriorityFilter] = useState<string>('');
+  const [sortBy, setSortBy] = useState<string>('created_at');
+  const [sortOrder, setSortOrder] = useState<string>('desc');
   const router = useRouter();
 
   useEffect(() => {
     fetchDebts();
-  }, []);
+  }, [statusFilter, priorityFilter, sortBy, sortOrder]);
 
   const fetchDebts = async () => {
     try {
-      const response = await fetch('/api/debts');
+      setLoading(true);
+      const params = new URLSearchParams();
+      if (statusFilter) {
+        params.append('status', statusFilter);
+      }
+      if (priorityFilter) {
+        params.append('priority', priorityFilter);
+      }
+      if (sortBy) {
+        params.append('sortBy', sortBy);
+      }
+      if (sortOrder) {
+        params.append('order', sortOrder);
+      }
+      
+      const url = `/api/debts${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await fetch(url);
       const result = await response.json();
       if (result.data) {
         setDebts(result.data);
@@ -50,14 +70,30 @@ export default function DebtsPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'paid':
+      case 'paga':
         return 'bg-green-500/10 text-green-500 border-green-500/20';
       case 'overdue':
         return 'bg-red-500/10 text-red-500 border-red-500/20';
       case 'negotiating':
+      case 'negociando':
         return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
+      case 'negociada':
+        return 'bg-blue-400/10 text-blue-400 border-blue-400/20';
       default:
         return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
     }
+  };
+
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      active: 'Ativa',
+      paid: 'Paga',
+      overdue: 'Vencida',
+      paga: 'Paga',
+      negociando: 'Negociando',
+      negociada: 'Negociada',
+    };
+    return labels[status] || status;
   };
 
   const getPriorityColor = (priority: string) => {
@@ -94,11 +130,103 @@ export default function DebtsPage() {
         </Link>
       </div>
 
+      <div className="glass-card p-4">
+        <div className="grid md:grid-cols-4 gap-4 items-end">
+          <div>
+            <label className="block text-sm font-medium mb-2">Filtrar por Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full px-4 py-2 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="">Todos os status</option>
+              <option value="active">Ativa</option>
+              <option value="paid">Paga</option>
+              <option value="overdue">Vencida</option>
+              <option value="paga">Paga</option>
+              <option value="negociando">Negociando</option>
+              <option value="negociada">Negociada</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Filtrar por Prioridade</label>
+            <select
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+              className="w-full px-4 py-2 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="">Todas as prioridades</option>
+              <option value="low">Baixa</option>
+              <option value="medium">Média</option>
+              <option value="high">Alta</option>
+              <option value="urgent">Urgente</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Ordenar por</label>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="w-full px-4 py-2 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="created_at">Data de criação</option>
+              <option value="total_amount_cents">Valor total</option>
+              <option value="remaining_amount_cents">Valor restante</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Ordem</label>
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+              className="w-full px-4 py-2 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="desc">Maior para menor</option>
+              <option value="asc">Menor para maior</option>
+            </select>
+          </div>
+        </div>
+
+        {(statusFilter || priorityFilter) && (
+          <div className="mt-4">
+            <button
+              onClick={() => {
+                setStatusFilter('');
+                setPriorityFilter('');
+              }}
+              className="px-4 py-2 rounded-xl bg-muted hover:bg-muted/80 border border-border text-sm font-medium transition-colors"
+            >
+              <i className='bx bx-x'></i> Limpar Filtros
+            </button>
+          </div>
+        )}
+      </div>
+
       {debts.length === 0 ? (
         <div className="glass-card p-12 text-center">
           <i className='bx bx-credit-card text-4xl text-muted-foreground mb-4'></i>
-          <h3 className="font-display font-semibold mb-2">Nenhuma dívida cadastrada</h3>
-          <p className="text-muted-foreground mb-6">Comece adicionando sua primeira dívida</p>
+          <h3 className="font-display font-semibold mb-2">
+            {statusFilter || priorityFilter ? 'Nenhuma dívida encontrada' : 'Nenhuma dívida cadastrada'}
+          </h3>
+          <p className="text-muted-foreground mb-6">
+            {statusFilter || priorityFilter 
+              ? 'Tente ajustar os filtros ou adicione uma nova dívida'
+              : 'Comece adicionando sua primeira dívida'}
+          </p>
+          {(statusFilter || priorityFilter) && (
+            <button
+              onClick={() => {
+                setStatusFilter('');
+                setPriorityFilter('');
+              }}
+              className="btn-secondary mb-4"
+            >
+              <i className='bx bx-x'></i> Limpar Filtros
+            </button>
+          )}
           <Link href="/app/debts/new" className="btn-primary">
             <i className='bx bx-plus'></i>
             Adicionar Dívida
@@ -118,9 +246,7 @@ export default function DebtsPage() {
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="font-display font-semibold text-lg">{debt.name}</h3>
                       <span className={`badge-pill text-xs ${getStatusColor(debt.status)}`}>
-                        {debt.status === 'paid' ? 'Paga' :
-                         debt.status === 'overdue' ? 'Vencida' :
-                         debt.status === 'negotiating' ? 'Negociando' : 'Ativa'}
+                        {getStatusLabel(debt.status)}
                       </span>
                       {debt.priority && (
                         <span className={`text-xs font-medium ${getPriorityColor(debt.priority)}`}>

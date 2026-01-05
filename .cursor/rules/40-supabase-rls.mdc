@@ -17,3 +17,23 @@ alwaysApply: false
 ## Performance
 - Índices para colunas de filtro frequente (owner_id, date, category_id, account_id).
 - Evitar N+1 e queries duplicadas em dashboard; considerar views/materializações.
+
+## Orçamentos e Projeções
+
+### Campos de Orçamento
+- Tabela `budgets`: `source_type`, `source_id`, `is_projected`, `minimum_amount_planned`, `auto_contributions_cents`.
+- Tabela `goals`: `include_in_budget`, `contribution_frequency`, `monthly_contribution_cents`.
+- Tabela `debts`: `include_in_budget`, `contribution_frequency`, `monthly_payment_cents`.
+- Tabela `investments`: `include_in_budget`, `contribution_frequency`, `monthly_contribution_cents`.
+- Tabela `transactions`: `contribution_frequency` (para transações recorrentes).
+
+### Índices para Orçamentos
+- `idx_goals_budget_inclusion`: (user_id, include_in_budget, contribution_frequency) WHERE include_in_budget = TRUE.
+- `idx_debts_budget_inclusion`: (user_id, include_in_budget, is_negotiated, contribution_frequency) WHERE include_in_budget = TRUE AND is_negotiated = TRUE.
+- `idx_investments_budget_inclusion`: (user_id, include_in_budget, contribution_frequency) WHERE include_in_budget = TRUE.
+- `idx_transactions_recurring_frequency`: (user_id, category_id, contribution_frequency) WHERE recurrence_rule IS NOT NULL OR contribution_frequency IS NOT NULL.
+- `idx_budgets_minimum`: (user_id, category_id, minimum_amount_planned) WHERE minimum_amount_planned > 0.
+
+### Constraints
+- `budgets.amount_planned >= budgets.minimum_amount_planned` (CHECK constraint).
+- `budgets.source_type` CHECK IN ('manual', 'credit_card', 'goal', 'debt', 'recurring', 'installment').

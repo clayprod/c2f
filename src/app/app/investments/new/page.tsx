@@ -3,10 +3,17 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { DatePicker } from '@/components/ui/date-picker';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { format } from 'date-fns';
+import { pt } from 'date-fns/locale';
+import { useToast } from '@/hooks/use-toast';
 
 export default function NewInvestmentPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     name: '',
     type: 'stocks',
@@ -18,6 +25,10 @@ export default function NewInvestmentPage() {
     unit_price_cents: '',
     status: 'active',
     notes: '',
+    include_in_budget: true,
+    contribution_frequency: 'monthly',
+    monthly_contribution_cents: '',
+    create_purchase_transaction: false,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -38,6 +49,13 @@ export default function NewInvestmentPage() {
           unit_price_cents: formData.unit_price_cents
             ? Math.round(parseFloat(formData.unit_price_cents) * 100)
             : undefined,
+          monthly_contribution_cents: formData.monthly_contribution_cents
+            ? Math.round(parseFloat(formData.monthly_contribution_cents) * 100)
+            : undefined,
+          contribution_frequency: formData.include_in_budget && formData.contribution_frequency
+            ? formData.contribution_frequency
+            : undefined,
+          create_purchase_transaction: formData.create_purchase_transaction,
         }),
       });
 
@@ -48,7 +66,11 @@ export default function NewInvestmentPage() {
 
       router.push('/app/investments');
     } catch (error: any) {
-      alert(error.message || 'Erro ao criar investimento');
+      toast({
+        variant: "destructive",
+        title: "Erro ao criar investimento",
+        description: error.message || "Ocorreu um erro ao tentar criar o investimento",
+      });
     } finally {
       setLoading(false);
     }
@@ -82,19 +104,23 @@ export default function NewInvestmentPage() {
 
           <div>
             <label className="block text-sm font-medium mb-2">Tipo *</label>
-            <select
+            <Select
               value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              onValueChange={(value) => setFormData({ ...formData, type: value })}
               required
             >
-              <option value="stocks">Ações</option>
-              <option value="bonds">Títulos</option>
-              <option value="funds">Fundos</option>
-              <option value="crypto">Criptomoedas</option>
-              <option value="real_estate">Imóveis</option>
-              <option value="other">Outros</option>
-            </select>
+              <SelectTrigger className="w-full bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="stocks">Ações</SelectItem>
+                <SelectItem value="bonds">Títulos</SelectItem>
+                <SelectItem value="funds">Fundos</SelectItem>
+                <SelectItem value="crypto">Criptomoedas</SelectItem>
+                <SelectItem value="real_estate">Imóveis</SelectItem>
+                <SelectItem value="other">Outros</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
@@ -110,12 +136,15 @@ export default function NewInvestmentPage() {
 
           <div>
             <label className="block text-sm font-medium mb-2">Data de Compra *</label>
-            <input
-              type="date"
-              value={formData.purchase_date}
-              onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              required
+            <DatePicker
+              date={formData.purchase_date ? new Date(formData.purchase_date) : undefined}
+              setDate={(date) => {
+                if (date) {
+                  const formattedDate = format(date, 'yyyy-MM-dd');
+                  setFormData({ ...formData, purchase_date: formattedDate });
+                }
+              }}
+              placeholder="Selecione a data de compra"
             />
           </div>
 
@@ -174,15 +203,19 @@ export default function NewInvestmentPage() {
 
           <div>
             <label className="block text-sm font-medium mb-2">Status</label>
-            <select
+            <Select
               value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              onValueChange={(value) => setFormData({ ...formData, status: value })}
             >
-              <option value="active">Ativo</option>
-              <option value="sold">Vendido</option>
-              <option value="matured">Vencido</option>
-            </select>
+              <SelectTrigger className="w-full bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Ativo</SelectItem>
+                <SelectItem value="sold">Vendido</SelectItem>
+                <SelectItem value="matured">Vencido</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -195,6 +228,70 @@ export default function NewInvestmentPage() {
             rows={3}
             placeholder="Observações sobre o investimento..."
           />
+        </div>
+
+        <div className="border-t pt-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <Checkbox
+              id="create_purchase_transaction"
+              checked={formData.create_purchase_transaction}
+              onCheckedChange={(checked) => setFormData({ ...formData, create_purchase_transaction: checked === true })}
+            />
+            <label htmlFor="create_purchase_transaction" className="text-sm font-medium cursor-pointer">
+              Criar transação de compra automaticamente
+            </label>
+          </div>
+          <div className="flex items-center gap-3">
+            <Checkbox
+              id="include_in_budget"
+              checked={formData.include_in_budget}
+              onCheckedChange={(checked) => setFormData({ ...formData, include_in_budget: checked === true })}
+            />
+            <label htmlFor="include_in_budget" className="text-sm font-medium cursor-pointer">
+              Incluir no orçamento
+            </label>
+          </div>
+
+          {formData.include_in_budget && (
+            <div className="grid md:grid-cols-2 gap-4 pl-6 border-l-2 border-primary/30">
+              <div>
+                <label className="block text-sm font-medium mb-2">Frequência de Aporte *</label>
+                <Select
+                  value={formData.contribution_frequency}
+                  onValueChange={(value) => setFormData({ ...formData, contribution_frequency: value })}
+                  required={formData.include_in_budget}
+                >
+                  <SelectTrigger className="w-full bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                    <SelectValue placeholder="Selecione a frequência" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">Diário</SelectItem>
+                    <SelectItem value="weekly">Semanal</SelectItem>
+                    <SelectItem value="biweekly">Quinzenal</SelectItem>
+                    <SelectItem value="monthly">Mensal</SelectItem>
+                    <SelectItem value="quarterly">Trimestral</SelectItem>
+                    <SelectItem value="yearly">Anual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Valor Mensal do Aporte (R$)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.monthly_contribution_cents}
+                  onChange={(e) => setFormData({ ...formData, monthly_contribution_cents: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  placeholder="0.00"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Valor mensal calculado automaticamente baseado na frequência, ou defina manualmente
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-4">

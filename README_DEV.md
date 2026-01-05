@@ -53,3 +53,6 @@ curl http://localhost:3000/api/health
 Veja `DEV_SETUP.md` para troubleshooting detalhado.
 
 
+
+
+

@@ -61,7 +61,7 @@ export default function ImportModal({
 
     if (!isValid) {
       toast({
-        title: 'Erro',
+        title: 'Formato de arquivo inválido',
         description: `Por favor, selecione um arquivo ${importType.toUpperCase()} válido`,
         variant: 'destructive',
       });
@@ -76,8 +76,8 @@ export default function ImportModal({
   const handleImport = async () => {
     if (!file) {
       toast({
-        title: 'Erro',
-        description: 'Por favor, selecione um arquivo',
+        title: 'Nenhum arquivo selecionado',
+        description: 'Por favor, selecione um arquivo para importar',
         variant: 'destructive',
       });
       return;
@@ -136,8 +136,8 @@ export default function ImportModal({
         message: error.message || `Erro ao importar ${importType.toUpperCase()}`,
       });
       toast({
-        title: 'Erro',
-        description: error.message || `Erro ao importar ${importType.toUpperCase()}`,
+        title: 'Falha na importação',
+        description: error.message || `Não foi possível importar o arquivo ${importType.toUpperCase()}. Verifique o formato e tente novamente.`,
         variant: 'destructive',
       });
     } finally {
@@ -337,3 +337,6 @@ export default function ImportModal({
     </Dialog>
   );
 }
+
+
+

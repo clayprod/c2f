@@ -75,8 +75,8 @@ export default function AccountsPage() {
     } catch (error) {
       console.error('Error fetching accounts:', error);
       toast({
-        title: 'Erro',
-        description: 'Não foi possível carregar as contas',
+        title: 'Falha ao carregar contas',
+        description: 'Não foi possível carregar as contas. Verifique sua conexão e tente novamente.',
         variant: 'destructive',
       });
     } finally {
@@ -87,8 +87,8 @@ export default function AccountsPage() {
   const handleSubmit = async () => {
     if (!formData.name.trim()) {
       toast({
-        title: 'Erro',
-        description: 'Nome é obrigatório',
+        title: 'Campo obrigatório',
+        description: 'O nome da conta é obrigatório',
         variant: 'destructive',
       });
       return;
@@ -390,7 +390,7 @@ export default function AccountsPage() {
                   <button
                     key={color}
                     type="button"
-                    className={`w-8 h-8 rounded-full border-2 transition-transform ${
+                    className={`w-10 h-10 rounded-lg border-2 transition-all ${
                       formData.color === color ? 'border-foreground scale-110' : 'border-transparent'
                     }`}
                     style={{ backgroundColor: color }}

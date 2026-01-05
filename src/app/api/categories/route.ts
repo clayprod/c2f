@@ -1,26 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientFromRequest } from '@/lib/supabase/server';
 import { getUserId } from '@/lib/auth';
 import { categorySchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = await createClient();
-    const { data, error } = await supabase
+    const { searchParams } = new URL(request.url);
+    const sourceType = searchParams.get('source_type'); // Filter by source type
+    const type = searchParams.get('type'); // Filter by income/expense
+    const includeInactive = searchParams.get('include_inactive') === 'true'; // Include inactive categories
+
+    const { supabase } = createClientFromRequest(request);
+    let query = supabase
       .from('categories')
       .select('*')
-      .eq('user_id', userId)
-      .order('name', { ascending: true });
+      .eq('user_id', userId);
 
-    if (error) throw error;
+    if (sourceType) {
+      query = query.eq('source_type', sourceType);
+    }
 
-    return NextResponse.json({ data });
+    if (type) {
+      query = query.eq('type', type);
+    }
+
+    const { data: allData, error } = await query.order('name', { ascending: true });
+
+    if (error) {
+      // If error is about missing column, return all categories (backward compatibility)
+      if (error.message?.includes('is_active') || error.message?.includes('column')) {
+        console.warn('is_active column may not exist yet, returning all categories');
+        return NextResponse.json({ data: allData || [] });
+      }
+      throw error;
+    }
+
+    // Filter by is_active in JavaScript for better compatibility
+    // If includeInactive is false, only return active categories (including null/undefined for backward compatibility)
+    let data = allData;
+    if (!includeInactive && allData) {
+      data = allData.filter(cat => {
+        // Treat null, undefined, or true as active
+        return cat.is_active !== false;
+      });
+    }
+
+    return NextResponse.json({ data: data || [] });
   } catch (error) {
     const errorResponse = createErrorResponse(error);
     return NextResponse.json(
@@ -32,7 +63,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -40,12 +71,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validated = categorySchema.parse(body);
 
-    const supabase = await createClient();
+    const { supabase } = createClientFromRequest(request);
     const { data, error } = await supabase
       .from('categories')
       .insert({
         ...validated,
         user_id: userId,
+        // If source_type is not provided, default to 'general'
+        source_type: validated.source_type || 'general',
+        // If is_active is not provided, default to true
+        is_active: validated.is_active !== undefined ? validated.is_active : true,
       })
       .select()
       .single();

@@ -37,17 +37,25 @@ export async function createCheckoutSession(
   successUrl: string,
   cancelUrl: string
 ): Promise<string> {
+  console.log('[Stripe] Creating checkout session for user:', userId);
+  console.log('[Stripe] Price ID:', priceId);
+
   const stripe = getStripeClient();
   const supabase = await createClient();
-  
+
   // Get user email
   const { data: { user } } = await supabase.auth.getUser();
+  console.log('[Stripe] User email:', user?.email || 'NOT FOUND');
+
   if (!user?.email) {
     throw new Error('User email not found');
   }
-  
-  const customerId = await getOrCreateStripeCustomer(userId, user.email);
 
+  console.log('[Stripe] Getting or creating Stripe customer...');
+  const customerId = await getOrCreateStripeCustomer(userId, user.email);
+  console.log('[Stripe] Customer ID:', customerId);
+
+  console.log('[Stripe] Creating checkout session...');
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     mode: 'subscription',
@@ -64,6 +72,9 @@ export async function createCheckoutSession(
       user_id: userId,
     },
   });
+
+  console.log('[Stripe] Checkout session created:', session.id);
+  console.log('[Stripe] Checkout URL:', session.url);
 
   return session.url || '';
 }

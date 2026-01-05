@@ -76,3 +76,6 @@ const result = await response.json();
 - Se não for fornecida uma conta, usa a primeira conta do usuário ou cria uma padrão
 
 
+
+
+

@@ -14,6 +14,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { DatePicker } from '@/components/ui/date-picker';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { format } from 'date-fns';
+import { pt } from 'date-fns/locale';
 
 export interface Transaction {
   id?: string;
@@ -29,13 +34,24 @@ export interface Transaction {
   installment_total?: number;
 }
 
+interface Account {
+  id: string;
+  name: string;
+  type?: string;
+  icon?: string;
+  color?: string;
+  last_four_digits?: string;
+  is_expired?: boolean;
+}
+
 interface TransactionFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: TransactionFormData) => Promise<void>;
   transaction?: Transaction;
-  accounts: Array<{ id: string; name: string }>;
-  categories: Array<{ id: string; name: string; type: string }>;
+  accounts: Account[];
+  creditCards?: Account[];
+  categories: Array<{ id: string; name: string; type: string; source_type?: string | null }>;
 }
 
 const formSchema = z.object({
@@ -59,12 +75,23 @@ const RECURRENCE_OPTIONS = [
   { value: 'custom', label: 'Personalizada' },
 ];
 
+const CONTRIBUTION_FREQUENCY_OPTIONS = [
+  { value: '', label: 'Selecione a frequência' },
+  { value: 'daily', label: 'Diário' },
+  { value: 'weekly', label: 'Semanal' },
+  { value: 'biweekly', label: 'Quinzenal' },
+  { value: 'monthly', label: 'Mensal' },
+  { value: 'quarterly', label: 'Trimestral' },
+  { value: 'yearly', label: 'Anual' },
+];
+
 export default function TransactionForm({
   open,
   onOpenChange,
   onSubmit,
   transaction,
   accounts,
+  creditCards = [],
   categories,
 }: TransactionFormProps) {
   const [loading, setLoading] = useState(false);
@@ -72,9 +99,10 @@ export default function TransactionForm({
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceType, setRecurrenceType] = useState('');
   const [customRecurrence, setCustomRecurrence] = useState('');
+  const [contributionFrequency, setContributionFrequency] = useState<string>('');
   const [isInstallment, setIsInstallment] = useState(false);
   const [installmentNumber, setInstallmentNumber] = useState('1');
-  const [installmentTotal, setInstallmentTotal] = useState('1');
+  const [installmentTotal, setInstallmentTotal] = useState('12');
 
   const {
     register,
@@ -97,6 +125,23 @@ export default function TransactionForm({
 
   const selectedAccountId = watch('account_id');
   const filteredCategories = categories;
+  
+  // Combine accounts and credit cards into a single list
+  // Filter out expired credit cards
+  const allAccounts = [
+    ...accounts.map(acc => ({ ...acc, isCreditCard: false })),
+    ...creditCards
+      .filter(card => !card.is_expired) // Filter out expired cards
+      .map(card => ({ ...card, isCreditCard: true }))
+  ];
+  
+  // Group categories by source_type
+  const generalIncome = categories.filter(c => c.type === 'income' && (c.source_type === 'general' || !c.source_type));
+  const generalExpense = categories.filter(c => c.type === 'expense' && (c.source_type === 'general' || !c.source_type));
+  const creditCardCategories = categories.filter(c => c.source_type === 'credit_card');
+  const investmentCategories = categories.filter(c => c.source_type === 'investment');
+  const goalCategories = categories.filter(c => c.source_type === 'goal');
+  const debtCategories = categories.filter(c => c.source_type === 'debt');
 
   // Initialize state from transaction when editing
   useEffect(() => {
@@ -149,7 +194,28 @@ export default function TransactionForm({
     }
   }, [transaction, reset, open]);
 
+  const [showFutureDateDialog, setShowFutureDateDialog] = useState(false);
+  const [pendingSubmitData, setPendingSubmitData] = useState<TransactionFormData | null>(null);
+
   const onFormSubmit = async (data: TransactionFormData) => {
+    // Check if date is in the future
+    const transactionDate = new Date(data.posted_at);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    transactionDate.setHours(0, 0, 0, 0);
+
+    if (transactionDate > today) {
+      // Show confirmation dialog
+      setPendingSubmitData(data);
+      setShowFutureDateDialog(true);
+      return;
+    }
+
+    // Proceed with submission
+    await submitTransaction(data);
+  };
+
+  const submitTransaction = async (data: TransactionFormData) => {
     try {
       setLoading(true);
       // Convert amount string to cents
@@ -168,12 +234,14 @@ export default function TransactionForm({
         type: transactionType,
         is_recurring: isRecurring,
         recurrence_rule: recurrence_rule,
+        contribution_frequency: isRecurring && contributionFrequency ? contributionFrequency : undefined,
         installment_number: isInstallment ? parseInt(installmentNumber) : undefined,
         installment_total: isInstallment ? parseInt(installmentTotal) : undefined,
       } as any);
 
       onOpenChange(false);
       reset();
+      setPendingSubmitData(null);
     } catch (error) {
       console.error('Error submitting transaction:', error);
     } finally {
@@ -181,9 +249,21 @@ export default function TransactionForm({
     }
   };
 
+  const handleConfirmFutureDate = async () => {
+    if (pendingSubmitData) {
+      await submitTransaction(pendingSubmitData);
+    }
+    setShowFutureDateDialog(false);
+  };
+
+  const handleCancelFutureDate = () => {
+    setShowFutureDateDialog(false);
+    setPendingSubmitData(null);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle>
             {transaction ? 'Editar Transação' : 'Nova Transação'}
@@ -222,50 +302,119 @@ export default function TransactionForm({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="account_id">Conta *</Label>
-              <select
-                id="account_id"
-                {...register('account_id')}
-                className="w-full px-3 py-2 rounded-md border border-input bg-background"
-              >
-                <option value="">Selecione uma conta</option>
-                {accounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name}
-                  </option>
-                ))}
-              </select>
-              {errors.account_id && (
-                <p className="text-sm text-destructive mt-1">{errors.account_id.message}</p>
-              )}
-            </div>
+          {/* Account/Credit Card Selection */}
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                {(() => {
+                  const selectedAccount = allAccounts.find(acc => acc.id === selectedAccountId);
+                  const isCreditCard = selectedAccount?.isCreditCard || selectedAccount?.type === 'credit';
+                  return (
+                    <Label htmlFor="account_id">{isCreditCard ? 'Forma de pagamento' : 'Conta'} *</Label>
+                  );
+                })()}
+                <Select
+                  onValueChange={(value) => {
+                    const event = { target: { name: 'account_id', value } } as any;
+                    register('account_id').onChange(event);
+                  }}
+                  value={watch('account_id')}
+                >
+                  <SelectTrigger id="account_id" className="w-full">
+                    <SelectValue placeholder="Selecione uma conta ou cartão" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allAccounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.isCreditCard ? '💳' : account.icon || '🏦'} {account.name}
+                        {account.isCreditCard && account.last_four_digits ? ` **** ${account.last_four_digits}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.account_id && (
+                  <p className="text-sm text-destructive mt-1">{errors.account_id.message}</p>
+                )}
+              </div>
 
             <div>
               <Label htmlFor="category_id">Categoria</Label>
-              <select
-                id="category_id"
-                {...register('category_id')}
-                className="w-full px-3 py-2 rounded-md border border-input bg-background"
+              <Select
+                onValueChange={(value) => {
+                  const event = { target: { name: 'category_id', value } } as any;
+                  register('category_id').onChange(event);
+                }}
+                value={watch('category_id')}
               >
-                <option value="">Sem categoria</option>
-                <optgroup label="Receitas">
-                  {filteredCategories.filter(c => c.type === 'income').map((category) => (
-                    <option key={category.id} value={category.id}>
+                <SelectTrigger id="category_id" className="w-full">
+                  <SelectValue placeholder="Sem categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Sem categoria</SelectItem>
+                  {generalIncome.length > 0 && (
+                    <SelectItem value="group-income" disabled>
+                      ────────────── Receitas ──────────────
+                    </SelectItem>
+                  )}
+                  {generalIncome.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
                       {category.name}
-                    </option>
+                    </SelectItem>
                   ))}
-                </optgroup>
-                <optgroup label="Despesas">
-                  {filteredCategories.filter(c => c.type === 'expense').map((category) => (
-                    <option key={category.id} value={category.id}>
+                  {generalExpense.length > 0 && (
+                    <SelectItem value="group-expense" disabled>
+                      ────────────── Despesas ──────────────
+                    </SelectItem>
+                  )}
+                  {generalExpense.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
                       {category.name}
-                    </option>
+                    </SelectItem>
                   ))}
-                </optgroup>
-              </select>
+                  {creditCardCategories.length > 0 && (
+                    <SelectItem value="group-credit" disabled>
+                      ────────────── 💳 Cartões de Crédito ──────────────
+                    </SelectItem>
+                  )}
+                  {creditCardCategories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                  {investmentCategories.length > 0 && (
+                    <SelectItem value="group-investment" disabled>
+                      ────────────── 📊 Investimentos ──────────────
+                    </SelectItem>
+                  )}
+                  {investmentCategories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                  {goalCategories.length > 0 && (
+                    <SelectItem value="group-goal" disabled>
+                      ────────────── 🎯 Objetivos ──────────────
+                    </SelectItem>
+                  )}
+                  {goalCategories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                  {debtCategories.length > 0 && (
+                    <SelectItem value="group-debt" disabled>
+                      ────────────── 💳 Dívidas ──────────────
+                    </SelectItem>
+                  )}
+                  {debtCategories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+          </div>
           </div>
 
           <div>
@@ -280,7 +429,7 @@ export default function TransactionForm({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="amount">Valor (R$) *</Label>
               <Input
@@ -306,10 +455,16 @@ export default function TransactionForm({
 
             <div>
               <Label htmlFor="posted_at">Data *</Label>
-              <Input
-                id="posted_at"
-                type="date"
-                {...register('posted_at')}
+              <DatePicker
+                date={watch('posted_at') ? new Date(watch('posted_at')) : undefined}
+                setDate={(date) => {
+                  if (date) {
+                    const formattedDate = format(date, 'yyyy-MM-dd');
+                    // Update the form field value
+                    const event = { target: { name: 'posted_at', value: formattedDate } } as any;
+                    register('posted_at').onChange(event);
+                  }
+                }}
               />
               {errors.posted_at && (
                 <p className="text-sm text-destructive mt-1">{errors.posted_at.message}</p>
@@ -329,41 +484,82 @@ export default function TransactionForm({
 
           {/* Installment Section */}
           <div className="border-t border-border pt-4">
-            <div className="flex items-center gap-2 mb-3">
-              <input
-                type="checkbox"
+            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+              <Checkbox
                 id="isInstallment"
                 checked={isInstallment}
-                onChange={(e) => setIsInstallment(e.target.checked)}
-                className="rounded border-border"
+                onCheckedChange={(checked) => setIsInstallment(checked === true)}
+                className="h-5 w-5"
               />
-              <label htmlFor="isInstallment" className="flex items-center gap-2 text-sm font-medium cursor-pointer">
-                <i className='bx bx-credit-card'></i>
-                Transação Parcelada
+              <label htmlFor="isInstallment" className="flex items-center gap-2 text-sm font-medium cursor-pointer flex-1">
+                <i className='bx bx-credit-card text-lg'></i>
+                <span>Compra Parcelada</span>
               </label>
             </div>
 
             {isInstallment && (
-              <div className="grid grid-cols-2 gap-4 pl-6 border-l-2 border-primary/30">
-                <div>
-                  <Label>Parcela Atual</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={installmentNumber}
-                    onChange={(e) => setInstallmentNumber(e.target.value)}
-                    placeholder="1"
-                  />
-                </div>
-                <div>
-                  <Label>Total de Parcelas</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={installmentTotal}
-                    onChange={(e) => setInstallmentTotal(e.target.value)}
-                    placeholder="12"
-                  />
+              <div className="space-y-4 pl-4 sm:pl-6 border-l-2 border-primary/30">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {(() => {
+                    const selectedAccount = allAccounts.find(acc => acc.id === selectedAccountId);
+                    const isCreditCard = selectedAccount?.isCreditCard || false;
+                    
+                    return (
+                      <>
+                        {!isCreditCard && (
+                          <div>
+                            <Label>Parcela Atual</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={installmentNumber}
+                              onChange={(e) => setInstallmentNumber(e.target.value)}
+                              placeholder="1"
+                            />
+                          </div>
+                        )}
+                        <div className={isCreditCard ? 'col-span-1' : ''}>
+                          <Label>Total de Parcelas</Label>
+                          <div className="flex flex-wrap gap-2">
+                            {[2, 3, 6, 10, 12].map((num) => (
+                              <button
+                                key={num}
+                                type="button"
+                                onClick={() => setInstallmentTotal(String(num))}
+                                className={`px-3 py-1.5 rounded border text-sm transition-all shrink-0 ${
+                                  installmentTotal === String(num)
+                                    ? 'border-primary bg-primary/10 text-primary'
+                                    : 'border-border hover:bg-muted/50'
+                                }`}
+                              >
+                                {num}x
+                              </button>
+                            ))}
+                            <Input
+                              type="number"
+                              min="2"
+                              max="48"
+                              value={installmentTotal}
+                              onChange={(e) => setInstallmentTotal(e.target.value)}
+                              placeholder="Outro"
+                              className="w-20 shrink-0"
+                            />
+                          </div>
+                        </div>
+                        {isCreditCard && parseInt(installmentTotal) > 1 && (
+                          <div className="col-span-2 bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-sm">
+                            <p className="flex items-center gap-2 text-blue-500">
+                              <i className='bx bx-info-circle'></i>
+                              <strong>Parcelamento automático</strong>
+                            </p>
+                            <p className="text-muted-foreground mt-1">
+                              Serão criadas {installmentTotal} parcelas automaticamente nas faturas dos próximos meses.
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             )}
@@ -371,35 +567,60 @@ export default function TransactionForm({
 
           {/* Recurrence Section */}
           <div className="border-t border-border pt-4">
-            <div className="flex items-center gap-2 mb-3">
-              <input
-                type="checkbox"
+            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+              <Checkbox
                 id="isRecurring"
                 checked={isRecurring}
-                onChange={(e) => setIsRecurring(e.target.checked)}
-                className="rounded border-border"
+                onCheckedChange={(checked) => setIsRecurring(checked === true)}
+                className="h-5 w-5"
               />
-              <label htmlFor="isRecurring" className="flex items-center gap-2 text-sm font-medium cursor-pointer">
-                <i className='bx bx-repeat'></i>
-                Transação Recorrente
+              <label htmlFor="isRecurring" className="flex items-center gap-2 text-sm font-medium cursor-pointer flex-1">
+                <i className='bx bx-repeat text-lg'></i>
+                <span>Transação Recorrente</span>
               </label>
             </div>
 
             {isRecurring && (
               <div className="space-y-3 pl-6 border-l-2 border-primary/30">
                 <div>
-                  <Label>Frequência</Label>
-                  <select
-                    value={recurrenceType}
-                    onChange={(e) => setRecurrenceType(e.target.value)}
-                    className="w-full px-3 py-2 rounded-md border border-input bg-background"
+                  <Label htmlFor="contribution_frequency">Frequência para Orçamento *</Label>
+                  <Select
+                    value={contributionFrequency}
+                    onValueChange={setContributionFrequency}
+                    required={isRecurring}
                   >
-                    {RECURRENCE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger id="contribution_frequency" className="w-full">
+                      <SelectValue placeholder="Selecione a frequência" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CONTRIBUTION_FREQUENCY_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Esta frequência será usada para incluir automaticamente nos orçamentos
+                  </p>
+                </div>
+                <div>
+                  <Label>Frequência</Label>
+                  <Select
+                    value={recurrenceType}
+                    onValueChange={setRecurrenceType}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecione a frequência" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {RECURRENCE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {recurrenceType === 'custom' && (
@@ -434,6 +655,33 @@ export default function TransactionForm({
           </DialogFooter>
         </form>
       </DialogContent>
+
+      {/* Future Date Confirmation Dialog */}
+      <Dialog open={showFutureDateDialog} onOpenChange={setShowFutureDateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Transação Futura</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Esta transação será criada com data futura e aparecerá apenas como projeção (orçamento) até a data chegar. Deseja continuar?
+          </p>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCancelFutureDate}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirmFutureDate}
+            >
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

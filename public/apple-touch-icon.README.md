@@ -16,3 +16,6 @@ Este arquivo deve ser uma imagem PNG de 180x180 pixels.
 O Next.js já está configurado para servir este arquivo automaticamente quando ele existir.
 
 
+
+
+
