@@ -36,5 +36,14 @@ build
 *.sw?
 
 # Gemini
-.gemini/
+.gemini/settings.json
 gemini.md
+
+# Claude
+.claude/settings.local.json
+
+# Cursor settings (if any sensitive files exist)
+# .cursor/settings.json (add if needed)
+
+# Qwen (if exists)
+.qwen/

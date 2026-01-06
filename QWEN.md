@@ -367,3 +367,31 @@ Frequências suportadas: `daily`, `weekly`, `biweekly`, `monthly`, `quarterly`, 
 ### Performance Considerations
 - O cálculo de valores reais para orçamentos deve ser feito em lote para evitar problemas N+1
 - Consultas devem ser otimizadas usando funções de janela quando apropriado
+
+---
+
+## Organização de Documentação
+
+### Estrutura de Diretórios
+
+A documentação do projeto está organizada da seguinte forma:
+
+- **Raiz do projeto**: Arquivos essenciais como `README.md`, `QWEN.md`, `CLAUDE.md`, e arquivos de configuração específicos de IA (`.gemini/`, `.cursor/`, `.claude/`)
+- **`/docs`**: Documentação geral do projeto, guias, especificações e recomendações
+- **`/setup`**: Documentação de configuração, instalação e variáveis de ambiente
+- **`/troubleshooting`**: Documentação de resolução de problemas, erros comuns e soluções
+
+### Regras de Organização
+
+- **Arquivos especiais mantidos na raiz**: `QWEN.md`, `CLAUDE.md`, e quaisquer arquivos de regras específicas de IA (como `cursor-rules.md` se existir)
+- **Documentação de setup**: Inclui arquivos como `DEV_SETUP.md`, `ENV_SETUP.md`, `CONFIGURACAO_COMPLETA.md`, `STRIPE_WEBHOOK_SETUP.md`, `EASYPANEL_WEBHOOK_SETUP.md`, etc.
+- **Documentação de troubleshooting**: Inclui arquivos como `DOCKER_TROUBLESHOOTING.md`, `PROBLEMAS_IDENTIFICADOS.md`, `PROBLEMAS_VISUAIS_RESOLVIDOS.md`, etc.
+- **Documentação geral**: Inclui arquivos como `IMPROVEMENTS.md`, `README_LOGOS.md`, e outros guias ou especificações
+
+### Diretrizes para Adição de Novos Arquivos
+
+- Avalie o tipo de conteúdo e coloque no diretório mais apropriado
+- Se for uma nova guideline específica para um modelo de IA, crie na raiz com o nome apropriado (ex: `gemini.md`)
+- Se for um guia de configuração, coloque em `/setup`
+- Se for uma solução para problemas comuns, coloque em `/troubleshooting`
+- Se for documentação geral do projeto, coloque em `/docs`
