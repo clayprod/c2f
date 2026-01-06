@@ -289,6 +289,16 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <i className='bx bx-door-open text-xl'></i>
               </button>
             </div>
+
+            {/* Links to legal pages */}
+            <div className="flex flex-col gap-1 mt-3 px-4 text-xs text-muted-foreground">
+              <Link href="/app/terms-of-service" className="hover:text-foreground transition-colors">
+                Termos de Uso
+              </Link>
+              <Link href="/app/privacy-policy" className="hover:text-foreground transition-colors">
+                Política de Privacidade
+              </Link>
+            </div>
           </div>
         </div>
       </aside>

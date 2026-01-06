@@ -72,9 +72,16 @@ export async function middleware(request: NextRequest) {
 
   // Rotas protegidas
   const protectedRoutes = ['/app'];
-  const isProtectedRoute = protectedRoutes.some((route) =>
+  // Exceções para páginas que podem ser acessadas sem autenticação
+  const publicAppRoutes = ['/app/terms-of-service', '/app/privacy-policy'];
+
+  const isPublicAppRoute = publicAppRoutes.some((route) =>
     request.nextUrl.pathname.startsWith(route)
   );
+
+  const isProtectedRoute = protectedRoutes.some((route) =>
+    request.nextUrl.pathname.startsWith(route)
+  ) && !isPublicAppRoute;
 
   // Se é rota protegida e não há sessão, redirecionar para login
   if (isProtectedRoute && !session) {

@@ -147,13 +147,13 @@ export default function LoginPage() {
 
         <p className="text-center text-xs text-muted-foreground mt-6">
           Ao entrar, você concorda com nossos{' '}
-          <a href="#" className="text-primary hover:underline">
+          <Link href="/terms-of-service" className="text-primary hover:underline">
             Termos de Uso
-          </a>{' '}
+          </Link>{' '}
           e{' '}
-          <a href="#" className="text-primary hover:underline">
-            Politica de Privacidade
-          </a>
+          <Link href="/privacy-policy" className="text-primary hover:underline">
+            Política de Privacidade
+          </Link>
         </p>
       </div>
     </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { createClient } from '@/lib/supabase/client';
@@ -244,7 +245,9 @@ export default function SettingsPage() {
             gender: profileData.gender || '',
           });
           if (profileData.birth_date) {
-            setBirthDate(new Date(profileData.birth_date));
+            // Treats date as local instead of UTC to prevent timezone shifts
+            const [year, month, day] = profileData.birth_date.split('-').map(Number);
+            setBirthDate(new Date(year, month - 1, day));
           } else {
             setBirthDate(undefined);
           }
@@ -410,7 +413,7 @@ export default function SettingsPage() {
           avatar_url: formData.avatar_url || null,
           city: formData.city || null,
           state: formData.state || null,
-          birth_date: birthDate ? birthDate.toISOString().split('T')[0] : null,
+          birth_date: birthDate ? format(birthDate, 'yyyy-MM-dd') : null,
           gender: formData.gender || null,
         })
         .eq('id', profile.id);
@@ -432,7 +435,7 @@ export default function SettingsPage() {
         gender: formData.gender || null,
       } : null);
     } catch (error: any) {
-      console.error('Error saving profile:', error);
+      console.error('Error saving profile:', JSON.stringify(error, null, 2));
       toast({
         title: 'Falha ao salvar perfil',
         description: error.message || 'Não foi possível salvar as alterações no perfil. Tente novamente.',

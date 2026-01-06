@@ -386,13 +386,13 @@ export default function SignupPage() {
 
         <p className="text-center text-xs text-muted-foreground mt-6">
           Ao criar sua conta, você concorda com nossos{' '}
-          <a href="#" className="text-primary hover:underline">
+          <Link href="/terms-of-service" className="text-primary hover:underline">
             Termos de Uso
-          </a>{' '}
+          </Link>{' '}
           e{' '}
-          <a href="#" className="text-primary hover:underline">
+          <Link href="/privacy-policy" className="text-primary hover:underline">
             Política de Privacidade
-          </a>
+          </Link>
         </p>
       </div>
     </div>

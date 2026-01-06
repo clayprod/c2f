@@ -21,7 +21,7 @@ const Navbar = () => {
 
   const navLinks = [
     { label: 'Produto', href: '#features' },
-    { label: 'Preços', href: '/pricing' },
+    { label: 'Preços', href: '#pricing' },
     { label: 'Segurança', href: '#security' },
     { label: 'FAQ', href: '#faq' },
   ];

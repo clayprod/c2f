@@ -16,10 +16,8 @@ const footerLinks = {
     { label: 'Contato', href: 'mailto:contato@c2finance.com' },
   ],
   legal: [
-    { label: 'Segurança', href: '#security' },
-    { label: 'Privacidade', href: '#' },
-    { label: 'LGPD', href: '#' },
-    { label: 'Termos', href: '#' },
+    { label: 'Termos de Uso', href: '/terms-of-service' },
+    { label: 'Política de Privacidade', href: '/privacy-policy' },
   ],
 };
 
@@ -45,13 +43,13 @@ const Footer = () => {
               Controle financeiro inteligente com AI Advisor.
             </p>
             <div className="flex gap-4">
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors" aria-label="Twitter">
+              <a href="https://twitter.com/c2finance" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors" aria-label="Twitter">
                 <i className='bxl bx-twitter text-xl'></i>
               </a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors" aria-label="LinkedIn">
+              <a href="https://linkedin.com/company/c2finance" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors" aria-label="LinkedIn">
                 <i className='bxl bx-linkedin text-xl'></i>
               </a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors" aria-label="Instagram">
+              <a href="https://instagram.com/c2finance" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors" aria-label="Instagram">
                 <i className='bxl bx-instagram text-xl'></i>
               </a>
             </div>
