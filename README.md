@@ -1,73 +1,63 @@
-# Welcome to your Lovable project
+# c2finance - Plataforma de Gestão Financeira
 
-## Project info
+c2finance é uma plataforma de gestão financeira moderna e completa, construída com Next.js e Supabase. Ela oferece um conjunto robusto de ferramentas para ajudar os usuários a rastrear, analisar e otimizar suas finanças.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Principais Funcionalidades
 
-## How can I edit this code?
+- **Controle Financeiro Essencial:** Gerencie contas, transações e orçamentos de forma centralizada.
+- **Gestão de Assinaturas:** Integração com Stripe para gerenciar faturas e assinaturas.
+- **Consultor de IA:** Um "Consultor de IA" integrado com Groq e/ou OpenAI para fornecer insights e recomendações financeiras.
+- **Integração Open Banking:** Conecte-se a contas bancárias e sincronize transações automaticamente usando a integração com a Pluggy.
+- **Importação de Dados:** Funcionalidade para importar dados financeiros.
 
-There are several ways of editing your application.
+## Pilha de Tecnologias
 
-**Use Lovable**
+- **Frontend:** Next.js (App Router), React, TypeScript, Tailwind CSS, Radix UI.
+- **Backend:** Next.js API Routes.
+- **Banco de Dados e Autenticação:** Supabase (PostgreSQL) com Row Level Security (RLS) para garantir a privacidade dos dados.
+- **Serviços Adicionais:** Redis (Upstash) para gerenciamento de sessões de IA.
+- **Containerização:** Docker e Docker Compose.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Começando
 
-Changes made via Lovable will be committed automatically to this repo.
+### Pré-requisitos
 
-**Use your preferred IDE**
+- [Docker](https://www.docker.com/products/docker-desktop/)
+- [Node.js](https://nodejs.org/) (versão 20 ou superior)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Configuração
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+1.  **Clone o repositório:**
+    ```sh
+    git clone <URL_DO_SEU_REPOSITORIO_GIT>
+    cd <NOME_DO_SEU_PROJETO>
+    ```
 
-Follow these steps:
+2.  **Crie o arquivo de ambiente:**
+    Copie o arquivo `env.example` para um novo arquivo chamado `.env` e preencha as variáveis de ambiente com suas credenciais para Supabase, Stripe, provedor de IA (Groq/OpenAI), Pluggy e Redis.
+    ```sh
+    cp env.example .env
+    ```
+
+3.  **Instale as dependências:**
+    ```sh
+    npm install
+    ```
+
+### Executando o Ambiente de Desenvolvimento
+
+Para iniciar o ambiente de desenvolvimento com hot-reloading, use o Docker Compose:
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+docker-compose -f docker-compose.dev.yml up --build
 ```
 
-**Edit a file directly in GitHub**
+A aplicação estará disponível em `http://localhost:3000`.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Deploy
 
-**Use GitHub Codespaces**
+A aplicação é totalmente containerizada. O `Dockerfile` utiliza uma abordagem multi-stage para criar uma imagem otimizada e segura para produção, pronta para ser implantada em qualquer serviço de hospedagem de contêineres.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Arquitetura
 
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+A aplicação utiliza o **App Router** do Next.js para uma arquitetura moderna no frontend e backend. A segurança é um pilar fundamental, com o banco de dados Supabase protegido por **Row Level Security (RLS)**, garantindo que os usuários só possam acessar seus próprios dados. A containerização com Docker assegura um ambiente consistente e replicável tanto para desenvolvimento quanto para produção.

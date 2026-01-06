@@ -34,3 +34,7 @@ build
 *.njsproj
 *.sln
 *.sw?
+
+# Gemini
+.gemini/
+gemini.md
