@@ -286,7 +286,7 @@ export default function EditGoalPage({ params }: { params: { id: string } }) {
           monthly_contribution_cents: goal.monthly_contribution_cents
             ? (goal.monthly_contribution_cents / 100).toString()
             : '',
-          start_date: goal.start_date || '',
+          start_date: goal.target_date || '',
         });
         if (goal.image_url) {
           setImagePreview(goal.image_url);

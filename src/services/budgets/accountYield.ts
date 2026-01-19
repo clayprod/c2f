@@ -230,7 +230,7 @@ export async function generateAccountYieldBudget(
   // Calculate yield for each account
   const accountYields: AccountYield[] = [];
   for (const account of accounts) {
-    const yield = await calculateAccountYield(
+    const accountYieldResult = await calculateAccountYield(
       supabase,
       account.id,
       account.name,
@@ -240,8 +240,8 @@ export async function generateAccountYieldBudget(
       endDate
     );
 
-    if (yield && yield.yield_cents > 0) {
-      accountYields.push(yield);
+    if (accountYieldResult && accountYieldResult.yield_cents > 0) {
+      accountYields.push(accountYieldResult);
     }
   }
 
