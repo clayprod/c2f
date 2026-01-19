@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -22,7 +22,7 @@ type InvitePreview = {
   };
 };
 
-export default function AcceptSharingInvitePage() {
+function AcceptSharingInviteContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { toast } = useToast();
