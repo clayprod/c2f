@@ -170,3 +170,20 @@ function AcceptSharingInviteContent() {
   );
 }
 
+export default function AcceptSharingInvitePage() {
+  return (
+    <Suspense fallback={
+      <div className="max-w-2xl mx-auto space-y-4 md:space-y-6">
+        <div className="glass-card p-4 md:p-6">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <i className="bx bx-loader-alt bx-spin" />
+            Carregando...
+          </div>
+        </div>
+      </div>
+    }>
+      <AcceptSharingInviteContent />
+    </Suspense>
+  );
+}
+
