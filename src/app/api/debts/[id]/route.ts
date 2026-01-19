@@ -93,6 +93,7 @@ export async function PATCH(
       payment_amount_cents: z.number().int().positive('Valor de pagamento deve ser positivo').optional(),
       include_in_plan: z.boolean().default(true).optional(),
       contribution_frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).optional(),
+      monthly_payment_cents: z.number().int().positive().optional(),
       is_negotiated: z.boolean().optional(), // Added this field which might be needed for updates
       plan_entries: z.array(z.object({
         month: z.string().regex(/^\d{4}-\d{2}$/, 'Mês inválido (use YYYY-MM)'),
@@ -120,13 +121,30 @@ export async function PATCH(
     }
 
     const hasCustomPlan = !!validated.plan_entries && validated.plan_entries.length > 0;
+    
+    // Validate custom plan total if using custom plan
+    if (hasCustomPlan && validated.plan_entries && validated.plan_entries.length > 0) {
+      const totalAmount = validated.total_amount_cents ?? currentDebt.total_amount_cents;
+      const paidAmount = validated.paid_amount_cents ?? currentDebt.paid_amount_cents ?? 0;
+      const remainingAmount = totalAmount - paidAmount;
+      const planTotal = validated.plan_entries.reduce((sum, entry) => sum + entry.amount_cents, 0);
+
+      if (planTotal < remainingAmount) {
+        // Log warning but don't prevent saving
+        console.warn(`Debt ${id}: Plan total (${planTotal}) is less than remaining amount (${remainingAmount})`);
+      }
+    }
+
     const { plan_entries, ...debtFields } = validated;
-    const updatePayload = {
+    const updatePayload: any = {
       ...debtFields,
       include_in_plan: hasCustomPlan ? true : validated.include_in_plan,
       contribution_frequency: hasCustomPlan
         ? null
         : (validated.contribution_frequency ?? validated.payment_frequency),
+      monthly_payment_cents: hasCustomPlan
+        ? null
+        : (validated.monthly_payment_cents ?? undefined),
       ...(validated.status ? { is_negotiated: validated.status === 'negociada' } : {}),
       updated_at: new Date().toISOString(),
     };
@@ -182,8 +200,11 @@ export async function PATCH(
     const statusChanged = validated.status !== undefined && validated.status !== currentDebt.status;
     const planEntriesChanged = validated.plan_entries !== undefined;
 
-    if (data && data.is_negotiated && data.include_in_plan && data.category_id &&
-        (isNegotiatedChanged || includeInPlanChanged || statusChanged || planEntriesChanged || data.status === 'negociada')) {
+    const contributionFrequencyChanged = validated.contribution_frequency !== undefined && validated.contribution_frequency !== currentDebt.contribution_frequency;
+    
+    if (data && data.include_in_plan && data.category_id && 
+        (data.contribution_frequency || (data.is_negotiated && data.status === 'negociada')) &&
+        (isNegotiatedChanged || includeInPlanChanged || statusChanged || planEntriesChanged || contributionFrequencyChanged || data.status === 'negociada')) {
       try {
         const today = new Date();
         const startMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -226,7 +247,7 @@ export async function PATCH(
         console.error('Error regenerating auto budgets for debt:', budgetError);
         // Don't fail the debt update if budget generation fails
       }
-    } else if (data && (!data.is_negotiated || !data.include_in_plan || data.status !== 'negociada')) {
+    } else if (data && (!data.include_in_plan || (!data.contribution_frequency && (!data.is_negotiated || data.status !== 'negociada')))) {
       // Remove auto-generated budgets if conditions no longer met
       try {
         await supabase

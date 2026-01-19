@@ -65,6 +65,9 @@ export async function PATCH(
     if (body.color !== undefined) updateData.color = body.color;
     if (body.icon !== undefined) updateData.icon = body.icon;
     if (body.is_default !== undefined) updateData.is_default = body.is_default;
+    if (body.overdraft_limit_cents !== undefined) updateData.overdraft_limit_cents = body.overdraft_limit_cents;
+    if (body.overdraft_interest_rate_monthly !== undefined) updateData.overdraft_interest_rate_monthly = body.overdraft_interest_rate_monthly;
+    if (body.yield_rate_monthly !== undefined) updateData.yield_rate_monthly = body.yield_rate_monthly;
 
     const { data, error } = await supabase
       .from('accounts')

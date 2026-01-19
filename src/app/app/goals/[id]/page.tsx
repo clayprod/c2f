@@ -67,6 +67,7 @@ export default function EditGoalPage({ params }: { params: { id: string } }) {
     include_in_plan: true,
     contribution_frequency: 'monthly',
     monthly_contribution_cents: '',
+    start_date: '',
   });
   const [useCustomPlan, setUseCustomPlan] = useState(false);
   const [planEntries, setPlanEntries] = useState<Array<{ month: string; amount: string }>>([
@@ -285,6 +286,7 @@ export default function EditGoalPage({ params }: { params: { id: string } }) {
           monthly_contribution_cents: goal.monthly_contribution_cents
             ? (goal.monthly_contribution_cents / 100).toString()
             : '',
+          start_date: goal.start_date || '',
         });
         if (goal.image_url) {
           setImagePreview(goal.image_url);
@@ -347,6 +349,9 @@ export default function EditGoalPage({ params }: { params: { id: string } }) {
           : undefined,
         monthly_contribution_cents: formData.monthly_contribution_cents
           ? Math.round(parseFloat(formData.monthly_contribution_cents) * 100)
+          : undefined,
+        start_date: !useCustomPlan && formData.include_in_plan && formData.start_date
+          ? formData.start_date
           : undefined,
         plan_entries: useCustomPlan
           ? cleanedPlanEntries.map((entry) => ({
@@ -784,6 +789,26 @@ export default function EditGoalPage({ params }: { params: { id: string } }) {
                     />
                     <p className="text-xs text-muted-foreground mt-1">
                       Valor mensal calculado automaticamente baseado na frequência, ou defina manualmente
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Mês Inicial dos Aportes</label>
+                    <input
+                      type="month"
+                      value={formData.start_date ? formData.start_date.substring(0, 7) : ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value) {
+                          setFormData({ ...formData, start_date: `${value}-01` });
+                        } else {
+                          setFormData({ ...formData, start_date: '' });
+                        }
+                      }}
+                      className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Mês em que se iniciam os aportes no orçamento
                     </p>
                   </div>
                 </>

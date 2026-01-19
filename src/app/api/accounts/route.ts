@@ -51,16 +51,29 @@ export async function POST(request: NextRequest) {
     const validated = accountSchema.parse(body);
 
     const { supabase } = createClientFromRequest(request);
+    const insertData: any = {
+      name: validated.name,
+      type: validated.type,
+      current_balance: validated.balance_cents / 100, // Convert cents to NUMERIC (reais)
+      currency: validated.currency,
+      institution: validated.institution,
+      user_id: ownerId,
+    };
+
+    // Add overdraft fields if provided
+    if (validated.overdraft_limit_cents !== undefined) {
+      insertData.overdraft_limit_cents = validated.overdraft_limit_cents;
+    }
+    if (validated.overdraft_interest_rate_monthly !== undefined) {
+      insertData.overdraft_interest_rate_monthly = validated.overdraft_interest_rate_monthly;
+    }
+    if (validated.yield_rate_monthly !== undefined) {
+      insertData.yield_rate_monthly = validated.yield_rate_monthly;
+    }
+
     const { data, error } = await supabase
       .from('accounts')
-      .insert({
-        name: validated.name,
-        type: validated.type,
-        current_balance: validated.balance_cents / 100, // Convert cents to NUMERIC (reais)
-        currency: validated.currency,
-        institution: validated.institution,
-        user_id: ownerId,
-      })
+      .insert(insertData)
       .select()
       .single();
 

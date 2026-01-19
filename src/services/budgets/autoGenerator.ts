@@ -258,11 +258,12 @@ export async function generateAutoBudgetsForDebt(
   options: GenerateBudgetsOptions
 ): Promise<{ created: number; updated: number; skipped: number }> {
   // Validate debt can generate budgets
-  if (!debt.include_in_plan || !debt.is_negotiated || !debt.category_id) {
+  if (!debt.include_in_plan || !debt.category_id) {
     return { created: 0, updated: 0, skipped: 0 };
   }
 
-  if (debt.status !== 'negociada') {
+  // Allow budgets for debts with contribution_frequency even if not negotiated
+  if (!debt.is_negotiated && !debt.contribution_frequency) {
     return { created: 0, updated: 0, skipped: 0 };
   }
 
@@ -499,11 +500,12 @@ export async function generateAutoBudgetsForReceivable(
   options: GenerateBudgetsOptions
 ): Promise<{ created: number; updated: number; skipped: number }> {
   // Validate receivable can generate budgets
-  if (!receivable.include_in_plan || !receivable.is_negotiated || !receivable.category_id) {
+  if (!receivable.include_in_plan || !receivable.category_id) {
     return { created: 0, updated: 0, skipped: 0 };
   }
 
-  if (receivable.status !== 'negociada') {
+  // Allow budgets for receivables with contribution_frequency even if not negotiated
+  if (!receivable.is_negotiated && !receivable.contribution_frequency) {
     return { created: 0, updated: 0, skipped: 0 };
   }
 

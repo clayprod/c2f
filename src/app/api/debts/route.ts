@@ -129,6 +129,19 @@ export async function POST(request: NextRequest) {
     const hasCustomPlan = !!validated.plan_entries && validated.plan_entries.length > 0;
     const includeInPlan = hasCustomPlan ? true : validated.include_in_plan;
 
+    // Validate custom plan total if using custom plan
+    if (hasCustomPlan && validated.plan_entries && validated.plan_entries.length > 0) {
+      const totalAmount = validated.total_amount_cents;
+      const paidAmount = validated.paid_amount_cents || 0;
+      const remainingAmount = totalAmount - paidAmount;
+      const planTotal = validated.plan_entries.reduce((sum, entry) => sum + entry.amount_cents, 0);
+
+      if (planTotal < remainingAmount) {
+        // Log warning but don't prevent saving
+        console.warn(`Debt ${validated.name}: Plan total (${planTotal}) is less than remaining amount (${remainingAmount})`);
+      }
+    }
+
     // Create the debt
     // Extract only the fields that exist in the database schema
     const debtData: any = {
@@ -152,7 +165,7 @@ export async function POST(request: NextRequest) {
       include_in_plan: includeInPlan ?? true,
     };
 
-    // Add fields for plan inclusion if negotiated
+    // Add fields for plan inclusion
     if (validated.status === 'negociada') {
       debtData.is_negotiated = true;
       debtData.include_in_plan = includeInPlan ?? true;
@@ -165,6 +178,11 @@ export async function POST(request: NextRequest) {
     } else {
       debtData.is_negotiated = false;
       debtData.include_in_plan = includeInPlan ?? false;
+      // Allow contribution_frequency and monthly_payment_cents even if not negotiated
+      if (includeInPlan && !hasCustomPlan) {
+        debtData.contribution_frequency = validated.contribution_frequency || null;
+        debtData.monthly_payment_cents = validated.monthly_payment_cents || null;
+      }
     }
 
     const { data, error } = await supabase
@@ -196,8 +214,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Generate automatic budgets if is_negotiated and include_in_plan is true
-    if (data.is_negotiated && data.include_in_plan && data.category_id && data.status === 'negociada') {
+    // Generate automatic budgets if include_in_plan is true and has contribution_frequency or is negotiated
+    if (data.include_in_plan && data.category_id && (data.contribution_frequency || (data.is_negotiated && data.status === 'negociada'))) {
       try {
         const today = new Date();
         const startMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;

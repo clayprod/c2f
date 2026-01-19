@@ -7,6 +7,8 @@ import { generateProjections } from '@/services/projections/generator';
 import { projectionCache } from '@/services/projections/cache';
 import { calculateMinimumBudget } from '@/services/budgets/minimumCalculator';
 import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
+import { generateOverdraftInterestBudget } from '@/services/budgets/overdraftInterest';
+import { generateAccountYieldBudget } from '@/services/budgets/accountYield';
 
 const MAX_PROJECTION_YEARS = 10;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
@@ -78,6 +80,43 @@ export async function GET(request: NextRequest) {
         const yearNum = parseInt(yearStr, 10);
         const monthNum = parseInt(monthStr, 10);
         query = query.eq('year', yearNum).eq('month', monthNum);
+
+        // Generate overdraft interest and yield budgets for this month
+        // (calculates from previous month, creates budget for target month)
+        // Only generate if previous month has closed (we're in a month after the target)
+        const today = new Date();
+        const targetDate = new Date(yearNum, monthNum - 1, 1);
+        const previousMonth = new Date(targetDate);
+        previousMonth.setMonth(previousMonth.getMonth() - 1);
+        
+        // Only generate if we're past the target month (previous month has closed)
+        if (today > targetDate) {
+          try {
+            await generateOverdraftInterestBudget(supabase, ownerId, yearNum, monthNum);
+          } catch (error) {
+            console.error('Error generating overdraft interest budget:', error);
+            // Continue even if generation fails
+          }
+
+          try {
+            await generateAccountYieldBudget(supabase, ownerId, yearNum, monthNum);
+          } catch (error) {
+            console.error('Error generating account yield budget:', error);
+            // Continue even if generation fails
+          }
+
+          // Re-fetch budgets after generation to include new ones
+          const { data: refreshedBudgets, error: refreshError } = await query;
+          if (!refreshError && refreshedBudgets) {
+            query = supabase
+              .from('budgets')
+              .select('*, categories(*)')
+              .eq('user_id', ownerId)
+              .eq('year', yearNum)
+              .eq('month', monthNum)
+              .order('created_at', { ascending: false });
+          }
+        }
       }
 
       const { data: budgets, error } = await query;

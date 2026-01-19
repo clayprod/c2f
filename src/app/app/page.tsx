@@ -323,13 +323,13 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      <div>
+    <div className="space-y-4 md:space-y-6 max-w-full overflow-x-hidden">
+      <div className="max-w-full">
         <h1 className="font-display text-xl md:text-2xl lg:text-3xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground text-sm md:text-base">Visão geral das suas finanças</p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 max-w-full">
         <div className="glass-card p-3 md:p-5">
           <div className="flex items-center justify-between mb-2 md:mb-3">
             <div className="flex items-center gap-2 md:gap-3">
@@ -519,7 +519,7 @@ export default function DashboardPage() {
 
       <ExpensesByCategoryChart />
 
-      <div className="grid lg:grid-cols-2 gap-4 md:gap-6">
+      <div className="grid md:grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         <PlanGuard minPlan="pro" showFallback={false}>
           <BudgetsByCategory />
         </PlanGuard>
@@ -574,8 +574,48 @@ export default function DashboardPage() {
                   );
                 })}
               </div>
-              {/* Desktop: Table view */}
-              <div className="hidden md:block overflow-x-auto">
+              {/* Tablet: Compact table view */}
+              <div className="hidden md:block lg:hidden overflow-x-hidden">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Descrição</th>
+                      <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Data</th>
+                      <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentTransactions.map((tx) => (
+                      <tr key={tx.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
+                        <td className="py-2 px-3 text-xs min-w-0">
+                          <div className="truncate max-w-[200px]" title={tx.description}>{tx.description}</div>
+                          <div className="text-[10px] text-muted-foreground mt-0.5">
+                            {tx.categories?.name || 'Sem categoria'}
+                          </div>
+                        </td>
+                        <td className="py-2 px-3 text-xs text-muted-foreground whitespace-nowrap">
+                          {new Date(tx.posted_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                        </td>
+                        <td
+                          className={`py-2 px-3 text-xs text-right font-medium whitespace-nowrap ${(() => {
+                              const amount = typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount;
+                              return amount > 0 ? 'text-green-500' : 'text-red-500';
+                            })()
+                            }`}
+                        >
+                          {(() => {
+                            const amount = typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount;
+                            return amount > 0 ? '+' : '';
+                          })()}
+                          {formatCurrency(typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Desktop: Full table view */}
+              <div className="hidden lg:block overflow-x-hidden">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-border">
@@ -588,17 +628,19 @@ export default function DashboardPage() {
                   <tbody>
                     {recentTransactions.map((tx) => (
                       <tr key={tx.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                        <td className="py-3 px-4 text-sm">{tx.description}</td>
+                        <td className="py-3 px-4 text-sm min-w-0 max-w-[300px]">
+                          <div className="truncate" title={tx.description}>{tx.description}</div>
+                        </td>
                         <td className="py-3 px-4">
                           <span className="badge-pill text-xs">
                             {tx.categories?.name || 'Sem categoria'}
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-sm text-muted-foreground">
+                        <td className="py-3 px-4 text-sm text-muted-foreground whitespace-nowrap">
                           {new Date(tx.posted_at).toLocaleDateString('pt-BR')}
                         </td>
                         <td
-                          className={`py-3 px-4 text-sm text-right font-medium ${(() => {
+                          className={`py-3 px-4 text-sm text-right font-medium whitespace-nowrap ${(() => {
                               const amount = typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount;
                               return amount > 0 ? 'text-green-500' : 'text-red-500';
                             })()

@@ -6,7 +6,22 @@ export const accountSchema = z.object({
   balance_cents: z.number().int().default(0),
   currency: z.string().default('BRL'),
   institution: z.string().optional(),
-});
+  overdraft_limit_cents: z.number().int().min(0).optional(),
+  overdraft_interest_rate_monthly: z.number().min(0).max(100).optional(),
+  yield_rate_monthly: z.number().min(0).max(100).optional(),
+}).refine(
+  (data) => {
+    // If overdraft_limit_cents > 0, overdraft_interest_rate_monthly must be > 0
+    if (data.overdraft_limit_cents && data.overdraft_limit_cents > 0) {
+      return data.overdraft_interest_rate_monthly !== undefined && data.overdraft_interest_rate_monthly > 0;
+    }
+    return true;
+  },
+  {
+    message: 'Se o limite de cheque especial for maior que zero, a taxa de juros mensal deve ser informada e maior que zero',
+    path: ['overdraft_interest_rate_monthly'],
+  }
+);
 
 export const categorySchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
@@ -150,14 +165,24 @@ export const debtSchema = z.object({
     if (data.status === 'negociada') {
       return data.payment_frequency !== undefined &&
              data.payment_amount_cents !== undefined &&
-             data.installment_count !== undefined &&
-             (data.contribution_frequency !== undefined || (data.plan_entries && data.plan_entries.length > 0));
+             data.installment_count !== undefined;
     }
     return true;
   },
   {
-    message: 'Para dívidas negociadas, informe frequência, valor, parcelas e contribuição (ou plano personalizado)',
+    message: 'Para dívidas negociadas, informe frequência, valor e parcelas',
     path: ['payment_frequency'],
+  }
+).refine(
+  (data) => {
+    if (data.include_in_plan) {
+      return data.contribution_frequency !== undefined || (data.plan_entries && data.plan_entries.length > 0);
+    }
+    return true;
+  },
+  {
+    message: 'Ao incluir no orçamento, informe frequência de aporte ou plano personalizado',
+    path: ['contribution_frequency'],
   }
 );
 
@@ -218,14 +243,24 @@ export const receivableSchema = z.object({
     if (data.status === 'negociada') {
       return data.payment_frequency !== undefined &&
              data.payment_amount_cents !== undefined &&
-             data.installment_count !== undefined &&
-             (data.contribution_frequency !== undefined || (data.plan_entries && data.plan_entries.length > 0));
+             data.installment_count !== undefined;
     }
     return true;
   },
   {
-    message: 'Para recebíveis negociados, informe frequência, valor, parcelas e contribuição (ou plano personalizado)',
+    message: 'Para recebíveis negociados, informe frequência, valor e parcelas',
     path: ['payment_frequency'],
+  }
+).refine(
+  (data) => {
+    if (data.include_in_plan) {
+      return data.contribution_frequency !== undefined || (data.plan_entries && data.plan_entries.length > 0);
+    }
+    return true;
+  },
+  {
+    message: 'Ao incluir no orçamento, informe frequência de aporte ou plano personalizado',
+    path: ['contribution_frequency'],
   }
 );
 
@@ -262,6 +297,7 @@ export const investmentSchema = z.object({
     month: z.string().regex(/^\d{4}-\d{2}$/, 'Mês inválido (use YYYY-MM)'),
     amount_cents: z.number().int().positive('Valor deve ser positivo'),
   })).optional(),
+  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (use YYYY-MM-DD)').optional(),
 }).refine(
   (data) => !data.include_in_plan || data.contribution_frequency !== undefined || (data.plan_entries && data.plan_entries.length > 0),
   {
@@ -315,9 +351,9 @@ export const goalSchema = z.object({
     amount_cents: z.number().int().positive('Valor deve ser positivo'),
   })).optional(),
 }).refine(
-  (data) => !data.include_in_plan || data.contribution_frequency !== undefined,
+  (data) => !data.include_in_plan || data.contribution_frequency !== undefined || (data.plan_entries && data.plan_entries.length > 0),
   {
-    message: 'Frequência de aporte é obrigatória quando incluir no plano',
+    message: 'Frequência de aporte é obrigatória quando incluir no plano, a menos que use um plano personalizado',
     path: ['contribution_frequency'],
   }
 );

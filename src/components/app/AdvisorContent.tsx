@@ -170,17 +170,17 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
   };
 
   return (
-    <div className={`flex flex-col ${inDialog ? 'h-full overflow-hidden' : 'h-[calc(100vh-10rem)]'}`}>
+    <div className={`flex flex-col max-w-full overflow-x-hidden ${inDialog ? 'h-full overflow-hidden' : 'h-[calc(100vh-10rem)]'}`}>
       {!inDialog && (
-        <div className="mb-4 sm:mb-6">
+        <div className="mb-4 sm:mb-6 max-w-full">
           <h1 className="font-display text-xl sm:text-2xl md:text-3xl font-bold">AI Advisor</h1>
           <p className="text-muted-foreground text-sm sm:text-base">Insights e recomendações personalizadas</p>
         </div>
       )}
 
-      <div className={`grid grid-cols-1 ${inDialog ? 'md:grid-cols-3 lg:grid-cols-3' : 'md:grid-cols-3 lg:grid-cols-3'} gap-4 sm:gap-6 flex-1 min-h-0 overflow-hidden`}>
+      <div className={`grid grid-cols-1 ${inDialog ? 'md:grid-cols-3 lg:grid-cols-3' : 'md:grid-cols-3 lg:grid-cols-3'} gap-4 sm:gap-6 flex-1 min-h-0 overflow-hidden max-w-full`}>
         {/* Chat */}
-        <div className={`${inDialog ? 'md:col-span-2 lg:col-span-2' : 'md:col-span-2 lg:col-span-2'} glass-card p-4 sm:p-6 flex flex-col min-h-0 overflow-hidden`}>
+        <div className={`${inDialog ? 'md:col-span-2 lg:col-span-2' : 'md:col-span-2 lg:col-span-2'} glass-card p-4 sm:p-6 flex flex-col min-h-0 overflow-hidden max-w-full min-w-0`}>
           <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <i className='bx bx-sparkles-alt text-xl sm:text-2xl text-purple-600 flex-shrink-0'></i>
@@ -305,16 +305,16 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-4 sm:space-y-6">
+        <div className="space-y-4 sm:space-y-6 max-w-full min-w-0 overflow-x-hidden">
           {/* Suggested Questions */}
-          <div className="glass-card p-4 sm:p-6">
+          <div className="glass-card p-4 sm:p-6 max-w-full overflow-x-hidden">
             <h3 className="font-display font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Perguntas Sugeridas</h3>
-            <div className="space-y-2">
+            <div className="space-y-2 max-w-full">
               {suggestedQuestions.map((question, i) => (
                 <button
                   key={i}
                   onClick={() => handleSuggestedQuestion(question)}
-                  className="w-full text-left p-2.5 sm:p-3 rounded-xl bg-muted/30 hover:bg-gradient-to-r hover:from-purple-600/20 hover:to-blue-600/20 transition-all text-xs sm:text-sm break-words"
+                  className="w-full text-left p-2.5 sm:p-3 rounded-xl bg-muted/30 hover:bg-gradient-to-r hover:from-purple-600/20 hover:to-blue-600/20 transition-all text-xs sm:text-sm break-words max-w-full"
                 >
                   {question}
                 </button>
@@ -323,7 +323,7 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
           </div>
 
           {/* Tips */}
-          <div className="glass-card p-4 sm:p-6">
+          <div className="glass-card p-4 sm:p-6 max-w-full overflow-x-hidden">
             <h3 className="font-display font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Dicas</h3>
             <ul className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-muted-foreground">
               <li className="flex items-start gap-2">

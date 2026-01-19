@@ -29,6 +29,9 @@ export default function NewDebtPage() {
     payment_amount_cents: '',
     installment_count: '',
     include_in_plan: true,
+    contribution_frequency: 'monthly',
+    monthly_payment_cents: '',
+    start_date: '',
   });
   const [useCustomPlan, setUseCustomPlan] = useState(false);
   const [planEntries, setPlanEntries] = useState<Array<{ month: string; amount: string }>>([
@@ -55,6 +58,22 @@ export default function NewDebtPage() {
         });
         setLoading(false);
         return;
+      }
+
+      // Validate custom plan total if using custom plan
+      if (useCustomPlan && cleanedPlanEntries.length > 0) {
+        const totalAmount = parseFloat(formData.total_amount_cents) * 100;
+        const paidAmount = parseFloat(formData.paid_amount_cents || '0') * 100;
+        const remainingAmount = totalAmount - paidAmount;
+        const planTotal = cleanedPlanEntries.reduce((sum, entry) => sum + (entry.amount * 100), 0);
+
+        if (planTotal < remainingAmount) {
+          toast({
+            variant: "default",
+            title: "Atenção: Valor do plano personalizado",
+            description: `O total do plano personalizado (${(planTotal / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}) é menor que o valor restante da dívida (${(remainingAmount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}).`,
+          });
+        }
       }
 
       // Validate installment calculation if status is 'negociada'
@@ -96,6 +115,15 @@ export default function NewDebtPage() {
             : undefined,
           installment_count: formData.status === 'negociada' && formData.installment_count
             ? parseInt(formData.installment_count)
+            : undefined,
+          contribution_frequency: !useCustomPlan && formData.include_in_plan && formData.contribution_frequency
+            ? formData.contribution_frequency
+            : undefined,
+          monthly_payment_cents: !useCustomPlan && formData.include_in_plan && formData.monthly_payment_cents
+            ? Math.round(parseFloat(formData.monthly_payment_cents) * 100)
+            : undefined,
+          start_date: !useCustomPlan && formData.include_in_plan && formData.start_date
+            ? formData.start_date
             : undefined,
           plan_entries: useCustomPlan
             ? cleanedPlanEntries.map((entry) => ({
@@ -419,6 +447,67 @@ export default function NewDebtPage() {
                     </div>
                   ))}
                 </div>
+              )}
+
+              {!useCustomPlan && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Frequência de Pagamento *</label>
+                    <Select
+                      value={formData.contribution_frequency}
+                      onValueChange={(value) => setFormData({ ...formData, contribution_frequency: value })}
+                      required={formData.include_in_plan}
+                    >
+                      <SelectTrigger className="w-full bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                        <SelectValue placeholder="Selecione a frequência" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">Diário</SelectItem>
+                        <SelectItem value="weekly">Semanal</SelectItem>
+                        <SelectItem value="biweekly">Quinzenal</SelectItem>
+                        <SelectItem value="monthly">Mensal</SelectItem>
+                        <SelectItem value="quarterly">Trimestral</SelectItem>
+                        <SelectItem value="yearly">Anual</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Valor Mensal do Pagamento (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.monthly_payment_cents}
+                      onChange={(e) => setFormData({ ...formData, monthly_payment_cents: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                      placeholder="0.00"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Valor mensal calculado automaticamente baseado na frequência, ou defina manualmente
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Mês Inicial dos Pagamentos</label>
+                    <input
+                      type="month"
+                      value={formData.start_date ? formData.start_date.substring(0, 7) : ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value) {
+                          setFormData({ ...formData, start_date: `${value}-01` });
+                        } else {
+                          setFormData({ ...formData, start_date: '' });
+                        }
+                      }}
+                      className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Mês em que se iniciam os pagamentos no orçamento
+                    </p>
+                  </div>
+                </>
               )}
             </div>
           )}

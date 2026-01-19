@@ -265,7 +265,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background flex overflow-x-hidden max-w-full">
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden"
@@ -410,16 +410,16 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-h-screen lg:ml-64">
-        <header className="h-14 md:h-16 border-b border-border flex items-center px-3 md:px-4 lg:px-6 bg-card/50 backdrop-blur-xl sticky top-0 z-40">
+      <div className="flex-1 flex flex-col min-h-screen lg:ml-64 overflow-x-hidden max-w-full min-w-0">
+        <header className="h-14 md:h-16 border-b border-border flex items-center px-3 md:px-4 lg:px-6 bg-card/50 backdrop-blur-xl sticky top-0 z-40 min-w-0 max-w-full overflow-x-hidden">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-1.5 md:p-2 text-foreground mr-2 md:mr-4"
+            className="lg:hidden p-1.5 md:p-2 text-foreground mr-2 md:mr-4 flex-shrink-0"
           >
             <i className='bx bx-menu text-xl md:text-2xl'></i>
           </button>
 
-          <div className="flex items-center gap-2 md:gap-4 flex-1">
+          <div className="flex items-center gap-2 md:gap-4 flex-1 min-w-0">
             {userProfile && userProfile.plan !== 'free' && (
               <div className="p-[1px] rounded-md transition-all duration-300 group"
                 style={{
@@ -455,8 +455,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 </button>
               </div>
             )}
-            <div className="flex-1" />
-            <div className="flex items-center gap-0.5 md:gap-2">
+            <div className="flex-1 min-w-0" />
+            <div className="flex items-center gap-0.5 md:gap-2 flex-shrink-0">
               {accountContext && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -595,7 +595,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </div>
         </header>
 
-        <main className="flex-1 p-3 md:p-4 lg:p-6 overflow-auto">{children}</main>
+        <main className="flex-1 p-3 md:p-4 lg:p-6 overflow-auto overflow-x-hidden max-w-full min-w-0">{children}</main>
       </div>
 
       <AdvisorDialog open={advisorOpen} onOpenChange={setAdvisorOpen} />

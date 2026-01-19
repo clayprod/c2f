@@ -8,13 +8,13 @@ import {
 
 export interface ProjectionItem {
   id: string;
-  type: 'credit_card_bill' | 'goal_contribution' | 'debt_payment' | 'investment_contribution' | 'installment' | 'receivable_payment';
+  type: 'credit_card_bill' | 'goal_contribution' | 'debt_payment' | 'investment_contribution' | 'installment' | 'receivable_payment' | 'overdraft_interest' | 'account_yield';
   date: string; // YYYY-MM-DD
   description: string;
   amount_cents: number;
   category_id?: string;
   category_name?: string;
-  source_type: 'credit_card' | 'goal' | 'debt' | 'installment' | 'investment' | 'receivable';
+  source_type: 'credit_card' | 'goal' | 'debt' | 'installment' | 'investment' | 'receivable' | 'overdraft' | 'yield';
   source_id?: string;
   metadata?: Record<string, unknown>;
 }
@@ -121,6 +121,24 @@ export async function generateProjections(
       projections.push(...investmentProjections);
     } catch (error: any) {
       errors.push(`Erro ao gerar projeções de investimentos: ${error.message}`);
+    }
+
+    // 7. Overdraft interest projections
+    try {
+      checkTimeout();
+      const overdraftProjections = await getOverdraftInterestProjections(supabase, userId, startDate, endDate, projections);
+      projections.push(...overdraftProjections);
+    } catch (error: any) {
+      errors.push(`Erro ao gerar projeções de juros de cheque especial: ${error.message}`);
+    }
+
+    // 8. Account yield projections
+    try {
+      checkTimeout();
+      const yieldProjections = await getAccountYieldProjections(supabase, userId, startDate, endDate, projections);
+      projections.push(...yieldProjections);
+    } catch (error: any) {
+      errors.push(`Erro ao gerar projeções de rendimento: ${error.message}`);
     }
 
   } catch (error: any) {
@@ -1052,6 +1070,295 @@ async function getInvestmentProjections(
         current.setMonth(current.getMonth() + 1);
       }
     }
+  }
+
+  return projections;
+}
+
+/**
+ * Calculate projected daily balances for accounts based on existing projections
+ */
+async function calculateProjectedAccountBalances(
+  supabase: SupabaseClient,
+  userId: string,
+  monthStart: Date,
+  monthEnd: Date,
+  existingProjections: ProjectionItem[]
+): Promise<Map<string, number>> {
+  // Get all accounts with current balances
+  const { data: accounts } = await supabase
+    .from('accounts')
+    .select('id, current_balance')
+    .eq('user_id', userId)
+    .neq('type', 'credit_card');
+
+  const balances = new Map<string, number>();
+  if (!accounts) return balances;
+
+  // Initialize balances with current balance
+  for (const account of accounts) {
+    balances.set(account.id, Math.round((account.current_balance || 0) * 100));
+  }
+
+  // Get all transactions up to month start
+  const monthStartStr = monthStart.toISOString().split('T')[0];
+  const { data: historicalTransactions } = await supabase
+    .from('transactions')
+    .select('account_id, amount, posted_at')
+    .eq('user_id', userId)
+    .lt('posted_at', monthStartStr);
+
+  // Apply historical transactions
+  if (historicalTransactions) {
+    for (const tx of historicalTransactions) {
+      const accountId = tx.account_id;
+      const amountCents = Math.round((tx.amount || 0) * 100);
+      const currentBalance = balances.get(accountId) || 0;
+      balances.set(accountId, currentBalance + amountCents);
+    }
+  }
+
+  // Apply projections that affect account balances (goals, debts, investments, installments)
+  // Filter projections that are expenses/income affecting accounts
+  const accountAffectingProjections = existingProjections.filter(p => {
+    return ['goal_contribution', 'debt_payment', 'investment_contribution', 'installment'].includes(p.type);
+  });
+
+  // Group by month and apply sequentially
+  const projectionsByMonth = new Map<string, ProjectionItem[]>();
+  for (const proj of accountAffectingProjections) {
+    const projDate = new Date(proj.date + 'T12:00:00');
+    if (projDate >= monthStart && projDate <= monthEnd) {
+      const monthKey = `${projDate.getFullYear()}-${String(projDate.getMonth() + 1).padStart(2, '0')}`;
+      if (!projectionsByMonth.has(monthKey)) {
+        projectionsByMonth.set(monthKey, []);
+      }
+      projectionsByMonth.get(monthKey)!.push(proj);
+    }
+  }
+
+  // Apply projections month by month
+  const sortedMonths = Array.from(projectionsByMonth.keys()).sort();
+  for (const monthKey of sortedMonths) {
+    const monthProjections = projectionsByMonth.get(monthKey)!;
+    // For simplicity, assume all transactions happen at start of month
+    // In a more accurate implementation, we'd need to track daily balances
+    for (const proj of monthProjections) {
+      // Extract account_id from metadata if available
+      // For now, we'll need to get account from the projection source
+      // This is a simplified version - in production, we'd need more context
+    }
+  }
+
+  return balances;
+}
+
+/**
+ * Get overdraft interest projections based on projected account balances
+ */
+async function getOverdraftInterestProjections(
+  supabase: SupabaseClient,
+  userId: string,
+  startDate: Date,
+  endDate: Date,
+  existingProjections: ProjectionItem[]
+): Promise<ProjectionItem[]> {
+  const projections: ProjectionItem[] = [];
+
+  // Get accounts with overdraft limit and interest rate
+  const { data: accounts } = await supabase
+    .from('accounts')
+    .select('id, name, overdraft_limit_cents, overdraft_interest_rate_monthly')
+    .eq('user_id', userId)
+    .neq('type', 'credit_card')
+    .gt('overdraft_limit_cents', 0)
+    .gt('overdraft_interest_rate_monthly', 0);
+
+  if (!accounts || accounts.length === 0) return projections;
+
+  // Calculate daily rate
+  const calculateDailyRate = (monthlyRate: number): number => {
+    if (monthlyRate <= 0) return 0;
+    const monthlyDecimal = monthlyRate / 100;
+    return Math.pow(1 + monthlyDecimal, 1 / 30) - 1;
+  };
+
+  // Process month by month
+  let current = new Date(startDate);
+  current.setDate(1);
+
+  while (current <= endDate) {
+    const monthStart = new Date(current.getFullYear(), current.getMonth(), 1);
+    const monthEnd = new Date(current.getFullYear(), current.getMonth() + 1, 0);
+    
+    // Calculate projected balance for each account at end of month
+    // Simplified: use current balance + sum of projections affecting this account
+    // In production, would need more sophisticated balance tracking
+    
+    for (const account of accounts) {
+      // Get current balance
+      const { data: accountData } = await supabase
+        .from('accounts')
+        .select('current_balance')
+        .eq('id', account.id)
+        .single();
+
+      if (!accountData) continue;
+
+      let projectedBalanceCents = Math.round((accountData.current_balance || 0) * 100);
+
+      // Add projections that affect this account (simplified - would need account_id in projections)
+      // For now, we'll check if any projections might affect this account
+      // This is a placeholder - real implementation would track account balances properly
+
+      // If projected balance is negative, generate interest for next month
+      if (projectedBalanceCents < 0) {
+        const nextMonth = new Date(monthStart);
+        nextMonth.setMonth(nextMonth.getMonth() + 1);
+
+        if (nextMonth <= endDate) {
+          // Calculate interest for the month
+          const dailyRate = calculateDailyRate(account.overdraft_interest_rate_monthly || 0);
+          const effectiveBalance = Math.max(
+            projectedBalanceCents,
+            -(account.overdraft_limit_cents || 0)
+          );
+          
+          // Simplified: assume average negative balance for the month
+          const daysInMonth = monthEnd.getDate();
+          const monthlyInterest = Math.round(effectiveBalance * dailyRate * daysInMonth);
+
+          if (monthlyInterest < 0) {
+            // Get or create category
+            const { data: category } = await supabase
+              .from('categories')
+              .select('id, name')
+              .eq('user_id', userId)
+              .eq('name', 'Juros - Limite')
+              .eq('type', 'expense')
+              .single();
+
+            if (category) {
+              projections.push({
+                id: `overdraft-${account.id}-${nextMonth.getFullYear()}-${nextMonth.getMonth() + 1}`,
+                type: 'overdraft_interest',
+                date: `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01`,
+                description: `Juros Cheque Especial - ${account.name}`,
+                amount_cents: monthlyInterest,
+                category_id: category.id,
+                category_name: category.name,
+                source_type: 'overdraft',
+                source_id: account.id,
+                metadata: {
+                  account_id: account.id,
+                  account_name: account.name,
+                },
+              });
+            }
+          }
+        }
+      }
+    }
+
+    current.setMonth(current.getMonth() + 1);
+  }
+
+  return projections;
+}
+
+/**
+ * Get account yield projections based on projected account balances
+ */
+async function getAccountYieldProjections(
+  supabase: SupabaseClient,
+  userId: string,
+  startDate: Date,
+  endDate: Date,
+  existingProjections: ProjectionItem[]
+): Promise<ProjectionItem[]> {
+  const projections: ProjectionItem[] = [];
+
+  // Get accounts with yield rate
+  const { data: accounts } = await supabase
+    .from('accounts')
+    .select('id, name, yield_rate_monthly')
+    .eq('user_id', userId)
+    .neq('type', 'credit_card')
+    .gt('yield_rate_monthly', 0);
+
+  if (!accounts || accounts.length === 0) return projections;
+
+  // Calculate daily rate
+  const calculateDailyRate = (monthlyRate: number): number => {
+    if (monthlyRate <= 0) return 0;
+    const monthlyDecimal = monthlyRate / 100;
+    return Math.pow(1 + monthlyDecimal, 1 / 30) - 1;
+  };
+
+  // Process month by month
+  let current = new Date(startDate);
+  current.setDate(1);
+
+  while (current <= endDate) {
+    const monthStart = new Date(current.getFullYear(), current.getMonth(), 1);
+    const monthEnd = new Date(current.getFullYear(), current.getMonth() + 1, 0);
+    
+    for (const account of accounts) {
+      // Get current balance
+      const { data: accountData } = await supabase
+        .from('accounts')
+        .select('current_balance')
+        .eq('id', account.id)
+        .single();
+
+      if (!accountData) continue;
+
+      let projectedBalanceCents = Math.round((accountData.current_balance || 0) * 100);
+
+      // If projected balance is positive, generate yield for next month
+      if (projectedBalanceCents > 0) {
+        const nextMonth = new Date(monthStart);
+        nextMonth.setMonth(nextMonth.getMonth() + 1);
+
+        if (nextMonth <= endDate) {
+          // Calculate yield for the month
+          const dailyRate = calculateDailyRate(account.yield_rate_monthly || 0);
+          const daysInMonth = monthEnd.getDate();
+          const monthlyYield = Math.round(projectedBalanceCents * dailyRate * daysInMonth);
+
+          if (monthlyYield > 0) {
+            // Get or create category
+            const { data: category } = await supabase
+              .from('categories')
+              .select('id, name')
+              .eq('user_id', userId)
+              .eq('name', 'Rendimento - Conta')
+              .eq('type', 'income')
+              .single();
+
+            if (category) {
+              projections.push({
+                id: `yield-${account.id}-${nextMonth.getFullYear()}-${nextMonth.getMonth() + 1}`,
+                type: 'account_yield',
+                date: `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01`,
+                description: `Rendimento - ${account.name}`,
+                amount_cents: monthlyYield,
+                category_id: category.id,
+                category_name: category.name,
+                source_type: 'yield',
+                source_id: account.id,
+                metadata: {
+                  account_id: account.id,
+                  account_name: account.name,
+                },
+              });
+            }
+          }
+        }
+      }
+    }
+
+    current.setMonth(current.getMonth() + 1);
   }
 
   return projections;

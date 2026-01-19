@@ -36,7 +36,7 @@ export default function AdvisorDialog({ open, onOpenChange }: AdvisorDialogProps
           className={cn(
             // Mobile: nearly full screen with small margins
             "fixed z-50 bg-background border border-border shadow-lg duration-200",
-            "flex flex-col overflow-hidden relative",
+            "flex flex-col overflow-hidden overflow-x-hidden relative",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
@@ -46,17 +46,19 @@ export default function AdvisorDialog({ open, onOpenChange }: AdvisorDialogProps
             "md:inset-auto md:left-[50%] md:top-[50%] md:w-[95vw] md:max-w-5xl md:translate-x-[-50%] md:-translate-y-1/2",
             // Desktop positioning
             "lg:w-[90vw] lg:max-w-6xl lg:top-[40%] lg:-translate-y-1/4",
-            "rounded-xl"
+            "rounded-xl",
+            "max-w-full"
           )}
           style={isMobile ? {
-            maxHeight: 'calc(100vh - 24px)'
+            maxHeight: 'calc(100vh - 24px)',
+            maxWidth: 'calc(100vw - 24px)'
           } : {
             maxHeight: '90vh',
             minHeight: '500px'
           }}
         >
           <div className={cn(
-            "flex-1 overflow-hidden",
+            "flex-1 overflow-hidden overflow-x-hidden max-w-full",
             "p-3 pt-10 sm:p-4 sm:pt-12 md:p-6 md:pr-12 md:pt-10 lg:pr-14"
           )}>
             <AdvisorContent inDialog={true} />

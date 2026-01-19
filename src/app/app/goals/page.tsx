@@ -185,7 +185,7 @@ export default function GoalsPage() {
                             className="w-full h-full object-cover"
                             style={{ objectPosition: goal.image_position || 'center' }}
                           />
-                          <div className="absolute inset-0 bg-gradient-to-t from-background/90 to-transparent" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 dark:from-background/90 to-transparent" />
                           <div className="absolute bottom-0 left-0 right-0 p-6">
                             <div className="flex items-start justify-between">
                               <div className="flex items-center gap-3 flex-1">

@@ -59,6 +59,7 @@ export default function InvestmentDetailPage() {
     include_in_plan: true,
     contribution_frequency: 'monthly',
     monthly_contribution_cents: '',
+    start_date: '',
   });
   const [useCustomPlan, setUseCustomPlan] = useState(false);
   const [planEntries, setPlanEntries] = useState<Array<{ month: string; amount: string }>>([
@@ -106,6 +107,7 @@ export default function InvestmentDetailPage() {
         monthly_contribution_cents: investmentData.monthly_contribution_cents 
           ? (investmentData.monthly_contribution_cents / 100).toFixed(2) 
           : '',
+        start_date: investmentData.start_date || '',
       });
 
       // Check for custom plan entries
@@ -192,6 +194,9 @@ export default function InvestmentDetailPage() {
           : undefined,
         monthly_contribution_cents: !useCustomPlan && data.monthly_contribution_cents
           ? Math.round(parseFloat(data.monthly_contribution_cents) * 100)
+          : undefined,
+        start_date: !useCustomPlan && data.include_in_plan && data.start_date
+          ? data.start_date
           : undefined,
         plan_entries: useCustomPlan
           ? cleanedPlanEntries.map((entry) => ({
@@ -539,6 +544,29 @@ export default function InvestmentDetailPage() {
                         className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                         placeholder="0.00"
                       />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Valor mensal calculado automaticamente baseado na frequência, ou defina manualmente
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Mês Inicial dos Aportes</label>
+                      <input
+                        type="month"
+                        value={formData.start_date ? formData.start_date.substring(0, 7) : ''}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value) {
+                            setFormData({ ...formData, start_date: `${value}-01` });
+                          } else {
+                            setFormData({ ...formData, start_date: '' });
+                          }
+                        }}
+                        className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Mês em que se iniciam os aportes no orçamento
+                      </p>
                     </div>
                   </>
                 )}

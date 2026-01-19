@@ -321,9 +321,9 @@ export default function CategoriesPage() {
   const expenseCategories = filteredCategories.filter(c => c.type === 'expense');
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-full overflow-x-hidden">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 max-w-full">
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-2xl sm:text-2xl md:text-3xl font-bold">Categorias</h1>
           <p className="text-muted-foreground text-sm sm:text-base">Organize suas transações por categoria</p>
@@ -336,20 +336,20 @@ export default function CategoriesPage() {
       </div>
 
       {/* Filters */}
-      <div className="glass-card p-4">
-        <div className="flex flex-col gap-4">
-          <div className="flex-1 relative">
+      <div className="glass-card p-4 max-w-full overflow-x-hidden">
+        <div className="flex flex-col gap-4 max-w-full">
+          <div className="flex-1 relative min-w-0">
             <i className='bx bx-search absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground'></i>
             <Input
               placeholder="Buscar categorias..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 w-full max-w-full"
             />
           </div>
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 max-w-full">
             {/* Type Filters */}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 max-w-full">
               <button
                 onClick={() => setFilterType('all')}
                 className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
@@ -480,15 +480,15 @@ export default function CategoriesPage() {
           )}
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-6 max-w-full overflow-x-hidden">
           {/* General Income Categories */}
           {(filterType === 'all' || filterType === 'income') && (filterSource === 'all' || filterSource === 'general') && generalIncome.length > 0 && (
-            <div>
+            <div className="max-w-full overflow-x-hidden">
               <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-green-500"></span>
                 Receitas ({generalIncome.length})
               </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 max-w-full">
                 {generalIncome.map((category) => (
                   <CategoryCard
                     key={category.id}
@@ -509,12 +509,12 @@ export default function CategoriesPage() {
 
           {/* General Expense Categories */}
           {(filterType === 'all' || filterType === 'expense') && (filterSource === 'all' || filterSource === 'general') && generalExpense.length > 0 && (
-            <div>
+            <div className="max-w-full overflow-x-hidden">
               <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-red-500"></span>
                 Despesas ({generalExpense.length})
               </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 max-w-full">
                 {generalExpense.map((category) => (
                   <CategoryCard
                     key={category.id}
@@ -535,12 +535,12 @@ export default function CategoriesPage() {
 
           {/* Credit Card Categories */}
           {(filterSource === 'all' || filterSource === 'credit_card') && creditCardCategories.length > 0 && (
-            <div>
+            <div className="max-w-full overflow-x-hidden">
               <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-pink-500"></span>
                 Cartões de Crédito ({creditCardCategories.length})
               </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 max-w-full">
                 {creditCardCategories.map((category) => (
                   <CategoryCard
                     key={category.id}
@@ -561,12 +561,12 @@ export default function CategoriesPage() {
 
           {/* Investment Categories */}
           {(filterSource === 'all' || filterSource === 'investment') && investmentCategories.length > 0 && (
-            <div>
+            <div className="max-w-full overflow-x-hidden">
               <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-cyan-500"></span>
                 Investimentos ({investmentCategories.length})
               </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 max-w-full">
                 {investmentCategories.map((category) => (
                   <CategoryCard
                     key={category.id}
@@ -587,12 +587,12 @@ export default function CategoriesPage() {
 
           {/* Goal Categories */}
           {(filterSource === 'all' || filterSource === 'goal') && goalCategories.length > 0 && (
-            <div>
+            <div className="max-w-full overflow-x-hidden">
               <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-green-600"></span>
                 Objetivos ({goalCategories.length})
               </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 max-w-full">
                 {goalCategories.map((category) => (
                   <CategoryCard
                     key={category.id}
@@ -613,12 +613,12 @@ export default function CategoriesPage() {
 
           {/* Debt Categories */}
           {(filterSource === 'all' || filterSource === 'debt') && debtCategories.length > 0 && (
-            <div>
+            <div className="max-w-full overflow-x-hidden">
               <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-red-600"></span>
                 Dívidas ({debtCategories.length})
               </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 max-w-full">
                 {debtCategories.map((category) => (
                   <CategoryCard
                     key={category.id}
@@ -833,17 +833,17 @@ function CategoryCard({
   const canDelete = transactionCount === 0;
   
   return (
-    <div className={`glass-card p-2.5 sm:p-3 hover:shadow-lg transition-shadow group ${isInactive ? 'opacity-60' : ''}`}>
-      <div className="flex items-center gap-2 sm:gap-3">
+    <div className={`glass-card p-2.5 sm:p-3 md:p-2.5 lg:p-3 hover:shadow-lg transition-shadow group ${isInactive ? 'opacity-60' : ''}`}>
+      <div className="flex items-center gap-2 md:gap-2.5 lg:gap-3">
         <div
-          className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center text-lg sm:text-xl flex-shrink-0"
+          className="w-8 h-8 md:w-8 md:h-8 lg:w-10 lg:h-10 rounded-lg flex items-center justify-center text-base md:text-lg lg:text-xl flex-shrink-0"
           style={{ backgroundColor: (category.color || '#3b82f6') + '20' }}
         >
           {category.icon || '📁'}
         </div>
         <div className="flex-1 min-w-0 overflow-hidden">
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-            <h3 className="font-medium truncate text-sm sm:text-base">{category.name}</h3>
+          <div className="flex items-center gap-1 md:gap-1.5 lg:gap-2 flex-wrap">
+            <h3 className="font-medium truncate text-sm md:text-sm lg:text-base flex-1 min-w-0">{category.name}</h3>
             {isInactive && (
               <span className="px-1.5 py-0.5 text-xs font-medium bg-muted text-muted-foreground rounded flex-shrink-0">
                 Inativa
@@ -855,7 +855,7 @@ function CategoryCard({
               </span>
             )}
           </div>
-          <span className={`text-xs block mt-0.5 ${
+          <span className={`text-xs block mt-0.5 hidden md:group-hover:block lg:block ${
             category.type === 'income' 
               ? 'text-green-500' 
               : category.source_type === 'goal'

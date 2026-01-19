@@ -680,16 +680,16 @@ export default function BudgetsPage() {
 
   return (
     <PlanGuard minPlan="pro">
-      <div className="space-y-3 md:space-y-4">
+      <div className="space-y-3 md:space-y-4 max-w-full overflow-x-hidden">
         {/* Compact Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 max-w-full">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="min-w-0">
               <h1 className="font-display text-lg md:text-xl lg:text-2xl font-bold">Orçamentos</h1>
               <p className="text-muted-foreground text-xs md:text-sm">Limites e acompanhamento</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
             <MonthYearPicker
               value={selectedMonth}
               onChange={setSelectedMonth}
@@ -721,8 +721,8 @@ export default function BudgetsPage() {
         </div>
 
         {/* Compact Filters + Summary Row */}
-        <div className="glass-card p-2.5 md:p-3">
-          <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4">
+        <div className="glass-card p-2.5 md:p-3 max-w-full overflow-x-hidden">
+          <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 max-w-full">
             {/* Search */}
             <div className="relative flex-1 min-w-0 md:max-w-xs">
               <i className='bx bx-search absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-sm'></i>
@@ -731,12 +731,12 @@ export default function BudgetsPage() {
                 placeholder="Buscar..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-sm rounded-md bg-muted/50 border border-border focus:border-primary focus:outline-none"
+                className="w-full max-w-full pl-8 pr-3 py-1.5 text-sm rounded-md bg-muted/50 border border-border focus:border-primary focus:outline-none"
               />
             </div>
             
             {/* Filter pills - compact */}
-            <div className="flex gap-1.5 overflow-x-auto scrollbar-hide flex-shrink-0">
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-hide flex-shrink-0 max-w-full">
               {[
                 { key: 'all', label: 'Todas' },
                 { key: 'general', label: 'Gerais' },

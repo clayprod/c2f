@@ -111,11 +111,11 @@ export function BudgetsByCategory() {
   }, [budgets, statusFilter]);
 
   return (
-    <div className="glass-card p-4 md:p-6 h-full flex flex-col">
-      <div className="flex flex-col gap-3 mb-4 md:mb-6">
+    <div className="glass-card p-3 md:p-4 lg:p-6 h-full flex flex-col">
+      <div className="flex flex-col gap-2 md:gap-3 mb-3 md:mb-4 lg:mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h2 className="font-display font-semibold text-sm md:text-lg">Orçamentos por Categoria</h2>
+            <h2 className="font-display font-semibold text-xs md:text-sm lg:text-lg">Orçamentos por Categoria</h2>
             <InfoIcon
               content={
                 <div className="space-y-2">
@@ -142,9 +142,10 @@ export function BudgetsByCategory() {
         <div className="flex items-center gap-2 flex-wrap">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 md:h-9 gap-1.5 text-xs md:text-sm">
-                <Filter className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                <span>Status: {
+              <Button variant="outline" size="sm" className="h-7 md:h-8 lg:h-9 gap-1 text-xs md:text-xs lg:text-sm">
+                <Filter className="h-3 w-3 md:h-3.5 md:w-3.5 lg:h-4 lg:w-4" />
+                <span className="hidden md:inline">Status: </span>
+                <span>{
                   statusFilter === 'all' ? 'Todos' :
                     statusFilter === 'over' ? 'Acima' :
                       statusFilter === 'warning' ? 'Atenção' : 'OK'
@@ -163,7 +164,7 @@ export function BudgetsByCategory() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <div className="flex-1 min-w-[140px] max-w-[180px]">
+          <div className="flex-1 min-w-[120px] md:min-w-[140px] max-w-[160px] md:max-w-[180px]">
             <MonthYearPicker
               value={selectedMonth}
               onChange={setSelectedMonth}
@@ -193,7 +194,7 @@ export function BudgetsByCategory() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-3 lg:gap-4">
           {filteredBudgets.map((budget) => {
             const spent = Math.abs(budget.amount_actual || 0);
             const limit = Math.abs((budget.limit_cents || budget.amount_planned_cents || 0) / 100);
@@ -209,16 +210,16 @@ export function BudgetsByCategory() {
               <div
                 key={budget.id}
                 className={cn(
-                  "group relative p-3 md:p-4 rounded-xl border border-border/50 bg-card/30 hover:bg-card/50 transition-all duration-300",
+                  "group relative p-2.5 md:p-3 lg:p-4 rounded-xl border border-border/50 bg-card/30 hover:bg-card/50 transition-all duration-300",
                   isOver && "border-red-500/20 bg-red-500/[0.02] hover:bg-red-500/[0.04]",
                   isWarning && "border-amber-500/20 bg-amber-500/[0.02] hover:bg-amber-500/[0.04]"
                 )}
                 style={!isOver && !isWarning ? { borderLeft: `3px solid ${categoryColor}` } : undefined}
               >
-                <div className="flex items-start justify-between mb-3 md:mb-4 gap-2">
+                <div className="flex items-start justify-between mb-2 md:mb-3 lg:mb-4 gap-2">
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <div className={cn(
-                      "w-7 h-7 md:w-8 md:h-8 rounded-lg flex items-center justify-center text-sm md:text-lg shadow-sm transition-transform group-hover:scale-110 flex-shrink-0",
+                      "w-6 h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center text-xs md:text-sm lg:text-lg shadow-sm transition-transform group-hover:scale-110 flex-shrink-0",
                       isOver ? "bg-red-500/10" : isWarning ? "bg-amber-500/10" : "bg-muted"
                     )}
                       style={!isOver && !isWarning ? { backgroundColor: `${categoryColor}15` } : undefined}
@@ -226,22 +227,22 @@ export function BudgetsByCategory() {
                       {categoryIcon}
                     </div>
                     <div className="flex flex-col min-w-0 flex-1">
-                      <h3 className="font-semibold text-xs md:text-sm truncate">{categoryName}</h3>
+                      <h3 className="font-semibold text-xs md:text-xs lg:text-sm truncate">{categoryName}</h3>
                       <div className="flex items-center gap-1">
                         {isOver ? (
                           <div className="flex items-center gap-0.5 text-red-500">
-                            <AlertCircle className="w-3 h-3 flex-shrink-0" />
-                            <span className="text-[9px] md:text-[10px] font-medium">Crítico</span>
+                            <AlertCircle className="w-2.5 h-2.5 md:w-3 md:h-3 flex-shrink-0" />
+                            <span className="text-[8px] md:text-[9px] lg:text-[10px] font-medium">Crítico</span>
                           </div>
                         ) : isWarning ? (
                           <div className="flex items-center gap-0.5 text-amber-500">
-                            <AlertTriangle className="w-3 h-3 flex-shrink-0" />
-                            <span className="text-[9px] md:text-[10px] font-medium">Atenção</span>
+                            <AlertTriangle className="w-2.5 h-2.5 md:w-3 md:h-3 flex-shrink-0" />
+                            <span className="text-[8px] md:text-[9px] lg:text-[10px] font-medium">Atenção</span>
                           </div>
                         ) : (
                           <div className="flex items-center gap-0.5 text-emerald-500">
-                            <CheckCircle2 className="w-3 h-3 flex-shrink-0" />
-                            <span className="text-[9px] md:text-[10px] font-medium">OK</span>
+                            <CheckCircle2 className="w-2.5 h-2.5 md:w-3 md:h-3 flex-shrink-0" />
+                            <span className="text-[8px] md:text-[9px] lg:text-[10px] font-medium">OK</span>
                           </div>
                         )}
                       </div>
@@ -249,7 +250,7 @@ export function BudgetsByCategory() {
                   </div>
                   <div className="text-right flex-shrink-0">
                     <span className={cn(
-                      "text-[10px] md:text-xs font-bold",
+                      "text-[10px] md:text-[11px] lg:text-xs font-bold",
                       isOver ? "text-red-500" : isWarning ? "text-amber-500" : "text-emerald-500"
                     )}>
                       {percentage.toFixed(0)}%
@@ -257,15 +258,16 @@ export function BudgetsByCategory() {
                   </div>
                 </div>
 
-                <div className="space-y-2 md:space-y-3">
+                <div className="space-y-2 lg:space-y-3">
                   <div className="space-y-1">
-                    <div className="flex items-center justify-between text-[10px] md:text-xs">
+                    <div className="flex items-center justify-between text-[9px] md:text-[10px] lg:text-xs">
                       <span className="text-muted-foreground font-medium">Consumido</span>
-                      <span className="font-bold">{formatCurrency(spent)}</span>
+                      <span className="font-bold hidden md:inline">{formatCurrency(spent)}</span>
+                      <span className="font-bold md:hidden text-xs">{formatCurrency(spent).replace('R$', 'R$').substring(0, 8)}</span>
                     </div>
                     <Progress
                       value={Math.min(percentage, 100)}
-                      className="h-1 md:h-1.5 transition-all"
+                      className="h-1 md:h-1 lg:h-1.5 transition-all"
                       indicatorClassName={cn(
                         "transition-all duration-500",
                         isOver ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]" :
@@ -276,17 +278,17 @@ export function BudgetsByCategory() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-1 md:gap-2 pt-1 border-t border-border/10">
+                  <div className="grid grid-cols-2 gap-1 md:gap-1.5 lg:gap-2 pt-1 border-t border-border/10 hidden md:grid">
                     <div className="flex flex-col">
-                      <span className="text-[9px] md:text-[10px] text-muted-foreground uppercase font-semibold">Objetivo</span>
-                      <span className="text-[10px] md:text-xs font-medium">{formatCurrency(limit)}</span>
+                      <span className="text-[8px] md:text-[9px] lg:text-[10px] text-muted-foreground uppercase font-semibold">Objetivo</span>
+                      <span className="text-[9px] md:text-[10px] lg:text-xs font-medium truncate">{formatCurrency(limit)}</span>
                     </div>
                     <div className="flex flex-col text-right">
-                      <span className="text-[9px] md:text-[10px] text-muted-foreground uppercase font-semibold">
+                      <span className="text-[8px] md:text-[9px] lg:text-[10px] text-muted-foreground uppercase font-semibold">
                         {isOver ? "Excedente" : "Disponível"}
                       </span>
                       <span className={cn(
-                        "text-[10px] md:text-xs font-bold",
+                        "text-[9px] md:text-[10px] lg:text-xs font-bold",
                         isOver ? "text-red-500" : "text-emerald-500"
                       )}>
                         {formatCurrency(isOver ? spent - limit : remaining)}

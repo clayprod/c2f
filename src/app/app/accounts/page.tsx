@@ -23,6 +23,9 @@ interface Account {
   color?: string;
   icon?: string;
   is_default?: boolean;
+  overdraft_limit_cents?: number;
+  overdraft_interest_rate_monthly?: number;
+  yield_rate_monthly?: number;
 }
 
 const accountTypes = [
@@ -59,6 +62,11 @@ export default function AccountsPage() {
     current_balance: '',
     color: '#3b82f6',
     icon: '🏦',
+    has_overdraft: false,
+    overdraft_limit: '',
+    overdraft_interest_rate: '',
+    has_yield: false,
+    yield_rate: '',
   });
   const { toast } = useToast();
 
@@ -100,18 +108,36 @@ export default function AccountsPage() {
         : '/api/accounts';
       const method = editingAccount ? 'PATCH' : 'POST';
 
+      const body: any = {
+        name: formData.name.trim(),
+        type: formData.type,
+        institution: formData.institution.trim() || null,
+        currency: formData.currency,
+        balance_cents: Math.round(parseFloat(formData.current_balance || '0') * 100),
+        color: formData.color,
+        icon: formData.icon,
+      };
+
+      // Add overdraft fields if enabled
+      if (formData.has_overdraft) {
+        body.overdraft_limit_cents = Math.round(parseFloat(formData.overdraft_limit || '0') * 100);
+        body.overdraft_interest_rate_monthly = parseFloat(formData.overdraft_interest_rate || '0');
+      } else {
+        body.overdraft_limit_cents = 0;
+        body.overdraft_interest_rate_monthly = 0;
+      }
+
+      // Add yield field if enabled
+      if (formData.has_yield) {
+        body.yield_rate_monthly = parseFloat(formData.yield_rate || '0');
+      } else {
+        body.yield_rate_monthly = 0;
+      }
+
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.name.trim(),
-          type: formData.type,
-          institution: formData.institution.trim() || null,
-          currency: formData.currency,
-          balance_cents: Math.round(parseFloat(formData.current_balance || '0') * 100),
-          color: formData.color,
-          icon: formData.icon,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
@@ -175,6 +201,11 @@ export default function AccountsPage() {
       current_balance: account.current_balance.toString(),
       color: account.color || '#3b82f6',
       icon: account.icon || '🏦',
+      has_overdraft: (account.overdraft_limit_cents || 0) > 0,
+      overdraft_limit: account.overdraft_limit_cents ? (account.overdraft_limit_cents / 100).toFixed(2) : '',
+      overdraft_interest_rate: account.overdraft_interest_rate_monthly ? account.overdraft_interest_rate_monthly.toString() : '',
+      has_yield: (account.yield_rate_monthly || 0) > 0,
+      yield_rate: account.yield_rate_monthly ? account.yield_rate_monthly.toString() : '',
     });
     setDialogOpen(true);
   };
@@ -189,6 +220,11 @@ export default function AccountsPage() {
       current_balance: '',
       color: '#3b82f6',
       icon: '🏦',
+      has_overdraft: false,
+      overdraft_limit: '',
+      overdraft_interest_rate: '',
+      has_yield: false,
+      yield_rate: '',
     });
     setDialogOpen(true);
   };
@@ -212,9 +248,9 @@ export default function AccountsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-full overflow-x-hidden">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 max-w-full">
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-2xl sm:text-2xl md:text-3xl font-bold">Contas</h1>
           <p className="text-muted-foreground text-sm sm:text-base">Gerencie suas contas bancárias e cartões</p>
@@ -227,15 +263,15 @@ export default function AccountsPage() {
       </div>
 
       {/* Filters */}
-      <div className="glass-card p-4">
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+      <div className="glass-card p-4 max-w-full overflow-x-hidden">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 max-w-full">
           <div className="flex-1 relative min-w-0">
             <i className='bx bx-search absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground'></i>
             <Input
               placeholder="Buscar contas..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 w-full max-w-full"
             />
           </div>
           <select
@@ -259,7 +295,7 @@ export default function AccountsPage() {
           <i className='bx bx-loader-alt bx-spin text-4xl text-primary'></i>
         </div>
       ) : filteredAccounts.length === 0 ? (
-        <div className="glass-card p-12 text-center">
+        <div className="glass-card p-12 text-center max-w-full">
           <i className='bx bx-wallet text-6xl text-muted-foreground mb-4'></i>
           <h3 className="text-lg font-medium mb-2">Nenhuma conta encontrada</h3>
           <p className="text-muted-foreground mb-4">
@@ -273,7 +309,7 @@ export default function AccountsPage() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-full">
           {filteredAccounts.map((account) => (
             <div key={account.id} className="glass-card p-4 hover:shadow-lg transition-shadow">
               <div className="flex items-start justify-between mb-4">
@@ -382,6 +418,84 @@ export default function AccountsPage() {
                 onChange={(e) => setFormData({ ...formData, current_balance: e.target.value })}
                 placeholder="0,00"
               />
+            </div>
+
+            {/* Cheque Especial */}
+            <div className="space-y-3 border-t pt-4">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="has_overdraft"
+                  checked={formData.has_overdraft}
+                  onChange={(e) => setFormData({ ...formData, has_overdraft: e.target.checked })}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <label htmlFor="has_overdraft" className="text-sm font-medium">
+                  Possui limite de cheque especial?
+                </label>
+              </div>
+              {formData.has_overdraft && (
+                <div className="space-y-2 pl-6">
+                  <div>
+                    <label className="text-sm font-medium">Limite de Cheque Especial (R$)</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={formData.overdraft_limit}
+                      onChange={(e) => setFormData({ ...formData, overdraft_limit: e.target.value })}
+                      placeholder="0,00"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Taxa de Juros Mensal (%)</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      value={formData.overdraft_interest_rate}
+                      onChange={(e) => setFormData({ ...formData, overdraft_interest_rate: e.target.value })}
+                      placeholder="0,00"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Taxa de juros aplicada sobre o saldo negativo (ex: 5.5 para 5,5% ao mês)
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Rendimento */}
+            <div className="space-y-3 border-t pt-4">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="has_yield"
+                  checked={formData.has_yield}
+                  onChange={(e) => setFormData({ ...formData, has_yield: e.target.checked })}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <label htmlFor="has_yield" className="text-sm font-medium">
+                  Rendimento da conta (a.m)
+                </label>
+              </div>
+              {formData.has_yield && (
+                <div className="pl-6">
+                  <label className="text-sm font-medium">Taxa de Rendimento Mensal (%)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={formData.yield_rate}
+                    onChange={(e) => setFormData({ ...formData, yield_rate: e.target.value })}
+                    placeholder="0,00"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Taxa de rendimento aplicada sobre o saldo positivo (ex: 0.5 para 0,5% ao mês)
+                  </p>
+                </div>
+              )}
             </div>
 
             <div>
