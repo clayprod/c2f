@@ -4,6 +4,8 @@ import { getUserId } from '@/lib/auth';
 import { calculateMinimumBudget } from '@/services/budgets/minimumCalculator';
 import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const userId = await getUserId(request);

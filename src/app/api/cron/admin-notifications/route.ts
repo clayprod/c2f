@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server';
 import { getSegmentedUsers } from '@/services/notifications/adminSegmentation';
 import { createNotification } from '@/services/notifications/helper';
 
+export const dynamic = 'force-dynamic';
+
 // Verify cron secret if provided
 function verifyCronSecret(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization');

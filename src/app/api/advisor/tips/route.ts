@@ -4,6 +4,8 @@ import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 import { getOrGenerateDailyTip, getRecentTips } from '@/services/advisor';
 import { createErrorResponse } from '@/lib/errors';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/advisor/tips
  * Get the daily tip for the authenticated user

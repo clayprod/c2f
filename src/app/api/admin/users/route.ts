@@ -3,6 +3,8 @@ import { requireAdmin } from '@/lib/auth';
 import { createErrorResponse } from '@/lib/errors';
 import { listUsers } from '@/services/admin/userPlans';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     // Require admin access

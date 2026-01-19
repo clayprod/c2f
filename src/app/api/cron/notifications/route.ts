@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { checkAllNotifications } from '@/services/notifications/rules';
 
+export const dynamic = 'force-dynamic';
+
 // Verify cron secret if provided
 function verifyCronSecret(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization');
