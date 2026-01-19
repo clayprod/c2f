@@ -17,14 +17,14 @@ const steps = [
     number: '03',
     title: 'Dashboard e categorias',
     description: 'Visualize tudo categorizado, com gráficos claros.',
-    icon: 'bx-pie-chart-alt',
+    icon: 'bx-pie-chart-alt-2',
     status: 'progress',
   },
   {
     number: '04',
     title: 'Advisor com ações e alertas',
     description: 'IA que detecta anomalias e sugere ações concretas.',
-    icon: 'bx-brain',
+    icon: 'bx-sparkles-alt',
     status: 'after',
   },
 ];
@@ -54,31 +54,28 @@ const Evolution = () => {
             {steps.map((step, index) => (
               <div
                 key={step.number}
-                className={`relative flex flex-col md:flex-row items-start gap-4 md:gap-8 ${
-                  index % 2 === 0 ? 'md:flex-row' : 'md:flex-row-reverse'
-                }`}
+                className={`relative flex flex-col md:flex-row items-start gap-4 md:gap-8 ${index % 2 === 0 ? 'md:flex-row' : 'md:flex-row-reverse'
+                  }`}
               >
                 {/* Card */}
                 <div className={`flex-1 ${index % 2 === 0 ? 'md:text-right' : 'md:text-left'}`}>
                   <div className="glass-card-hover p-6 inline-block text-left">
                     <div className="flex items-center gap-3 mb-3">
                       <div
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                          step.status === 'before'
-                            ? 'bg-destructive/20'
-                            : step.status === 'after'
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center ${step.status === 'before'
+                          ? 'bg-destructive/20'
+                          : step.status === 'after'
                             ? 'bg-primary/20'
                             : 'bg-muted'
-                        }`}
+                          }`}
                       >
                         <i
-                          className={`bx ${step.icon} text-xl ${
-                            step.status === 'before'
-                              ? 'text-destructive'
-                              : step.status === 'after'
+                          className={`bx ${step.icon} text-xl ${step.status === 'before'
+                            ? 'text-destructive'
+                            : step.status === 'after'
                               ? 'text-primary'
                               : 'text-muted-foreground'
-                          }`}
+                            }`}
                         ></i>
                       </div>
                       <span className="text-xs font-mono text-muted-foreground">{step.number}</span>

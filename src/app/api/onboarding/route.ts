@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     
     // Call setup_new_user function
     const { error } = await supabase.rpc('setup_new_user', {
-      user_id: userId,
+      p_user_id: userId,
     });
 
     if (error) {
@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
 
 
 

@@ -5,6 +5,7 @@ import { investmentSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
 import { generateAutoBudgetsForInvestment } from '@/services/budgets/autoGenerator';
 import { projectionCache } from '@/services/projections/cache';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,6 +13,7 @@ export async function GET(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
@@ -21,7 +23,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('investments')
       .select('*, accounts(*), categories(*)')
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .order('created_at', { ascending: false });
 
     if (status) {
@@ -43,7 +45,7 @@ export async function GET(request: NextRequest) {
           const { data: transactions } = await supabase
             .from('transactions')
             .select('amount')
-            .eq('user_id', userId)
+            .eq('user_id', ownerId)
             .eq('category_id', investment.category_id);
 
           if (transactions && transactions.length > 0) {
@@ -89,6 +91,7 @@ export async function POST(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const body = await request.json();
     const validated = investmentSchema.parse(body);
@@ -100,7 +103,7 @@ export async function POST(request: NextRequest) {
     const { data: category, error: categoryError } = await supabase
       .from('categories')
       .insert({
-        user_id: userId,
+        user_id: ownerId,
         name: categoryName,
         type: 'expense', // Contributions are expenses, but can also be used for income (dividends/withdrawals)
         icon: '📊',
@@ -114,11 +117,17 @@ export async function POST(request: NextRequest) {
       console.error('Error creating investment category:', categoryError);
     }
 
+    const hasCustomPlan = !!validated.plan_entries && validated.plan_entries.length > 0;
+    const includeInPlan = hasCustomPlan ? true : validated.include_in_plan;
+    const { plan_entries, ...investmentData } = validated;
+
     const { data, error } = await supabase
       .from('investments')
       .insert({
-        ...validated,
-        user_id: userId,
+        ...investmentData,
+        user_id: ownerId,
+        include_in_plan: includeInPlan,
+        contribution_frequency: hasCustomPlan ? null : validated.contribution_frequency || null,
         initial_investment_cents: validated.initial_investment_cents,
         current_value_cents: validated.current_value_cents || validated.initial_investment_cents,
         category_id: category?.id,
@@ -128,9 +137,29 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
-    // Generate automatic budgets if include_in_budget is true
-    if (data.include_in_budget && data.status === 'active' && data.category_id && 
-        data.contribution_frequency && data.monthly_contribution_cents) {
+    if (data && validated.plan_entries && validated.plan_entries.length > 0) {
+      const planEntries = validated.plan_entries.map((entry) => ({
+        user_id: ownerId,
+        investment_id: data.id,
+        category_id: data.category_id || null,
+        entry_month: `${entry.month}-01`,
+        amount_cents: entry.amount_cents,
+        description: `Plano personalizado - ${data.name}`,
+      }));
+
+      const { error: planError } = await supabase
+        .from('investment_plan_entries')
+        .upsert(planEntries, {
+          onConflict: 'investment_id,entry_month',
+        });
+
+      if (planError) {
+        console.error('Error inserting investment plan entries:', planError);
+      }
+    }
+
+    // Generate automatic budgets if include_in_plan is true
+    if (data.include_in_plan && data.status === 'active' && data.category_id) {
       try {
         const today = new Date();
         const startMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -140,11 +169,11 @@ export async function POST(request: NextRequest) {
 
         await generateAutoBudgetsForInvestment(
           supabase,
-          userId,
+          ownerId,
           {
             id: data.id,
             category_id: data.category_id,
-            include_in_budget: data.include_in_budget,
+            include_in_plan: data.include_in_plan,
             status: data.status,
             contribution_frequency: data.contribution_frequency,
             monthly_contribution_cents: data.monthly_contribution_cents,
@@ -157,7 +186,7 @@ export async function POST(request: NextRequest) {
           }
         );
 
-        projectionCache.invalidateUser(userId);
+        projectionCache.invalidateUser(ownerId);
       } catch (budgetError) {
         console.error('Error generating auto budgets for investment:', budgetError);
         // Don't fail the investment creation if budget generation fails
@@ -174,7 +203,7 @@ export async function POST(request: NextRequest) {
           const { data: defaultAccount } = await supabase
             .from('accounts')
             .select('id')
-            .eq('user_id', userId)
+            .eq('user_id', ownerId)
             .eq('type', 'checking')
             .order('created_at', { ascending: true })
             .limit(1)
@@ -186,7 +215,7 @@ export async function POST(request: NextRequest) {
           const { error: txError } = await supabase
             .from('transactions')
             .insert({
-              user_id: userId,
+              user_id: ownerId,
               account_id: accountId,
               category_id: data.category_id,
               posted_at: validated.purchase_date,

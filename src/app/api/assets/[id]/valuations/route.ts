@@ -1,28 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientFromRequest } from '@/lib/supabase/server';
 import { getUserId } from '@/lib/auth';
 import { assetValuationSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { id } = await params;
-    const supabase = await createClient();
+    const { supabase } = createClientFromRequest(request);
 
     // Verify asset ownership
     const { data: asset, error: assetError } = await supabase
       .from('assets')
       .select('id')
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .single();
 
     if (assetError || !asset) {
@@ -34,7 +36,7 @@ export async function GET(
       .from('asset_valuations')
       .select('*')
       .eq('asset_id', id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .order('valuation_date', { ascending: true });
 
     if (error) throw error;
@@ -55,10 +57,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { id } = await params;
     const body = await request.json();
@@ -67,14 +70,14 @@ export async function POST(
     const bodyWithAssetId = { ...body, asset_id: id };
     const validated = assetValuationSchema.parse(bodyWithAssetId);
 
-    const supabase = await createClient();
+    const { supabase } = createClientFromRequest(request);
 
     // Verify asset ownership
     const { data: asset, error: assetError } = await supabase
       .from('assets')
       .select('id')
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .single();
 
     if (assetError || !asset) {
@@ -86,7 +89,7 @@ export async function POST(
       .from('asset_valuations')
       .insert({
         asset_id: id,
-        user_id: userId,
+        user_id: ownerId,
         valuation_date: validated.valuation_date,
         value_cents: validated.value_cents,
         valuation_type: validated.valuation_type,
@@ -102,7 +105,7 @@ export async function POST(
       .from('assets')
       .update({ current_value_cents: validated.value_cents })
       .eq('id', id)
-      .eq('user_id', userId);
+      .eq('user_id', ownerId);
 
     return NextResponse.json({
       data: valuation

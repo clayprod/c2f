@@ -34,6 +34,7 @@ export {
   getSession,
   isRedisAvailable,
   buildMessagesForLLM,
+  createSummarizedContext,
 } from './sessionMemory';
 
 // LLM

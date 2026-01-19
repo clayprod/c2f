@@ -8,6 +8,8 @@ import { BudgetsByCategory } from '@/components/dashboard/BudgetsByCategory';
 import { AdvisorTips } from '@/components/dashboard/AdvisorTips';
 import { Button } from '@/components/ui/button';
 import { InfoIcon } from '@/components/ui/InfoIcon';
+import { useProfile } from '@/hooks/useProfile';
+import { PlanGuard } from '@/components/app/PlanGuard';
 
 interface DashboardData {
   totalBalance: number;
@@ -46,6 +48,15 @@ const formatCurrency = (value: number) => {
   }).format(value);
 };
 
+// Função para obter o nome do mês atual no timezone do Brasil (UTC-3)
+const getCurrentMonthName = () => {
+  const now = new Date();
+  // Converter para timezone do Brasil (America/Sao_Paulo = UTC-3)
+  const brazilDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+  return brazilDate.toLocaleDateString('pt-BR', { month: 'long' });
+};
+
+// Updated: 2026-01-18 - Melhorias na indicação do mês corrente
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
@@ -53,6 +64,26 @@ export default function DashboardPage() {
   const [cashFlowData, setCashFlowData] = useState<Record<string, MonthlyTotal>>({});
   const [cashFlowLoading, setCashFlowLoading] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState(12); // Default: 1 year
+  const { isFree, loading: profileLoading } = useProfile();
+  
+  // Memoizar o nome do mês atual para evitar recálculos
+  const currentMonthName = useMemo(() => {
+    try {
+      const monthName = getCurrentMonthName();
+      if (!monthName || monthName === 'Invalid Date') {
+        // Fallback caso haja problema com timezone
+        const now = new Date();
+        return now.toLocaleDateString('pt-BR', { month: 'long' }).charAt(0).toUpperCase() + 
+               now.toLocaleDateString('pt-BR', { month: 'long' }).slice(1);
+      }
+      return monthName.charAt(0).toUpperCase() + monthName.slice(1);
+    } catch (error) {
+      // Fallback em caso de erro
+      const now = new Date();
+      return now.toLocaleDateString('pt-BR', { month: 'long' }).charAt(0).toUpperCase() + 
+             now.toLocaleDateString('pt-BR', { month: 'long' }).slice(1);
+    }
+  }, []);
 
   useEffect(() => {
     fetchDashboardData();
@@ -63,7 +94,7 @@ export default function DashboardPage() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch accounts for balance
       const accountsRes = await fetch('/api/accounts');
       if (!accountsRes.ok) {
@@ -85,9 +116,11 @@ export default function DashboardPage() {
         return sum + (parseFloat(acc.current_balance || acc.balance_cents / 100 || 0) || 0);
       }, 0);
 
+      // Usar timezone do Brasil (UTC-3)
       const now = new Date();
-      const currentMonth = now.getMonth();
-      const currentYear = now.getFullYear();
+      const brazilDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+      const currentMonth = brazilDate.getMonth();
+      const currentYear = brazilDate.getFullYear();
 
       const monthTransactions = transactions.filter((tx: Transaction) => {
         const txDate = new Date(tx.posted_at);
@@ -143,18 +176,20 @@ export default function DashboardPage() {
   const fetchCashFlowData = async () => {
     try {
       setCashFlowLoading(true);
+      // Usar timezone do Brasil (UTC-3)
       const today = new Date();
-      const currentYear = today.getFullYear();
-      const currentMonth = today.getMonth();
-      
+      const brazilDate = new Date(today.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+      const currentYear = brazilDate.getFullYear();
+      const currentMonth = brazilDate.getMonth();
+
       // Start: 5 months back from current month
       const startDate = new Date(currentYear, currentMonth - 5, 1);
-      
+
       // End: selectedPeriod months forward from current month
       // Limit to max 10 years (120 months total from start)
       // We have 5 months back, so max 115 months forward
       const maxMonthsForward = Math.min(selectedPeriod, 115);
-      
+
       // Calculate end date: add months to current date
       const endDate = new Date(today);
       endDate.setMonth(endDate.getMonth() + maxMonthsForward);
@@ -162,15 +197,15 @@ export default function DashboardPage() {
       endDate.setMonth(endDate.getMonth() + 1, 0);
 
       // Double-check period doesn't exceed 120 months total
-      const monthsDiff = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
-                         (endDate.getMonth() - startDate.getMonth() + 1);
+      const monthsDiff = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+        (endDate.getMonth() - startDate.getMonth() + 1);
       if (monthsDiff > 120) {
         console.warn('Período excede 10 anos, limitando a 10 anos');
         const limitedEndDate = new Date(startDate);
         limitedEndDate.setMonth(limitedEndDate.getMonth() + 120);
         endDate.setTime(limitedEndDate.getTime());
       }
-      
+
       // Ensure end date is not before start date
       if (endDate < startDate) {
         console.error('Data final anterior à data inicial');
@@ -201,9 +236,11 @@ export default function DashboardPage() {
   };
 
   const chartData = useMemo(() => {
+    // Usar timezone do Brasil (UTC-3) para determinar o mês atual
     const today = new Date();
-    const currentYear = today.getFullYear();
-    const currentMonth = today.getMonth() + 1;
+    const brazilDate = new Date(today.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    const currentYear = brazilDate.getFullYear();
+    const currentMonth = brazilDate.getMonth() + 1;
     const startDate = new Date(currentYear, currentMonth - 6, 1); // 5 months back
     const endDate = new Date(currentYear, currentMonth + selectedPeriod, 0); // selectedPeriod months forward
 
@@ -233,6 +270,7 @@ export default function DashboardPage() {
         actual_expenses: 0,
       };
 
+      // Comparar usando timezone do Brasil
       const isCurrentMonth = year === currentYear && month === currentMonth;
       const isProjected = year > currentYear || (year === currentYear && month > currentMonth);
 
@@ -241,7 +279,7 @@ export default function DashboardPage() {
       // Para meses futuros: sempre usar valores projetados
       let income: number;
       let expenses: number;
-      
+
       if (isCurrentMonth) {
         // Mês corrente: preferir valores reais, mas usar projetados se não houver reais
         income = totals.actual_income > 0 ? totals.actual_income : totals.planned_income;
@@ -276,7 +314,7 @@ export default function DashboardPage() {
     return months;
   }, [cashFlowData, selectedPeriod]);
 
-  if (loading) {
+  if (loading || profileLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-muted-foreground">Carregando...</div>
@@ -285,20 +323,20 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <div>
-        <h1 className="font-display text-2xl md:text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">Visão geral das suas finanças</p>
+        <h1 className="font-display text-xl md:text-2xl lg:text-3xl font-bold">Dashboard</h1>
+        <p className="text-muted-foreground text-sm md:text-base">Visão geral das suas finanças</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="glass-card p-5">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <i className='bx bx-wallet text-xl text-primary'></i>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        <div className="glass-card p-3 md:p-5">
+          <div className="flex items-center justify-between mb-2 md:mb-3">
+            <div className="flex items-center gap-2 md:gap-3">
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-primary/10 flex items-center justify-center">
+                <i className='bx bx-wallet text-lg md:text-xl text-primary'></i>
               </div>
-              <span className="text-sm text-muted-foreground">Saldo Total</span>
+              <span className="text-xs md:text-sm text-muted-foreground">Saldo Total</span>
             </div>
             <InfoIcon
               content={
@@ -313,25 +351,33 @@ export default function DashboardPage() {
               }
             />
           </div>
-          <p className="font-display text-2xl font-bold">
+          <p className="font-display text-lg md:text-2xl font-bold">
             {data ? formatCurrency(data.totalBalance) : 'R$ 0,00'}
           </p>
         </div>
 
-        <div className="glass-card p-5">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
-                <i className='bx bx-trending-up text-xl text-green-500'></i>
+        <div className="glass-card p-3 md:p-5">
+          <div className="flex items-center justify-between mb-2 md:mb-3">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2 md:gap-3">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-green-500/10 flex items-center justify-center">
+                  <i className='bx bx-trending-up text-lg md:text-xl text-green-500'></i>
+                </div>
+                <span className="text-xs md:text-sm font-semibold text-foreground">
+                  Receitas
+                </span>
               </div>
-              <span className="text-sm text-muted-foreground">Receitas (Mês)</span>
+              <span className="text-[10px] md:text-xs text-primary font-medium ml-1 flex items-center gap-1">
+                <i className='bx bx-calendar text-xs'></i>
+                Mês Atual ({currentMonthName})
+              </span>
             </div>
             <InfoIcon
               content={
                 <div className="space-y-2">
                   <p className="font-semibold">Sobre este valor:</p>
                   <ul className="space-y-1.5 text-xs list-disc list-inside">
-                    <li>Representa todas as entradas de dinheiro no mês atual.</li>
+                    <li>Representa todas as entradas de dinheiro no <strong>mês atual ({currentMonthName})</strong>.</li>
                     <li>Inclui salários, freelas, aluguéis, dividendos e outras fontes de receita.</li>
                     <li>Valores são calculados com base nas transações registradas.</li>
                   </ul>
@@ -339,25 +385,33 @@ export default function DashboardPage() {
               }
             />
           </div>
-          <p className="font-display text-2xl font-bold text-green-500">
+          <p className="font-display text-lg md:text-2xl font-bold text-green-500">
             {data ? formatCurrency(data.totalIncome) : 'R$ 0,00'}
           </p>
         </div>
 
-        <div className="glass-card p-5">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
-                <i className='bx bx-trending-down text-xl text-red-500'></i>
+        <div className="glass-card p-3 md:p-5">
+          <div className="flex items-center justify-between mb-2 md:mb-3">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2 md:gap-3">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-red-500/10 flex items-center justify-center">
+                  <i className='bx bx-trending-down text-lg md:text-xl text-red-500'></i>
+                </div>
+                <span className="text-xs md:text-sm font-semibold text-foreground">
+                  Despesas
+                </span>
               </div>
-              <span className="text-sm text-muted-foreground">Despesas (Mês)</span>
+              <span className="text-[10px] md:text-xs text-primary font-medium ml-1 flex items-center gap-1">
+                <i className='bx bx-calendar text-xs'></i>
+                Mês Atual ({currentMonthName})
+              </span>
             </div>
             <InfoIcon
               content={
                 <div className="space-y-2">
                   <p className="font-semibold">Sobre este valor:</p>
                   <ul className="space-y-1.5 text-xs list-disc list-inside">
-                    <li>Representa todas as saídas de dinheiro no mês atual.</li>
+                    <li>Representa todas as saídas de dinheiro no <strong>mês atual ({currentMonthName})</strong>.</li>
                     <li>Inclui despesas fixas, variáveis e eventuais registradas como transações.</li>
                     <li>Valores são calculados com base nas transações registradas.</li>
                   </ul>
@@ -365,25 +419,33 @@ export default function DashboardPage() {
               }
             />
           </div>
-          <p className="font-display text-2xl font-bold text-red-500">
+          <p className="font-display text-lg md:text-2xl font-bold text-red-500">
             {data ? formatCurrency(data.totalExpenses) : 'R$ 0,00'}
           </p>
         </div>
 
-        <div className="glass-card p-5">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center">
-                <i className='bx bx-pie-chart text-xl text-secondary'></i>
+        <div className="glass-card p-3 md:p-5">
+          <div className="flex items-center justify-between mb-2 md:mb-3">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2 md:gap-3">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-secondary/10 flex items-center justify-center">
+                  <i className='bx bx-pie-chart text-lg md:text-xl text-secondary'></i>
+                </div>
+                <span className="text-xs md:text-sm font-semibold text-foreground">
+                  Economia
+                </span>
               </div>
-              <span className="text-sm text-muted-foreground">Economia (Mês)</span>
+              <span className="text-[10px] md:text-xs text-primary font-medium ml-1 flex items-center gap-1">
+                <i className='bx bx-calendar text-xs'></i>
+                Mês Atual ({currentMonthName})
+              </span>
             </div>
             <InfoIcon
               content={
                 <div className="space-y-2">
                   <p className="font-semibold">Sobre este valor:</p>
                   <ul className="space-y-1.5 text-xs list-disc list-inside">
-                    <li>Representa a diferença entre receitas e despesas do mês (Receitas - Despesas).</li>
+                    <li>Representa a diferença entre receitas e despesas do <strong>mês atual ({currentMonthName})</strong> (Receitas - Despesas).</li>
                     <li>Valores positivos indicam que você economizou dinheiro.</li>
                     <li>Valores negativos indicam que você gastou mais do que recebeu.</li>
                   </ul>
@@ -391,19 +453,18 @@ export default function DashboardPage() {
               }
             />
           </div>
-          <p className={`font-display text-2xl font-bold ${
-            data && data.savings >= 0 ? 'text-green-500' : 'text-red-500'
-          }`}>
+          <p className={`font-display text-lg md:text-2xl font-bold ${data && data.savings >= 0 ? 'text-green-500' : 'text-red-500'
+            }`}>
             {data ? formatCurrency(data.savings) : 'R$ 0,00'}
           </p>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 glass-card p-6">
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
+      <div className="grid lg:grid-cols-3 gap-4 md:gap-6">
+        <div className="lg:col-span-2 glass-card p-4 md:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
             <div className="flex items-center gap-2">
-              <h2 className="font-display font-semibold">Fluxo de Caixa</h2>
+              <h2 className="font-display font-semibold text-sm md:text-base">Fluxo de Caixa</h2>
               <InfoIcon
                 content={
                   <div className="space-y-2">
@@ -413,21 +474,22 @@ export default function DashboardPage() {
                       <li><strong>Despesas:</strong> Valores gastos no período. Barras mais apagadas indicam projeções.</li>
                       <li><strong>Saldo Acumulado:</strong> Soma acumulada de receitas menos despesas ao longo do tempo.</li>
                       <li><strong>Linha tracejada:</strong> Indica valores projetados (futuros).</li>
-                      <li><strong>Fundo azul:</strong> Destaca o mês corrente.</li>
-                      <li>O mês corrente está sempre centralizado, com histórico à esquerda e projeções à direita.</li>
+                      <li><strong>◆ MÊS ATUAL ◆:</strong> Área destacada em azul indica o mês corrente.</li>
+                      <li>O mês atual sempre aparece centralizado no gráfico, com histórico à esquerda e projeções à direita.</li>
                     </ul>
                   </div>
                 }
               />
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-muted-foreground">Período:</span>
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
+              <span className="text-xs md:text-sm text-muted-foreground whitespace-nowrap flex-shrink-0">Período:</span>
               {PERIOD_OPTIONS.map((option) => (
                 <Button
                   key={option.months}
                   variant={selectedPeriod === option.months ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setSelectedPeriod(option.months)}
+                  className="flex-shrink-0 text-xs md:text-sm px-2 md:px-3"
                 >
                   {option.label}
                 </Button>
@@ -439,7 +501,10 @@ export default function DashboardPage() {
               <div className="text-muted-foreground">Carregando gráfico...</div>
             </div>
           ) : chartData.length > 0 ? (
-            <CashFlowChart data={chartData} periodMonths={selectedPeriod} />
+            <CashFlowChart
+              data={chartData}
+              periodMonths={isFree ? 0 : selectedPeriod}
+            />
           ) : (
             <div className="h-64 flex items-center justify-center">
               <div className="text-muted-foreground">Nenhum dado disponível</div>
@@ -447,17 +512,21 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <AdvisorTips />
+        <PlanGuard minPlan="pro" showFallback={false}>
+          <AdvisorTips />
+        </PlanGuard>
       </div>
 
       <ExpensesByCategoryChart />
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        <BudgetsByCategory />
-        <div className="glass-card p-6">
+      <div className="grid lg:grid-cols-2 gap-4 md:gap-6">
+        <PlanGuard minPlan="pro" showFallback={false}>
+          <BudgetsByCategory />
+        </PlanGuard>
+        <div className="glass-card p-4 md:p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <h2 className="font-display font-semibold">Transações Recentes</h2>
+              <h2 className="font-display font-semibold text-sm md:text-base">Transações Recentes</h2>
               <InfoIcon
                 content={
                   <div className="space-y-2">
@@ -472,59 +541,81 @@ export default function DashboardPage() {
                 }
               />
             </div>
-            <Link href="/app/transactions" className="text-sm text-primary hover:underline">
+            <Link href="/app/transactions" className="text-xs md:text-sm text-primary hover:underline">
               Ver todas
             </Link>
           </div>
           {recentTransactions.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <p>Nenhuma transação encontrada</p>
-            <Link href="/app/transactions" className="text-primary hover:underline mt-2 inline-block">
-              Adicionar transação
-            </Link>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Descrição</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Categoria</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Data</th>
-                  <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Valor</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentTransactions.map((tx) => (
-                  <tr key={tx.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                    <td className="py-3 px-4 text-sm">{tx.description}</td>
-                    <td className="py-3 px-4">
-                      <span className="badge-pill text-xs">
-                        {tx.categories?.name || 'Sem categoria'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-sm text-muted-foreground">
-                      {new Date(tx.posted_at).toLocaleDateString('pt-BR')}
-                    </td>
-                    <td
-                      className={`py-3 px-4 text-sm text-right font-medium ${
-                        (() => {
-                          const amount = typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount;
-                          return amount > 0 ? 'text-green-500' : 'text-red-500';
-                        })()
-                      }`}
-                    >
-                      {(() => {
-                        const amount = typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount;
-                        return amount > 0 ? '+' : '';
-                      })()}
-                      {formatCurrency(typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+            <div className="text-center py-6 md:py-8 text-muted-foreground">
+              <p className="text-sm">Nenhuma transação encontrada</p>
+              <Link href="/app/transactions" className="text-primary hover:underline mt-2 inline-block text-sm">
+                Adicionar transação
+              </Link>
+            </div>
+          ) : (
+            <>
+              {/* Mobile: Card view */}
+              <div className="md:hidden space-y-2">
+                {recentTransactions.map((tx) => {
+                  const amount = typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount;
+                  const isIncome = amount > 0;
+                  return (
+                    <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
+                      <div className="flex-1 min-w-0 mr-3">
+                        <p className="text-sm font-medium truncate">{tx.description}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {tx.categories?.name || 'Sem categoria'} • {new Date(tx.posted_at).toLocaleDateString('pt-BR')}
+                        </p>
+                      </div>
+                      <p className={`text-sm font-semibold whitespace-nowrap ${isIncome ? 'text-green-500' : 'text-red-500'}`}>
+                        {isIncome ? '+' : ''}{formatCurrency(amount)}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Desktop: Table view */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Descrição</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Categoria</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Data</th>
+                      <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentTransactions.map((tx) => (
+                      <tr key={tx.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
+                        <td className="py-3 px-4 text-sm">{tx.description}</td>
+                        <td className="py-3 px-4">
+                          <span className="badge-pill text-xs">
+                            {tx.categories?.name || 'Sem categoria'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-sm text-muted-foreground">
+                          {new Date(tx.posted_at).toLocaleDateString('pt-BR')}
+                        </td>
+                        <td
+                          className={`py-3 px-4 text-sm text-right font-medium ${(() => {
+                              const amount = typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount;
+                              return amount > 0 ? 'text-green-500' : 'text-red-500';
+                            })()
+                            }`}
+                        >
+                          {(() => {
+                            const amount = typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount;
+                            return amount > 0 ? '+' : '';
+                          })()}
+                          {formatCurrency(typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       </div>

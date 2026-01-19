@@ -216,9 +216,14 @@ export async function POST(request: NextRequest) {
           category_id: categoryId,
           year: targetYear,
           month: targetMonth,
-          amount_planned: sourceBudget.amount_planned || 0,
+          amount_planned_cents: sourceBudget.amount_planned_cents || 0,
           amount_actual: 0,
         };
+
+        // Copy metadata (e.g., budget_breakdown) if present
+        if (sourceBudget.metadata) {
+          budget.metadata = sourceBudget.metadata;
+        }
 
         if (hasNewColumns) {
           budget.source_type = 'manual';
@@ -241,9 +246,10 @@ export async function POST(request: NextRequest) {
           console.error('Upsert error:', upsertError);
           const errorMsg = upsertError.message?.toLowerCase() || '';
           if (errorMsg.includes('source_type') || errorMsg.includes('is_projected') ||
+              errorMsg.includes('metadata') ||
               (errorMsg.includes('column') && errorMsg.includes('does not exist'))) {
             const fallbackBudgets = budgetsToUpsert.map((budget: any) => {
-              const { source_type, is_projected, ...rest } = budget;
+              const { source_type, is_projected, metadata, ...rest } = budget;
               return rest;
             });
             const { error: fallbackError } = await supabase
@@ -265,9 +271,10 @@ export async function POST(request: NextRequest) {
           console.error('Insert error:', insertError);
           const errorMsg = insertError.message?.toLowerCase() || '';
           if (errorMsg.includes('source_type') || errorMsg.includes('is_projected') ||
+              errorMsg.includes('metadata') ||
               (errorMsg.includes('column') && errorMsg.includes('does not exist'))) {
             const fallbackBudgets = budgetsToUpsert.map((budget: any) => {
-              const { source_type, is_projected, ...rest } = budget;
+              const { source_type, is_projected, metadata, ...rest } = budget;
               return rest;
             });
             const { error: fallbackError } = await supabase

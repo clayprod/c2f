@@ -7,6 +7,18 @@ import { createClient } from '@/lib/supabase/client';
 import { getLogo } from '@/lib/logo';
 import Image from 'next/image';
 import AdvisorDialog from './AdvisorDialog';
+import { NotificationDropdown } from './NotificationDropdown';
+import { useTheme } from '@/hooks/useTheme';
+import { useAccountContext } from '@/hooks/useAccountContext';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -16,29 +28,30 @@ interface UserProfile {
   full_name: string | null;
   email: string;
   avatar_url: string | null;
-  plan: 'free' | 'pro' | 'business';
+  plan: 'free' | 'pro' | 'premium';
   role?: string;
 }
 
 const planLabels: Record<string, { label: string; color: string }> = {
   free: { label: 'Free', color: 'bg-muted text-muted-foreground' },
   pro: { label: 'Pro', color: 'bg-primary/20 text-primary' },
-  business: { label: 'Business', color: 'bg-amber-500/20 text-amber-500' },
+  premium: { label: 'Premium', color: 'bg-amber-500/20 text-amber-500' },
 };
 
 const menuItems = [
-  { icon: 'bx-home', label: 'Dashboard', path: '/app' },
-  { icon: 'bx-swap-horizontal', label: 'Transações', path: '/app/transactions' },
-  { icon: 'bx-wallet', label: 'Contas', path: '/app/accounts' },
-  { icon: 'bx-credit-card', label: 'Cartões', path: '/app/credit-cards' },
-  { icon: 'bx-categories', label: 'Categorias', path: '/app/categories' },
-  { icon: 'bx-wallet-alt', label: 'Orçamentos', path: '/app/budgets' },
-  { icon: 'bx-file', label: 'Dívidas', path: '/app/debts' },
-  { icon: 'bx-trending-up', label: 'Investimentos', path: '/app/investments' },
-  { icon: 'bx-home-alt', label: 'Patrimônio', path: '/app/assets' },
-  { icon: 'bx-bullseye', label: 'Objetivos', path: '/app/goals' },
-  { icon: 'bx-bar-chart', label: 'Relatórios', path: '/app/reports' },
-  { icon: 'bx-share', label: 'Integrações', path: '/app/integrations' },
+  { icon: 'bx-home', label: 'Dashboard', path: '/app', minPlan: 'free' },
+  { icon: 'bx-arrow-right-left', label: 'Transações', path: '/app/transactions', minPlan: 'free' },
+  { icon: 'bx-wallet', label: 'Contas', path: '/app/accounts', minPlan: 'free' },
+  { icon: 'bx-credit-card', label: 'Cartões', path: '/app/credit-cards', minPlan: 'free' },
+  { icon: 'bx-categories', label: 'Categorias', path: '/app/categories', minPlan: 'free' },
+  { icon: 'bx-wallet-alt', label: 'Orçamentos', path: '/app/budgets', minPlan: 'pro' },
+  { icon: 'bx-note', label: 'Dívidas', path: '/app/debts', minPlan: 'pro' },
+  { icon: 'bx-receipt', label: 'Recebíveis', path: '/app/receivables', minPlan: 'pro' },
+  { icon: 'bx-trending-up', label: 'Investimentos', path: '/app/investments', minPlan: 'pro' },
+  { icon: 'bx-home-alt', label: 'Patrimônio', path: '/app/assets', minPlan: 'pro' },
+  { icon: 'bx-bullseye', label: 'Objetivos', path: '/app/goals', minPlan: 'pro' },
+  { icon: 'bx-bar-chart', label: 'Relatórios', path: '/app/reports', minPlan: 'premium' },
+  { icon: 'bx-share', label: 'Integrações', path: '/app/integrations', minPlan: 'premium' },
 ];
 
 export default function AppLayout({ children }: AppLayoutProps) {
@@ -50,10 +63,106 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const menuListRef = useRef<HTMLUListElement>(null);
   const pathname = usePathname();
   const router = useRouter();
+  const { theme, toggleTheme } = useTheme();
+  const { context: accountContext, activeAccountId, setActiveAccountId, isViewingSharedAccount, hasPermission } = useAccountContext();
+
+  const persistActiveAccountNow = (id: string | null) => {
+    try {
+      if (id) {
+        localStorage.setItem('c2f_active_account', id);
+      } else {
+        localStorage.removeItem('c2f_active_account');
+      }
+    } catch {
+      // ignore
+    }
+
+    // Persist to cookie so server routes can read it immediately (before reload).
+    if (!id) {
+      document.cookie = `c2f_active_account=; path=/; max-age=0; samesite=lax`;
+      return;
+    }
+    document.cookie = `c2f_active_account=${encodeURIComponent(id)}; path=/; max-age=${60 * 60 * 24 * 30}; samesite=lax`;
+  };
+
+  // Persist active account to cookie so server routes can read it.
+  useEffect(() => {
+    if (!activeAccountId) {
+      document.cookie = `c2f_active_account=; path=/; max-age=0; samesite=lax`;
+      return;
+    }
+    // 30 days
+    document.cookie = `c2f_active_account=${encodeURIComponent(activeAccountId)}; path=/; max-age=${60 * 60 * 24 * 30}; samesite=lax`;
+  }, [activeAccountId]);
 
   useEffect(() => {
     fetchUserProfile();
-  }, []);
+
+    // Listen for profile updates from other components
+    const handleProfileUpdate = () => {
+      fetchUserProfile();
+    };
+
+    window.addEventListener('profile-updated', handleProfileUpdate);
+    return () => {
+      window.removeEventListener('profile-updated', handleProfileUpdate);
+    };
+  }, [activeAccountId]); // Reload profile when active account changes
+
+  // Filter menu items:
+  // - Own account: based on user's plan (current behavior)
+  // - Shared account: ignore invited user's plan and respect shared permissions instead
+  const visibleMenuItems = menuItems.filter((item) => {
+    if (isViewingSharedAccount) {
+      const resource = (() => {
+        switch (item.path) {
+          case '/app':
+            return 'dashboard';
+          case '/app/transactions':
+            return 'transactions';
+          case '/app/accounts':
+            // Not present in permissions JSON; tie to transactions visibility.
+            return 'transactions';
+          case '/app/credit-cards':
+            // Not present in permissions JSON; tie to transactions visibility.
+            return 'transactions';
+          case '/app/categories':
+            // Not present in permissions JSON; tie to transactions visibility.
+            return 'transactions';
+          case '/app/budgets':
+            return 'budgets';
+          case '/app/goals':
+            return 'goals';
+          case '/app/debts':
+            return 'debts';
+          case '/app/receivables':
+            // Not present in permissions JSON; tie to transactions visibility.
+            return 'transactions';
+          case '/app/investments':
+            return 'investments';
+          case '/app/assets':
+            return 'assets';
+          case '/app/reports':
+            return 'reports';
+          case '/app/integrations':
+            return 'integrations';
+          default:
+            return null;
+        }
+      })();
+
+      if (!resource) return true;
+      // For object-shaped permissions, check "view" explicitly.
+      return hasPermission(resource, 'view');
+    }
+
+    // Own account plan gating
+    if (!userProfile) return item.minPlan === 'free';
+    if (item.minPlan === 'free') return true;
+    if (item.minPlan === 'pro') return userProfile.plan === 'pro' || userProfile.plan === 'premium';
+    if (item.minPlan === 'premium') return userProfile.plan === 'premium';
+    return true;
+  });
 
   useEffect(() => {
     const checkScroll = () => {
@@ -62,7 +171,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
       const { scrollTop, scrollHeight, clientHeight } = list;
       const hasOverflow = scrollHeight > clientHeight;
-      
+
       setShowScrollUp(hasOverflow && scrollTop > 10);
       setShowScrollDown(hasOverflow && scrollTop < scrollHeight - clientHeight - 10);
     };
@@ -77,14 +186,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
       list.addEventListener('scroll', checkScroll);
       // Verificar também quando a janela redimensiona
       window.addEventListener('resize', checkScroll);
-      
+
       return () => {
         clearTimeout(timeoutId);
         list.removeEventListener('scroll', checkScroll);
         window.removeEventListener('resize', checkScroll);
       };
     }
-  }, [menuItems, sidebarOpen]);
+  }, [visibleMenuItems, sidebarOpen]);
 
   const fetchUserProfile = async () => {
     try {
@@ -93,26 +202,21 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
       if (user) {
         // Buscar perfil e plano em paralelo
-        const [profileResult, subscriptionResult] = await Promise.all([
+        // Use /api/billing/plan to get the correct plan (owner's plan when viewing shared account)
+        const [profileResult, planResponse] = await Promise.all([
           supabase
             .from('profiles')
             .select('full_name, email, avatar_url, role')
             .eq('id', user.id)
             .single(),
-          supabase
-            .from('billing_subscriptions')
-            .select('plan_id, status')
-            .eq('user_id', user.id)
-            .maybeSingle()
+          fetch('/api/billing/plan')
         ]);
 
         const profile = profileResult.data;
-        const subscription = subscriptionResult.data;
-
-        // Determinar o plano (free se não tiver assinatura ativa)
-        let plan: 'free' | 'pro' | 'business' = 'free';
-        if (subscription && subscription.status === 'active') {
-          plan = subscription.plan_id as 'free' | 'pro' | 'business';
+        let plan: 'free' | 'pro' | 'premium' = 'free';
+        if (planResponse.ok) {
+          const planData = await planResponse.json();
+          plan = (planData?.plan || 'free') as 'free' | 'pro' | 'premium';
         }
 
         if (profile) {
@@ -150,8 +254,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
     const scrollAmount = 100; // pixels por clique
     const currentScroll = list.scrollTop;
-    const newScroll = direction === 'up' 
-      ? currentScroll - scrollAmount 
+    const newScroll = direction === 'up'
+      ? currentScroll - scrollAmount
       : currentScroll + scrollAmount;
 
     list.scrollTo({
@@ -170,15 +274,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border transform transition-transform duration-300 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        }`}
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border transform transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+          }`}
       >
         <div className="flex flex-col h-full">
           <div className="h-16 border-b border-border flex items-center px-6">
-            <Link href="/" className="flex items-center">
+            <Link href="/app" className="flex items-center">
               <Image
-                src={getLogo('auto')}
+                src={getLogo(theme)}
                 alt="c2Finance"
                 width={150}
                 height={40}
@@ -216,17 +319,16 @@ export default function AppLayout({ children }: AppLayoutProps) {
               ref={menuListRef}
               className="space-y-2 h-full overflow-y-auto max-h-[calc(100vh-200px)] scrollbar-hide"
             >
-              {menuItems.map((item) => {
+              {visibleMenuItems.map((item) => {
                 const isActive = pathname === item.path;
                 return (
                   <li key={item.path}>
                     <Link
                       href={item.path}
-                      className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
-                        isActive
-                          ? 'bg-primary/10 text-primary'
-                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                      }`}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${isActive
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                        }`}
                     >
                       <i className={`bx ${item.icon} text-xl`}></i>
                       <span className="font-medium">{item.label}</span>
@@ -239,11 +341,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <li>
                   <Link
                     href="/app/admin"
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
-                      pathname === '/app/admin'
-                        ? 'bg-amber-500/10 text-amber-500'
-                        : 'text-amber-500/70 hover:bg-amber-500/10 hover:text-amber-500'
-                    }`}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${pathname === '/app/admin'
+                      ? 'bg-amber-500/10 text-amber-500'
+                      : 'text-amber-500/70 hover:bg-amber-500/10 hover:text-amber-500'
+                      }`}
                   >
                     <i className="bx bx-shield text-xl"></i>
                     <span className="font-medium">Admin</span>
@@ -255,36 +356,42 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
           <div className="p-4 border-t border-border mt-auto">
             <div className="flex items-center gap-3 px-4 py-3">
-              {userProfile?.avatar_url ? (
-                <img
-                  src={userProfile.avatar_url}
-                  alt={userProfile.full_name || 'Usuário'}
-                  className="w-10 h-10 rounded-full object-cover flex-shrink-0 border border-border"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                  <i className='bx bx-user text-primary text-xl'></i>
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="font-medium text-sm truncate">
-                    {userProfile?.full_name || 'Usuário'}
-                  </p>
+              <Link
+                href="/app/settings"
+                className="flex items-center gap-3 flex-1 min-w-0 rounded-xl hover:bg-muted transition-colors cursor-pointer group"
+              >
+                <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                  {userProfile?.avatar_url ? (
+                    <img
+                      src={userProfile.avatar_url}
+                      alt={userProfile.full_name || 'Usuário'}
+                      className="w-10 h-10 rounded-full object-cover border border-border"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                      <i className='bx bx-user text-primary text-xl'></i>
+                    </div>
+                  )}
                   {userProfile?.plan && (
                     <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${planLabels[userProfile.plan].color}`}>
                       {planLabels[userProfile.plan].label}
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground truncate">
-                  {userProfile?.email || 'Carregando...'}
-                </p>
-              </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">
+                    {userProfile?.full_name || 'Usuário'}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate group-hover:text-foreground transition-colors">
+                    {userProfile?.email || 'Carregando...'}
+                  </p>
+                </div>
+              </Link>
               <button
                 onClick={handleLogout}
-                className="text-muted-foreground hover:text-foreground flex-shrink-0"
+                className="text-muted-foreground hover:text-foreground flex-shrink-0 p-2 rounded-lg hover:bg-muted transition-colors"
                 title="Sair"
+                aria-label="Sair"
               >
                 <i className='bx bx-door-open text-xl'></i>
               </button>
@@ -304,64 +411,191 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </aside>
 
       <div className="flex-1 flex flex-col min-h-screen lg:ml-64">
-        <header className="h-16 border-b border-border flex items-center px-4 lg:px-6 bg-card/50 backdrop-blur-xl sticky top-0 z-40">
+        <header className="h-14 md:h-16 border-b border-border flex items-center px-3 md:px-4 lg:px-6 bg-card/50 backdrop-blur-xl sticky top-0 z-40">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 text-foreground mr-4"
+            className="lg:hidden p-1.5 md:p-2 text-foreground mr-2 md:mr-4"
           >
-            <i className='bx bx-menu text-2xl'></i>
+            <i className='bx bx-menu text-xl md:text-2xl'></i>
           </button>
 
-          <div className="flex items-center gap-4 flex-1">
-            <div className="p-[1px] rounded-md transition-all duration-300 group"
-                 style={{
-                   background: 'linear-gradient(to right, #9333ea, #3b82f6)',
-                   boxShadow: '0 0 0 0 rgba(147, 51, 234, 0)',
-                 }}
-                 onMouseEnter={(e) => {
-                   e.currentTarget.style.boxShadow = '0 0 10px 2px rgba(147, 51, 234, 0.5)';
-                 }}
-                 onMouseLeave={(e) => {
-                   e.currentTarget.style.boxShadow = '0 0 0 0 rgba(147, 51, 234, 0)';
-                 }}>
-              <button
-                onClick={() => setAdvisorOpen(true)}
-                className="px-3 py-1 rounded-md flex items-center gap-2 bg-background text-sm transition-all duration-300"
-              >
-                <i
-                  className='bx bx-brain text-base'
-                  style={{
-                    background: 'linear-gradient(to right, #9333ea, #3b82f6)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                  }}
-                ></i>
-                <span
-                  className="hidden sm:inline font-medium"
-                  style={{
-                    background: 'linear-gradient(to right, #9333ea, #3b82f6)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                  }}
-                >Advisor I.A</span>
-              </button>
-            </div>
+          <div className="flex items-center gap-2 md:gap-4 flex-1">
+            {userProfile && userProfile.plan !== 'free' && (
+              <div className="p-[1px] rounded-md transition-all duration-300 group"
+                style={{
+                  background: 'linear-gradient(to right, #9333ea, #3b82f6)',
+                  boxShadow: '0 0 0 0 rgba(147, 51, 234, 0)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = '0 0 10px 2px rgba(147, 51, 234, 0.5)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = '0 0 0 0 rgba(147, 51, 234, 0)';
+                }}>
+                <button
+                  onClick={() => setAdvisorOpen(true)}
+                  className="px-2 md:px-3 py-1 rounded-md flex items-center gap-1.5 md:gap-2 bg-background text-xs md:text-sm transition-all duration-300"
+                >
+                  <i
+                    className='bx bx-sparkles-alt text-sm md:text-base'
+                    style={{
+                      background: 'linear-gradient(to right, #9333ea, #3b82f6)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                    }}
+                  ></i>
+                  <span
+                    className="hidden sm:inline font-medium"
+                    style={{
+                      background: 'linear-gradient(to right, #9333ea, #3b82f6)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                    }}
+                  >Advisor I.A</span>
+                </button>
+              </div>
+            )}
             <div className="flex-1" />
-            <button className="relative p-2 text-muted-foreground hover:text-foreground transition-colors">
-              <i className='bx bx-bell text-xl'></i>
-              <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />
-            </button>
+            <div className="flex items-center gap-0.5 md:gap-2">
+              {accountContext && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="hidden sm:flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors"
+                      title="Selecionar conta"
+                      aria-label="Selecionar conta"
+                    >
+                      {(() => {
+                        const isOwn =
+                          !activeAccountId || activeAccountId === accountContext.currentUserId;
+                        const shared = isOwn
+                          ? null
+                          : accountContext.sharedAccounts.find((sa) => sa.ownerId === activeAccountId);
+
+                        const avatarUrl = isOwn
+                          ? userProfile?.avatar_url
+                          : shared?.ownerAvatarUrl;
+
+                        const label = isOwn
+                          ? 'Minha conta'
+                          : shared?.ownerName || shared?.ownerEmail || 'Conta compartilhada';
+
+                        return (
+                          <>
+                            {avatarUrl ? (
+                              <img
+                                src={avatarUrl}
+                                alt={label}
+                                className="w-6 h-6 rounded-full object-cover border border-border"
+                              />
+                            ) : (
+                              <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center border border-border">
+                                <i
+                                  className={`bx ${isOwn ? 'bx-user' : 'bx-group'} text-base text-muted-foreground`}
+                                />
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                      <span className="text-xs md:text-sm font-medium max-w-[180px] truncate">
+                        {(() => {
+                          if (!activeAccountId) return 'Minha conta';
+                          if (activeAccountId === accountContext.currentUserId) return 'Minha conta';
+                          const shared = accountContext.sharedAccounts.find((sa) => sa.ownerId === activeAccountId);
+                          return shared?.ownerName || shared?.ownerEmail || 'Conta compartilhada';
+                        })()}
+                      </span>
+                      <i className="bx bx-chevron-down text-muted-foreground text-sm" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-72">
+                    <DropdownMenuLabel>Conta ativa</DropdownMenuLabel>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        const id = accountContext.currentUserId;
+                        persistActiveAccountNow(id);
+                        setActiveAccountId(id);
+                        window.location.reload();
+                      }}
+                    >
+                      {userProfile?.avatar_url ? (
+                        <img
+                          src={userProfile.avatar_url}
+                          alt="Minha conta"
+                          className="w-5 h-5 rounded-full object-cover border border-border mr-2"
+                        />
+                      ) : (
+                        <i className="bx bx-user mr-2 text-muted-foreground" />
+                      )}
+                      Minha conta
+                    </DropdownMenuItem>
+                    {accountContext.sharedAccounts.length > 0 && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel>Contas compartilhadas comigo</DropdownMenuLabel>
+                        {accountContext.sharedAccounts.map((sa) => (
+                          <DropdownMenuItem
+                            key={sa.ownerId}
+                            onClick={() => {
+                              persistActiveAccountNow(sa.ownerId);
+                              setActiveAccountId(sa.ownerId);
+                              window.location.reload();
+                            }}
+                          >
+                            {sa.ownerAvatarUrl ? (
+                              <img
+                                src={sa.ownerAvatarUrl}
+                                alt={sa.ownerName || sa.ownerEmail || 'Conta compartilhada'}
+                                className="w-5 h-5 rounded-full object-cover border border-border mr-2"
+                              />
+                            ) : (
+                              <i className="bx bx-group mr-2 text-muted-foreground" />
+                            )}
+                            <span className="truncate">{sa.ownerName || sa.ownerEmail || 'Conta compartilhada'}</span>
+                          </DropdownMenuItem>
+                        ))}
+                      </>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => router.push('/app/settings')}
+                    >
+                      <i className="bx bx-share-alt mr-2 text-muted-foreground" />
+                      Gerenciar compartilhamento
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              <button
+                onClick={toggleTheme}
+                className="p-1.5 md:p-2 text-muted-foreground hover:text-foreground transition-colors"
+                title={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
+                aria-label="Alternar tema"
+              >
+                <i className={`bx ${theme === 'dark' ? 'bx-sun' : 'bx-moon'} text-lg md:text-xl`}></i>
+              </button>
+              <Link
+                href="/app/help"
+                className="hidden sm:flex p-1.5 md:p-2 text-muted-foreground hover:text-foreground transition-colors relative"
+                title="Central de Ajuda"
+              >
+                <i className='bx bx-help-circle text-lg md:text-xl'></i>
+              </Link>
+              <NotificationDropdown />
+            </div>
+
             <Link
               href="/app/settings"
-              className="p-2 text-muted-foreground hover:text-foreground transition-colors"
+              className="p-1.5 md:p-2 text-muted-foreground hover:text-foreground transition-colors"
               title="Configurações"
             >
-              <i className='bx bx-cog text-xl'></i>
+              <i className='bx bx-cog text-lg md:text-xl'></i>
             </Link>
           </div>
         </header>
 
-        <main className="flex-1 p-4 lg:p-6 overflow-auto">{children}</main>
+        <main className="flex-1 p-3 md:p-4 lg:p-6 overflow-auto">{children}</main>
       </div>
 
       <AdvisorDialog open={advisorOpen} onOpenChange={setAdvisorOpen} />

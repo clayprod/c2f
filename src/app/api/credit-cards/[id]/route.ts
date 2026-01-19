@@ -1,21 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientFromRequest } from '@/lib/supabase/server';
 import { getUserId } from '@/lib/auth';
 import { creditCardUpdateSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { id } = await params;
-    const supabase = await createClient();
+    const { supabase } = createClientFromRequest(request);
 
     const { data, error } = await supabase
       .from('accounts')
@@ -34,7 +36,7 @@ export async function GET(
         )
       `)
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .eq('type', 'credit_card')
       .single();
 
@@ -75,16 +77,17 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { id } = await params;
     const body = await request.json();
     const validated = creditCardUpdateSchema.parse(body);
 
-    const supabase = await createClient();
+    const { supabase } = createClientFromRequest(request);
 
     // Build update object with only provided fields
     const updateData: Record<string, unknown> = {};
@@ -131,7 +134,7 @@ export async function PATCH(
       await supabase
         .from('accounts')
         .update({ is_default: false })
-        .eq('user_id', userId)
+        .eq('user_id', ownerId)
         .eq('type', 'credit_card');
       updateData.is_default = true;
     } else if (validated.is_default === false) {
@@ -142,7 +145,7 @@ export async function PATCH(
       .from('accounts')
       .update(updateData)
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .eq('type', 'credit_card')
       .select()
       .single();
@@ -179,20 +182,21 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { id } = await params;
-    const supabase = await createClient();
+    const { supabase } = createClientFromRequest(request);
 
     // Check if card has transactions
     const { count } = await supabase
       .from('transactions')
       .select('*', { count: 'exact', head: true })
       .eq('account_id', id)
-      .eq('user_id', userId);
+      .eq('user_id', ownerId);
 
     if (count && count > 0) {
       return NextResponse.json(
@@ -206,14 +210,14 @@ export async function DELETE(
       .from('credit_card_bills')
       .delete()
       .eq('account_id', id)
-      .eq('user_id', userId);
+      .eq('user_id', ownerId);
 
     // Delete the card
     const { error } = await supabase
       .from('accounts')
       .delete()
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .eq('type', 'credit_card');
 
     if (error) throw error;

@@ -1,14 +1,22 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AdminDashboard from '@/components/admin/AdminDashboard';
 import AdminFiltersWrapper from '@/components/admin/AdminFiltersWrapper';
-import BrazilMap from '@/components/admin/BrazilMap';
 import GlobalSettings from '@/components/admin/GlobalSettings';
 import PriceManagement from '@/components/admin/PriceManagement';
+import UserManagement from '@/components/admin/UserManagement';
+import WhatsAppSettings from '@/components/admin/WhatsAppSettings';
+
+// Importação dinâmica para evitar problemas de resolução de módulos durante o build
+const BrazilMap = dynamic(() => import('@/components/admin/BrazilMap'), {
+  ssr: false,
+  loading: () => <div className="text-center py-8">Carregando mapa...</div>,
+});
 
 export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -74,12 +82,14 @@ export default function AdminPage() {
       </div>
 
       <Tabs defaultValue="dashboard" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="map">Mapa</TabsTrigger>
-          <TabsTrigger value="reports">Relatórios</TabsTrigger>
-          <TabsTrigger value="settings">Configurações</TabsTrigger>
-          <TabsTrigger value="prices">Preços</TabsTrigger>
+          <TabsTrigger value="reports">Relatorios</TabsTrigger>
+          <TabsTrigger value="users">Usuarios</TabsTrigger>
+          <TabsTrigger value="settings">Config</TabsTrigger>
+          <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
+          <TabsTrigger value="prices">Precos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="mt-6">
@@ -96,8 +106,16 @@ export default function AdminPage() {
           </div>
         </TabsContent>
 
+        <TabsContent value="users" className="mt-6">
+          <UserManagement />
+        </TabsContent>
+
         <TabsContent value="settings" className="mt-6">
           <GlobalSettings />
+        </TabsContent>
+
+        <TabsContent value="whatsapp" className="mt-6">
+          <WhatsAppSettings />
         </TabsContent>
 
         <TabsContent value="prices" className="mt-6">

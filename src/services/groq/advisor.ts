@@ -55,28 +55,6 @@ IMPORTANTE: Você DEVE sempre retornar uma resposta em formato JSON válido com 
 
 Analise os dados financeiros fornecidos e forneça recomendações práticas e acionáveis.`;
 
-const DEFAULT_INSIGHTS_PROMPT = `Você é um AI Advisor financeiro. Gere insights diários sobre a situação financeira do usuário baseado nos dados fornecidos.
-
-Retorne um JSON com:
-{
-  "summary": "resumo em 1-2 frases",
-  "insights": [
-    {
-      "type": "tipo do insight",
-      "message": "descrição",
-      "severity": "low|medium|high"
-    }
-  ],
-  "actions": [
-    {
-      "type": "tipo da ação",
-      "payload": {},
-      "confidence": "low|medium|high"
-    }
-  ],
-  "confidence": "low|medium|high",
-  "citations": []
-}`;
 
 async function callAI(
   systemPrompt: string,
@@ -127,13 +105,13 @@ export async function getAdvisorResponse(
   try {
     // Get global settings
     const settings = await getGlobalSettings();
-    
+
     // Check if user has paid plan to use global keys
     let useGlobalKeys = false;
     if (userId) {
       try {
         const plan = await getUserPlan(userId);
-        useGlobalKeys = plan.plan === 'pro' || plan.plan === 'business';
+        useGlobalKeys = plan.plan === 'pro' || plan.plan === 'premium';
       } catch (error) {
         console.error('Error checking user plan:', error);
       }
@@ -142,7 +120,7 @@ export async function getAdvisorResponse(
     // Determine API key and model
     const aiModel = settings.ai_model || 'groq';
     const aiModelName = settings.ai_model_name || (aiModel === 'groq' ? 'llama-3.1-70b-versatile' : 'gpt-4');
-    
+
     let apiKey: string;
     if (useGlobalKeys && settings.groq_api_key && aiModel === 'groq') {
       apiKey = settings.groq_api_key;
@@ -169,7 +147,7 @@ ${conversationHistory ? `Histórico da conversa:\n${JSON.stringify(conversationH
 Forneça uma resposta estruturada em JSON conforme o formato especificado.`;
 
     const content = await callAI(systemPrompt, userPrompt, aiModel, aiModelName, apiKey);
-    
+
     if (!content) {
       throw new Error('No response from AI');
     }
@@ -195,11 +173,11 @@ export async function getAdvisorInsights(
   try {
     const settings = await getGlobalSettings();
     const plan = await getUserPlan(userId);
-    const useGlobalKeys = plan.plan === 'pro' || plan.plan === 'business';
+    const useGlobalKeys = plan.plan === 'pro' || plan.plan === 'premium';
 
     const aiModel = settings.ai_model || 'groq';
     const aiModelName = settings.ai_model_name || (aiModel === 'groq' ? 'llama-3.1-70b-versatile' : 'gpt-4');
-    
+
     let apiKey: string;
     if (useGlobalKeys && settings.groq_api_key && aiModel === 'groq') {
       apiKey = settings.groq_api_key;
@@ -215,14 +193,15 @@ export async function getAdvisorInsights(
       throw new Error('API key not available');
     }
 
-    const systemPrompt = settings.insights_prompt || DEFAULT_INSIGHTS_PROMPT;
+    // Use tips_prompt for insights generation (legacy function, now uses tips prompt)
+    const systemPrompt = settings.tips_prompt || DEFAULT_ADVISOR_PROMPT;
     const userPrompt = `Dados financeiros do usuário:
 ${JSON.stringify(financialData, null, 2)}
 
 Gere insights diários sobre a situação financeira do usuário.`;
 
     const content = await callAI(systemPrompt, userPrompt, aiModel, aiModelName, apiKey);
-    
+
     if (!content) {
       throw new Error('No response from AI');
     }

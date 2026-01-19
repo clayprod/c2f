@@ -8,6 +8,7 @@ import ImportModal from '@/components/transactions/ImportModal';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { useMembers } from '@/hooks/useMembers';
 
 interface Account {
   id: string;
@@ -30,6 +31,7 @@ export default function TransactionsPage() {
   const [creditCards, setCreditCards] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const { members } = useMembers();
   // Initialize with default date range (last 3 months)
   const getDefaultDateRange = () => {
     const today = new Date();
@@ -52,8 +54,8 @@ export default function TransactionsPage() {
     type: '',
     fromDate: defaultDates.fromDate,
     toDate: defaultDates.toDate,
-    isRecurring: 'all',
     isInstallment: 'all',
+    assignedTo: '',
   });
   const [pagination, setPagination] = useState({
     offset: 0,
@@ -125,11 +127,11 @@ export default function TransactionsPage() {
       if (filters.type) params.append('type', filters.type);
       if (filters.fromDate) params.append('from_date', filters.fromDate);
       if (filters.toDate) params.append('to_date', filters.toDate);
-      if (filters.isRecurring && filters.isRecurring !== 'all') {
-        params.append('is_recurring', filters.isRecurring === 'recurring' ? 'true' : 'false');
-      }
       if (filters.isInstallment && filters.isInstallment !== 'all') {
         params.append('is_installment', filters.isInstallment === 'installment' ? 'true' : 'false');
+      }
+      if (filters.assignedTo) {
+        params.append('assigned_to', filters.assignedTo);
       }
       params.append('limit', pagination.limit.toString());
       params.append('offset', pagination.offset.toString());
@@ -292,6 +294,7 @@ export default function TransactionsPage() {
         onFiltersChange={setFilters}
         accounts={accounts}
         categories={categories}
+        members={members}
       />
 
       <TransactionTable

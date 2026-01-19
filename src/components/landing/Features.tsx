@@ -15,7 +15,7 @@ const features = [
     description: 'Defina metas de gastos e veja projeções baseadas no seu histórico.',
   },
   {
-    icon: 'bx-brain',
+    icon: 'bx-sparkles-alt',
     title: 'AI Advisor',
     description: 'Insights personalizados e ações sugeridas pela inteligência artificial.',
   },
@@ -25,7 +25,7 @@ const features = [
     description: 'Conecte seus bancos via Pluggy/Open Finance (opcional).',
   },
   {
-    icon: 'bx-shield-quarter',
+    icon: 'bx-shield-alt',
     title: 'Segurança & LGPD',
     description: 'Seus dados criptografados e em conformidade com a LGPD.',
   },

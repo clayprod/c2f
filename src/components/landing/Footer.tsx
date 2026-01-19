@@ -113,7 +113,7 @@ const Footer = () => {
             © {new Date().getFullYear()} c2Finance. Todos os direitos reservados.
           </p>
           <div className="flex items-center gap-2 text-muted-foreground text-sm">
-            <i className='bx bx-shield-quarter text-primary'></i>
+            <i className='bx bx-shield text-primary'></i>
             <span>Seus dados protegidos com criptografia de ponta</span>
           </div>
         </div>

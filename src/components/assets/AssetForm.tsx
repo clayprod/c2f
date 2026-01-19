@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { assetSchema } from '@/lib/validation/schemas';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -72,6 +73,7 @@ export default function AssetForm({
     register,
     handleSubmit,
     formState: { errors },
+    control,
     setValue,
     watch,
     reset,
@@ -121,31 +123,82 @@ export default function AssetForm({
   const onFormSubmit = async (data: AssetFormData) => {
     try {
       setLoading(true);
+      console.log('Form submitted with data:', data);
+      console.log('Purchase price (raw):', data.purchase_price_cents);
+      console.log('Current value (raw):', data.current_value_cents);
+      console.log('Current value type:', typeof data.current_value_cents);
+      console.log('Current value is null?', data.current_value_cents === null);
+      console.log('Current value is undefined?', data.current_value_cents === undefined);
+      
       // Remove undefined values from the data before submitting
-      const cleanedData = Object.fromEntries(
-        Object.entries(data).filter(([_, value]) => value !== undefined)
-      ) as AssetFormData;
+      // BUT: always include current_value_cents if it exists in data (even if null/undefined)
+      // to allow explicit updates or clearing
+      const cleanedData: any = { ...data };
+      
+      // Explicitly ensure current_value_cents is included if it was in the original data
+      if ('current_value_cents' in data) {
+        cleanedData.current_value_cents = data.current_value_cents;
+      }
+      
+      // Remove undefined values (except current_value_cents)
+      for (const [key, value] of Object.entries(cleanedData)) {
+        if (key !== 'current_value_cents' && value === undefined) {
+          delete cleanedData[key];
+        }
+      }
+      
       // Add create_purchase_transaction flag if creating new asset
       if (!asset && createPurchaseTransaction) {
         (cleanedData as any).create_purchase_transaction = true;
       }
+      
+      console.log('Cleaned data:', cleanedData);
+      console.log('Cleaned data keys:', Object.keys(cleanedData));
+      console.log('Purchase price (cleaned):', cleanedData.purchase_price_cents);
+      console.log('Current value (cleaned):', cleanedData.current_value_cents);
+      console.log('Current value in cleanedData?', 'current_value_cents' in cleanedData);
+      console.log('Cleaned data JSON:', JSON.stringify(cleanedData));
+      
       await onSubmit(cleanedData);
       if (!asset) {
         reset();
       }
     } catch (error: any) {
+      console.error('Error in form submit:', error);
       toast({
         title: 'Erro',
         description: error.message || 'Erro ao salvar bem',
         variant: 'destructive',
       });
+      // Re-throw to let react-hook-form handle it
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
+  const handleFormSubmit = handleSubmit(
+    (data) => {
+      console.log('✅ Form validation passed, submitting...', data);
+      console.log('✅ Form data - current_value_cents:', data.current_value_cents);
+      console.log('✅ Form data - has current_value_cents?', 'current_value_cents' in data);
+      console.log('✅ Form data JSON:', JSON.stringify(data));
+      return onFormSubmit(data);
+    },
+    (errors) => {
+      console.error('❌ Form validation errors:', errors);
+      console.error('Form errors object:', JSON.stringify(errors, null, 2));
+      const firstError = Object.values(errors)[0];
+      toast({
+        title: 'Erro de validação',
+        description: firstError?.message || 'Por favor, corrija os erros no formulário',
+        variant: 'destructive',
+      });
+    }
+  );
+
   return (
-    <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
+    <form onSubmit={handleFormSubmit} className="space-y-6">
       {/* Nome */}
       <div>
         <Label htmlFor="name">Nome do Bem *</Label>
@@ -215,15 +268,21 @@ export default function AssetForm({
       {/* Valor de Compra */}
       <div>
         <Label htmlFor="purchase_price_cents">Valor de Compra *</Label>
-        <Input
-          id="purchase_price_cents"
-          type="number"
-          step="0.01"
-          {...register('purchase_price_cents', {
-            valueAsNumber: true,
-            setValueAs: (v) => Math.round((typeof v === 'string' ? parseFloat(v) : v) * 100),
-          })}
-          placeholder="0.00"
+        <Controller
+          name="purchase_price_cents"
+          control={control}
+          render={({ field }) => (
+            <CurrencyInput
+              id="purchase_price_cents"
+              value={field.value}
+              onValueChange={(value) => {
+                field.onChange(value);
+              }}
+              convertToCents={false}
+              allowEmpty={false}
+              placeholder="0,00"
+            />
+          )}
         />
         {errors.purchase_price_cents && (
           <p className="text-sm text-red-500 mt-1">{errors.purchase_price_cents.message}</p>
@@ -233,33 +292,21 @@ export default function AssetForm({
       {/* Valor Atual */}
       <div>
         <Label htmlFor="current_value_cents">Valor Atual (opcional)</Label>
-        <Input
-          id="current_value_cents"
-          type="number"
-          step="0.01"
-          {...register('current_value_cents', {
-            required: false,
-            setValueAs: (v) => {
-              // Return undefined for empty values
-              if (v === '' || v === null || v === undefined || (typeof v === 'string' && v.trim() === '')) {
-                return undefined;
-              }
-              // Convert to number if it's a string
-              const num = typeof v === 'string' ? parseFloat(v.trim()) : v;
-              // Return undefined if NaN, otherwise return the number (will be converted to cents by schema)
-              return (isNaN(num) || !isFinite(num)) ? undefined : num;
-            },
-            validate: (value) => {
-              // Allow undefined/empty
-              if (value === undefined || value === null) {
-                return true;
-              }
-              // If provided, must be a valid number
-              const num = typeof value === 'string' ? parseFloat(value) : value;
-              return !isNaN(num) && isFinite(num) && num >= 0;
-            },
-          })}
-          placeholder="Deixe em branco para usar valor de compra"
+        <Controller
+          name="current_value_cents"
+          control={control}
+          render={({ field }) => (
+            <CurrencyInput
+              id="current_value_cents"
+              value={field.value}
+              onValueChange={(value) => {
+                field.onChange(value);
+              }}
+              convertToCents={false}
+              allowEmpty={true}
+              placeholder="Deixe em branco para usar valor de compra"
+            />
+          )}
         />
         <p className="text-xs text-muted-foreground mt-1">
           Se não preenchido, será usado o valor de compra
@@ -426,15 +473,21 @@ export default function AssetForm({
           </div>
           <div>
             <Label htmlFor="sale_price_cents">Valor de Venda *</Label>
-            <Input
-              id="sale_price_cents"
-              type="number"
-              step="0.01"
-              {...register('sale_price_cents', {
-                valueAsNumber: true,
-                setValueAs: (v) => v ? Math.round((typeof v === 'string' ? parseFloat(v) : v) * 100) : undefined,
-              })}
-              placeholder="0.00"
+            <Controller
+              name="sale_price_cents"
+              control={control}
+              render={({ field }) => (
+                <CurrencyInput
+                  id="sale_price_cents"
+                  value={field.value}
+                  onValueChange={(value) => {
+                    field.onChange(value);
+                  }}
+                  convertToCents={false}
+                  allowEmpty={false}
+                  placeholder="0,00"
+                />
+              )}
             />
             {errors.sale_price_cents && (
               <p className="text-sm text-red-500 mt-1">{errors.sale_price_cents.message}</p>
@@ -518,7 +571,10 @@ export default function AssetForm({
             Cancelar
           </Button>
         )}
-        <Button type="submit" disabled={loading}>
+        <Button 
+          type="submit" 
+          disabled={loading}
+        >
           {loading ? 'Salvando...' : asset ? 'Atualizar' : 'Criar'}
         </Button>
       </div>

@@ -8,6 +8,7 @@ import { ZodError } from 'zod';
 import { calculateMonthlyContribution } from '@/services/goals/contributionCalculator';
 import { generateAutoBudgetsForGoal } from '@/services/budgets/autoGenerator';
 import { projectionCache } from '@/services/projections/cache';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
 export async function GET(
   request: NextRequest,
@@ -18,6 +19,7 @@ export async function GET(
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { id } = await params;
     const { supabase } = createClientFromRequest(request);
@@ -25,12 +27,24 @@ export async function GET(
       .from('goals')
       .select('*, accounts(*), categories(*), goal_contributions(*)')
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .single();
 
     if (error) throw error;
 
-    return NextResponse.json({ data });
+    const { data: planEntries } = await supabase
+      .from('goal_plan_entries')
+      .select('entry_month, amount_cents, description')
+      .eq('user_id', ownerId)
+      .eq('goal_id', id)
+      .order('entry_month', { ascending: true });
+
+    return NextResponse.json({
+      data: {
+        ...data,
+        plan_entries: planEntries || [],
+      }
+    });
   } catch (error) {
     const errorResponse = createErrorResponse(error);
     return NextResponse.json(
@@ -49,6 +63,7 @@ export async function PATCH(
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const body = await request.json();
     console.log('PATCH body received:', JSON.stringify(body, null, 2));
@@ -95,9 +110,12 @@ export async function PATCH(
         z.string().optional()
       ),
       monthly_contribution_cents: z.number().int().positive().optional(),
-      include_in_projection: z.boolean().optional(),
-      include_in_budget: z.boolean().optional(),
+      include_in_plan: z.boolean().optional(),
       contribution_frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).optional(),
+      plan_entries: z.array(z.object({
+        month: z.string().regex(/^\d{4}-\d{2}$/, 'Mês inválido (use YYYY-MM)'),
+        amount_cents: z.number().int().positive('Valor deve ser positivo'),
+      })).optional(),
     });
     let validated;
     try {
@@ -117,7 +135,7 @@ export async function PATCH(
       .from('goals')
       .select('*')
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .single();
 
     if (!currentGoal) {
@@ -127,13 +145,15 @@ export async function PATCH(
       );
     }
 
-    // Calculate monthly contribution if include_in_budget is true and target_date changed
+    // Calculate monthly contribution if include_in_plan is true and target_date changed
     const targetDateChanged = validated.target_date && validated.target_date !== currentGoal.target_date;
     const targetAmountChanged = validated.target_amount_cents && validated.target_amount_cents !== currentGoal.target_amount_cents;
-    const includeInBudgetChanged = validated.include_in_budget !== undefined && validated.include_in_budget !== currentGoal.include_in_budget;
+    const includeInPlanChanged = validated.include_in_plan !== undefined && validated.include_in_plan !== currentGoal.include_in_plan;
+    const planEntriesChanged = validated.plan_entries !== undefined;
     
-    let monthlyContributionCents = validated.monthly_contribution_cents;
-    if (validated.include_in_budget !== false && !monthlyContributionCents) {
+    const hasCustomPlan = !!validated.plan_entries && validated.plan_entries.length > 0;
+    let monthlyContributionCents = hasCustomPlan ? undefined : validated.monthly_contribution_cents;
+    if (!hasCustomPlan && validated.include_in_plan !== false && !monthlyContributionCents) {
       const targetDate = validated.target_date || currentGoal.target_date;
       const targetAmount = validated.target_amount_cents || currentGoal.target_amount_cents;
       const currentAmount = validated.current_amount_cents !== undefined ? validated.current_amount_cents : currentGoal.current_amount_cents;
@@ -171,15 +191,23 @@ export async function PATCH(
     Object.keys(validated).forEach((key) => {
       const value = validated[key as keyof typeof validated];
       if (value !== undefined && value !== null) {
+        if (key === 'plan_entries') {
+          return;
+        }
         if (key === 'image_url' || key === 'image_position') {
           imageFields[key] = value;
-        } else if (key === 'include_in_budget' || key === 'include_in_projection' || key === 'contribution_frequency') {
+        } else if (key === 'include_in_plan' || key === 'contribution_frequency') {
           contributionFields[key] = value;
         } else {
           regularFields[key] = value;
         }
       }
     });
+
+    if (hasCustomPlan) {
+      contributionFields.include_in_plan = true;
+      delete contributionFields.contribution_frequency;
+    }
 
     // First try to update with all fields
     const fullUpdateData = { ...updateData, ...regularFields, ...contributionFields, ...imageFields };
@@ -189,7 +217,7 @@ export async function PATCH(
       .from('goals')
       .update(fullUpdateData)
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .select('*, accounts(*), categories(*)')
       .single();
 
@@ -225,7 +253,7 @@ export async function PATCH(
           .from('goals')
           .update(updateWithoutNewFields)
           .eq('id', id)
-          .eq('user_id', userId)
+          .eq('user_id', ownerId)
           .select('*, accounts(*), categories(*)')
           .single();
 
@@ -250,10 +278,46 @@ export async function PATCH(
       throw error;
     }
 
-    // Regenerate budgets if include_in_budget is true and goal is active
-    if (data && data.include_in_budget && data.status === 'active' && data.category_id) {
-      // Regenerate if include_in_budget was just enabled, or if target_date/amount changed
-      if (includeInBudgetChanged || targetDateChanged || targetAmountChanged) {
+    // Update custom plan entries if provided
+    if (validated.plan_entries) {
+      await supabase
+        .from('goal_plan_entries')
+        .delete()
+        .eq('user_id', ownerId)
+        .eq('goal_id', data.id);
+
+      if (validated.plan_entries.length > 0) {
+        const planEntries = validated.plan_entries.map((entry) => ({
+          user_id: ownerId,
+          goal_id: data.id,
+          category_id: data.category_id || null,
+          entry_month: `${entry.month}-01`,
+          amount_cents: entry.amount_cents,
+          description: `Plano personalizado - ${data.name}`,
+        }));
+
+        const { error: planError } = await supabase
+          .from('goal_plan_entries')
+          .upsert(planEntries, {
+            onConflict: 'goal_id,entry_month',
+          });
+
+        if (planError) {
+          console.error('Error updating goal plan entries:', planError);
+        }
+      }
+    } else if (validated.category_id && validated.category_id !== currentGoal.category_id) {
+      await supabase
+        .from('goal_plan_entries')
+        .update({ category_id: validated.category_id })
+        .eq('user_id', ownerId)
+        .eq('goal_id', data.id);
+    }
+
+    // Regenerate budgets if include_in_plan is true and goal is active
+    if (data && data.include_in_plan && data.status === 'active' && data.category_id) {
+      // Regenerate if include_in_plan was just enabled, or if target_date/amount changed
+      if (includeInPlanChanged || targetDateChanged || targetAmountChanged || planEntriesChanged) {
         try {
           const today = new Date();
           const startMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -263,11 +327,11 @@ export async function PATCH(
 
           await generateAutoBudgetsForGoal(
             supabase,
-            userId,
+            ownerId,
             {
               id: data.id,
               category_id: data.category_id,
-              include_in_budget: data.include_in_budget,
+              include_in_plan: data.include_in_plan,
               status: data.status,
               contribution_frequency: data.contribution_frequency,
               monthly_contribution_cents: data.monthly_contribution_cents,
@@ -283,25 +347,25 @@ export async function PATCH(
             }
           );
 
-          projectionCache.invalidateUser(userId);
+          projectionCache.invalidateUser(ownerId);
         } catch (budgetError) {
           console.error('Error regenerating auto budgets for goal:', budgetError);
           // Don't fail the goal update if budget generation fails
         }
       }
-    } else if (data && (!data.include_in_budget || data.status !== 'active')) {
-      // Remove auto-generated budgets if include_in_budget is false or status is not active
+    } else if (data && (!data.include_in_plan || data.status !== 'active')) {
+      // Remove auto-generated budgets if include_in_plan is false or status is not active
       try {
         await supabase
           .from('budgets')
           .delete()
-          .eq('user_id', userId)
+          .eq('user_id', ownerId)
           .eq('category_id', data.category_id)
           .eq('source_type', 'goal')
           .eq('source_id', data.id)
           .eq('is_auto_generated', true);
         
-        projectionCache.invalidateUser(userId);
+        projectionCache.invalidateUser(ownerId);
       } catch (deleteError) {
         console.error('Error deleting auto budgets for goal:', deleteError);
       }
@@ -357,6 +421,7 @@ export async function DELETE(
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { id } = await params;
     const { supabase } = createClientFromRequest(request);
@@ -364,7 +429,7 @@ export async function DELETE(
       .from('goals')
       .delete()
       .eq('id', id)
-      .eq('user_id', userId);
+      .eq('user_id', ownerId);
 
     if (error) throw error;
 

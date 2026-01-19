@@ -5,54 +5,47 @@ const plans = [
     name: 'Free',
     price: 'Grátis',
     period: 'para sempre',
-    description: 'Para começar a organizar suas finanças',
+    description: 'Comece a organizar suas finanças',
     features: [
       'Até 100 transações/mês',
       'Dashboard básico',
       'Importação CSV',
-      '3 consultas ao Advisor/mês',
-      'Suporte por email',
+      'Controle de contas e cartões',
+      '❌ Sem AI Advisor',
     ],
-    cta: 'Começar grátis',
+    cta: 'Começar agora',
     popular: false,
   },
   {
     name: 'Pro',
     price: 'R$29',
     period: '/mês',
-    description: 'Para quem quer controle total',
+    description: 'O poder da IA para suas finanças',
     features: [
       'Transações ilimitadas',
-      'Dashboard avançado',
-      'Importação CSV + OFX',
-      'Advisor ilimitado',
+      'AI Advisor (10 consultas/mês)',
+      'Importação OFX',
       'Orçamentos e Projeções',
-      'Dívidas',
-      'Investimentos',
-      'Patrimônio',
-      'Objetivos',
-      'Relatórios detalhados',
-      'Categorias personalizadas',
-      'Suporte prioritário',
+      'Investimentos e Dívidas',
+      'Patrimônio e Objetivos',
     ],
     cta: 'Assinar Pro',
     popular: true,
   },
   {
-    name: 'Business',
+    name: 'Premium',
     price: 'R$79',
     period: '/mês',
-    description: 'Para equipes e empresas',
+    description: 'Análise avançada e IA ilimitada',
     features: [
       'Tudo do Pro',
-      'Múltiplos usuários',
-      'Integração bancária (Pluggy)',
-      'Auditoria e logs',
-      'API de integração',
-      'Onboarding dedicado',
-      'SLA garantido',
+      'AI Advisor (100 consultas/mês)',
+      'Relatórios Executivos',
+      'Categorização inteligente via IA',
+      'Análise preditiva de gastos',
+      'Suporte prioritário',
     ],
-    cta: 'Falar com vendas',
+    cta: 'Assinar Premium',
     popular: false,
   },
 ];
@@ -78,9 +71,8 @@ const Pricing = () => {
           {plans.map((plan) => (
             <div
               key={plan.name}
-              className={`glass-card p-6 md:p-8 relative ${
-                plan.popular ? 'border-primary/50 md:scale-105' : ''
-              }`}
+              className={`glass-card p-6 md:p-8 relative ${plan.popular ? 'border-primary/50 md:scale-105' : ''
+                }`}
             >
               {plan.popular && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">

@@ -81,7 +81,8 @@ export function ReplicateCategoryModal({
           : data.data.budgets?.find((b: any) => b.category_id === selectedCategoryId);
         
         if (budget) {
-          setCurrentBudgetAmount(Math.abs(budget.amount_planned || 0));
+          const plannedCents = budget.limit_cents || budget.amount_planned_cents || 0;
+          setCurrentBudgetAmount(Math.abs(plannedCents) / 100);
         } else {
           setCurrentBudgetAmount(null);
         }
@@ -497,4 +498,5 @@ export function ReplicateCategoryModal({
     </Dialog>
   );
 }
+
 

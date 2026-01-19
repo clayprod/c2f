@@ -14,7 +14,7 @@ const Hero = () => {
           {/* Badge */}
           <div className="fade-in-up stagger-1 mb-6">
             <span className="badge-pill">
-              <i className='bx bx-brain'></i>
+              <i className='bx bx-sparkles-alt'></i>
               AI-Powered Financial Control
             </span>
           </div>
@@ -27,7 +27,7 @@ const Hero = () => {
 
           {/* Subtitle */}
           <p className="fade-in-up stagger-3 text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8 text-balance">
-            Transações, orçamentos, projeções e insights acionáveis — tudo em um painel simples. 
+            Transações, orçamentos, projeções e insights acionáveis — tudo em um painel simples.
             Conecte bancos opcionalmente e deixe a IA te orientar.
           </p>
 
@@ -59,7 +59,7 @@ const Hero = () => {
                 <div className="flex gap-4 h-full">
                   {/* Sidebar mock */}
                   <div className="hidden md:block w-16 bg-muted/30 rounded-lg" />
-                  
+
                   {/* Main content mock */}
                   <div className="flex-1 space-y-4">
                     {/* Header */}
@@ -67,7 +67,7 @@ const Hero = () => {
                       <div className="h-8 w-32 bg-muted/50 rounded-lg" />
                       <div className="h-8 w-8 bg-primary/30 rounded-lg" />
                     </div>
-                    
+
                     {/* Cards row */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {[1, 2, 3, 4].map((i) => (
@@ -77,7 +77,7 @@ const Hero = () => {
                         </div>
                       ))}
                     </div>
-                    
+
                     {/* Chart area */}
                     <div className="flex-1 bg-muted/20 rounded-lg p-4 min-h-[120px] md:min-h-[200px]">
                       <div className="flex items-end justify-around h-full gap-2">
@@ -100,7 +100,7 @@ const Hero = () => {
                   </div>
                 </div>
               </div>
-              
+
               {/* Glow effect */}
               <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 via-secondary/20 to-primary/20 blur-2xl opacity-50 -z-10" />
             </div>

@@ -16,16 +16,20 @@ interface GlobalSettingsData {
   smtp_user?: string;
   smtp_password?: string;
   smtp_from_email?: string;
+  smtp_secure?: boolean;
   groq_api_key?: string;
   openai_api_key?: string;
   ai_model?: 'groq' | 'openai';
   ai_model_name?: string;
   advisor_prompt?: string;
-  insights_prompt?: string;
   tips_prompt?: string;
   tips_enabled?: boolean;
   chat_max_tokens?: number;
   session_ttl_minutes?: number;
+  advisor_limit_pro?: number;
+  advisor_limit_premium?: number;
+  support_email?: string;
+  support_whatsapp?: string;
 }
 
 interface ModelInfo {
@@ -80,29 +84,6 @@ IMPORTANTE: Voce DEVE sempre retornar uma resposta em formato JSON valido com a 
 
 Analise os dados financeiros fornecidos e forneca recomendacoes praticas e acionaveis.`;
 
-const DEFAULT_INSIGHTS_PROMPT = `Voce e um AI Advisor financeiro. Gere insights diarios sobre a situacao financeira do usuario baseado nos dados fornecidos.
-
-Retorne um JSON com:
-{
-  "summary": "resumo em 1-2 frases",
-  "insights": [
-    {
-      "type": "tipo do insight",
-      "message": "descricao",
-      "severity": "low|medium|high"
-    }
-  ],
-  "actions": [
-    {
-      "type": "tipo da acao",
-      "payload": {},
-      "confidence": "low|medium|high"
-    }
-  ],
-  "confidence": "low|medium|high",
-  "citations": []
-}`;
-
 const DEFAULT_TIPS_PROMPT = `Voce e um consultor financeiro pessoal inteligente. Analise os dados financeiros do usuario e forneca uma dica do dia personalizada e acionavel.
 
 Diretrizes:
@@ -147,6 +128,40 @@ export default function GlobalSettings() {
   });
   const [loadingModels, setLoadingModels] = useState(false);
 
+  const fetchSettings = async () => {
+    try {
+      // Clear cache first to ensure fresh data
+      await fetch('/api/admin/settings/clear-cache', { method: 'POST' });
+      
+      const res = await fetch('/api/admin/settings');
+      if (!res.ok) throw new Error('Failed to fetch settings');
+      const data = await res.json();
+      
+      console.log('[GlobalSettings] Fetched data:', {
+        hasSupportEmail: !!data.support_email,
+        hasSupportWhatsapp: !!data.support_whatsapp,
+        supportEmail: data.support_email,
+        supportWhatsapp: data.support_whatsapp,
+      });
+      
+      setSettings({
+        ...data,
+        tips_enabled: data.tips_enabled !== false, // Default to true
+        chat_max_tokens: data.chat_max_tokens || 4000,
+        session_ttl_minutes: data.session_ttl_minutes || 30,
+      });
+    } catch (error) {
+      console.error('Error fetching settings:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: 'Nao foi possivel carregar as configuracoes',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchModels = useCallback(async (provider: 'groq' | 'openai', refresh = false) => {
     setLoadingModels(true);
     try {
@@ -177,44 +192,35 @@ export default function GlobalSettings() {
     }
   }, [loading, settings.ai_model, fetchModels]);
 
-  const fetchSettings = async () => {
-    try {
-      const res = await fetch('/api/admin/settings');
-      if (!res.ok) throw new Error('Failed to fetch settings');
-      const data = await res.json();
-      setSettings({
-        ...data,
-        tips_enabled: data.tips_enabled !== false, // Default to true
-        chat_max_tokens: data.chat_max_tokens || 4000,
-        session_ttl_minutes: data.session_ttl_minutes || 30,
-      });
-    } catch (error) {
-      console.error('Error fetching settings:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Erro',
-        description: 'Nao foi possivel carregar as configuracoes',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSave = async () => {
     setSaving(true);
     try {
+      console.log('[GlobalSettings] Saving settings:', {
+        hasSupportEmail: !!settings.support_email,
+        hasSupportWhatsapp: !!settings.support_whatsapp,
+        supportEmail: settings.support_email,
+        supportWhatsapp: settings.support_whatsapp,
+      });
+      
       const res = await fetch('/api/admin/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings),
       });
 
-      if (!res.ok) throw new Error('Failed to save settings');
+      if (!res.ok) {
+        const errorData = await res.json();
+        console.error('[GlobalSettings] Save error:', errorData);
+        throw new Error('Failed to save settings');
+      }
 
       toast({
         title: 'Sucesso',
         description: 'Configuracoes salvas com sucesso',
       });
+      
+      // Reload settings to reflect saved data
+      await fetchSettings();
     } catch (error) {
       console.error('Error saving settings:', error);
       toast({
@@ -236,57 +242,135 @@ export default function GlobalSettings() {
 
   return (
     <div className="space-y-6">
-      {/* SMTP */}
+      {/* Support Contacts - Moved to top for visibility */}
       <Card>
         <CardHeader>
-          <CardTitle>Configuracoes SMTP</CardTitle>
-          <CardDescription>Configuracoes de email para envio de notificacoes</CardDescription>
+          <CardTitle>Contatos de Suporte</CardTitle>
+          <CardDescription>Configure os contatos exibidos na central de ajuda e páginas de suporte</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <Label>Host SMTP</Label>
+              <Label htmlFor="support_email">Email de Suporte</Label>
               <Input
-                value={settings.smtp_host || ''}
-                onChange={(e) => setSettings({ ...settings, smtp_host: e.target.value })}
-                placeholder="smtp.example.com"
+                id="support_email"
+                type="email"
+                value={settings.support_email || ''}
+                onChange={(e) => setSettings({ ...settings, support_email: e.target.value })}
+                placeholder="suporte@exemplo.com"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Email exibido na central de ajuda para contato
+              </p>
             </div>
             <div>
-              <Label>Porta</Label>
+              <Label htmlFor="support_whatsapp">WhatsApp de Suporte</Label>
               <Input
+                id="support_whatsapp"
+                type="text"
+                value={settings.support_whatsapp || ''}
+                onChange={(e) => setSettings({ ...settings, support_whatsapp: e.target.value })}
+                placeholder="+5511999999999"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Número do WhatsApp (formato: +5511999999999)
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* SMTP */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Configuracoes SMTP</CardTitle>
+          <CardDescription>Configuracoes de email para envio de notificacoes e emails transacionais</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <Label htmlFor="smtp_host">Host SMTP</Label>
+              <Input
+                id="smtp_host"
+                value={settings.smtp_host || ''}
+                onChange={(e) => setSettings({ ...settings, smtp_host: e.target.value })}
+                placeholder="smtp.gmail.com"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Ex: smtp.gmail.com, smtp.sendgrid.net
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="smtp_port">Porta</Label>
+              <Input
+                id="smtp_port"
                 type="number"
                 value={settings.smtp_port || ''}
                 onChange={(e) => setSettings({ ...settings, smtp_port: parseInt(e.target.value) || undefined })}
                 placeholder="587"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Porta padrão: 587 (TLS), 465 (SSL), 25 (não seguro)
+              </p>
             </div>
             <div>
-              <Label>Usuario</Label>
+              <Label htmlFor="smtp_user">Usuario</Label>
               <Input
+                id="smtp_user"
                 value={settings.smtp_user || ''}
                 onChange={(e) => setSettings({ ...settings, smtp_user: e.target.value })}
                 placeholder="user@example.com"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Email ou usuário do servidor SMTP
+              </p>
             </div>
             <div>
-              <Label>Senha</Label>
+              <Label htmlFor="smtp_password">Senha</Label>
               <Input
+                id="smtp_password"
                 type="password"
                 value={settings.smtp_password || ''}
                 onChange={(e) => setSettings({ ...settings, smtp_password: e.target.value })}
                 placeholder="********"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Senha ou app password do servidor SMTP
+              </p>
             </div>
-            <div className="md:col-span-2">
-              <Label>Email Remetente</Label>
+            <div>
+              <Label htmlFor="smtp_from_email">Email Remetente</Label>
               <Input
+                id="smtp_from_email"
                 type="email"
                 value={settings.smtp_from_email || ''}
                 onChange={(e) => setSettings({ ...settings, smtp_from_email: e.target.value })}
                 placeholder="noreply@example.com"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Email que aparecerá como remetente
+              </p>
             </div>
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div>
+                <Label htmlFor="smtp_secure">Usar Conexão Segura (TLS/SSL)</Label>
+                <p className="text-sm text-muted-foreground">Habilitar TLS/SSL para conexão segura (recomendado)</p>
+              </div>
+              <Switch
+                id="smtp_secure"
+                checked={settings.smtp_secure !== false}
+                onCheckedChange={(checked) => setSettings({ ...settings, smtp_secure: checked })}
+              />
+            </div>
+          </div>
+          <div className="rounded-md bg-muted p-4">
+            <p className="text-sm font-medium mb-2">Dicas de Configuração SMTP:</p>
+            <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+              <li><strong>Gmail:</strong> smtp.gmail.com, porta 587 (TLS) ou 465 (SSL), use App Password</li>
+              <li><strong>SendGrid:</strong> smtp.sendgrid.net, porta 587, use API Key como senha</li>
+              <li><strong>Outlook/Hotmail:</strong> smtp-mail.outlook.com, porta 587</li>
+              <li><strong>Amazon SES:</strong> Use as credenciais SMTP fornecidas pela AWS</li>
+            </ul>
           </div>
         </CardContent>
       </Card>
@@ -362,20 +446,23 @@ export default function GlobalSettings() {
                   {loadingModels ? (
                     <i className="bx bx-loader-alt bx-spin mr-1"></i>
                   ) : (
-                    <i className="bx bx-refresh mr-1"></i>
+                    <i className="bx bx-repeat mr-1"></i>
                   )}
                   Atualizar lista
                 </Button>
               </div>
               <Select
                 value={settings.ai_model_name || availableModels[0]?.id || ''}
-                onValueChange={(value) => setSettings({ ...settings, ai_model_name: value })}
-                disabled={loadingModels}
+                onValueChange={(value) => {
+                  console.log('Model selected:', value);
+                  setSettings({ ...settings, ai_model_name: value });
+                }}
+                disabled={loadingModels || availableModels.length === 0}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={loadingModels ? 'Carregando...' : 'Selecione um modelo'} />
+                  <SelectValue placeholder={loadingModels ? 'Carregando...' : availableModels.length === 0 ? 'Nenhum modelo disponível' : 'Selecione um modelo'} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[300px]">
                   {availableModels.map((model) => (
                     <SelectItem key={model.id} value={model.id}>
                       {model.name}
@@ -437,6 +524,29 @@ export default function GlobalSettings() {
               <p className="text-xs text-muted-foreground mt-1">Tempo de vida da sessao no Redis</p>
             </div>
           </div>
+
+          <div className="grid gap-4 md:grid-cols-2 pt-4 border-t">
+            <div>
+              <Label>Limite Mensal Advisor (PRO)</Label>
+              <Input
+                type="number"
+                value={settings.advisor_limit_pro || 10}
+                onChange={(e) => setSettings({ ...settings, advisor_limit_pro: parseInt(e.target.value) || 0 })}
+                min={0}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Consultas de IA permitidas por mes para o plano Pro</p>
+            </div>
+            <div>
+              <Label>Limite Mensal Advisor (PREMIUM)</Label>
+              <Input
+                type="number"
+                value={settings.advisor_limit_premium || 100}
+                onChange={(e) => setSettings({ ...settings, advisor_limit_premium: parseInt(e.target.value) || 0 })}
+                min={0}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Consultas de IA permitidas por mes para o plano Premium</p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -444,7 +554,7 @@ export default function GlobalSettings() {
       <Card>
         <CardHeader>
           <CardTitle>Prompts Customizados</CardTitle>
-          <CardDescription>Configure os prompts para o Advisor, Insights e Tips</CardDescription>
+          <CardDescription>Configure os prompts para o Advisor Chat e Tips Diárias</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div>
@@ -487,25 +597,6 @@ export default function GlobalSettings() {
             <p className="text-xs text-muted-foreground mt-1">Usado para gerar a dica do dia no dashboard</p>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <Label>Prompt de Insights (Legacy)</Label>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSettings({ ...settings, insights_prompt: DEFAULT_INSIGHTS_PROMPT })}
-              >
-                Restaurar padrao
-              </Button>
-            </div>
-            <Textarea
-              value={settings.insights_prompt || DEFAULT_INSIGHTS_PROMPT}
-              onChange={(e) => setSettings({ ...settings, insights_prompt: e.target.value })}
-              rows={8}
-              className="font-mono text-sm"
-            />
-            <p className="text-xs text-muted-foreground mt-1">Prompt legado para compatibilidade</p>
-          </div>
         </CardContent>
       </Card>
 
@@ -517,3 +608,4 @@ export default function GlobalSettings() {
     </div>
   );
 }
+

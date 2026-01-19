@@ -117,16 +117,17 @@ export async function POST(request: NextRequest) {
 
     // Determine amount to use
     let amountToUse: number;
+    let recentBudget: any | null = null;
     
     if (initial_amount_cents && typeof initial_amount_cents === 'number' && initial_amount_cents > 0) {
-      // Use provided amount
-      amountToUse = initial_amount_cents / 100; // Convert cents to reais
+      // Use provided amount (cents)
+      amountToUse = initial_amount_cents;
     } else {
       // Try to find any recent budget for this category
       // Search from most recent budget backwards
-      const { data: recentBudget, error: budgetError } = await supabase
+      const { data, error: budgetError } = await supabase
         .from('budgets')
-        .select('amount_planned, year, month')
+        .select('amount_planned_cents, year, month, metadata')
         .eq('user_id', userId)
         .eq('category_id', category_id)
         .order('year', { ascending: false })
@@ -142,6 +143,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      recentBudget = data;
+
       if (!recentBudget) {
         return NextResponse.json(
           { error: 'Não há orçamento para esta categoria. Forneça um valor inicial (initial_amount_cents).' },
@@ -149,7 +152,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      amountToUse = Math.abs(recentBudget.amount_planned || 0);
+      amountToUse = Math.abs(recentBudget.amount_planned_cents || 0);
     }
 
     if (amountToUse <= 0) {
@@ -209,6 +212,9 @@ export async function POST(request: NextRequest) {
     let totalOverwritten = 0;
     let totalSkipped = 0;
 
+    const shouldCopyMetadata = !(initial_amount_cents && typeof initial_amount_cents === 'number' && initial_amount_cents > 0);
+    const metadataToCopy = shouldCopyMetadata ? (recentBudget as any)?.metadata : undefined;
+
     for (const { year: targetYear, month: targetMonth } of targetMonths) {
       const targetKey = `${targetYear}-${targetMonth}`;
       const exists = existingBudgetsMap.has(targetKey);
@@ -229,11 +235,16 @@ export async function POST(request: NextRequest) {
         category_id: category_id,
         year: targetYear,
         month: targetMonth,
-        amount_planned: amountToUse,
+        amount_planned_cents: amountToUse,
         amount_actual: 0,
         source_type: 'manual',
         is_projected: false,
       };
+
+      // Copy metadata (e.g., budget_breakdown) only when using existing budget as base (not when forcing a custom amount)
+      if (metadataToCopy) {
+        budget.metadata = metadataToCopy;
+      }
 
       budgetsToUpsert.push(budget);
     }
@@ -251,9 +262,10 @@ export async function POST(request: NextRequest) {
           console.error('Upsert error:', upsertError);
           const errorMsg = upsertError.message?.toLowerCase() || '';
           if (errorMsg.includes('source_type') || errorMsg.includes('is_projected') ||
+              errorMsg.includes('metadata') ||
               (errorMsg.includes('column') && errorMsg.includes('does not exist'))) {
             const fallbackBudgets = budgetsToUpsert.map((budget: any) => {
-              const { source_type, is_projected, ...rest } = budget;
+              const { source_type, is_projected, metadata, ...rest } = budget;
               return rest;
             });
             const { error: fallbackError } = await supabase
@@ -275,9 +287,10 @@ export async function POST(request: NextRequest) {
           console.error('Insert error:', insertError);
           const errorMsg = insertError.message?.toLowerCase() || '';
           if (errorMsg.includes('source_type') || errorMsg.includes('is_projected') ||
+              errorMsg.includes('metadata') ||
               (errorMsg.includes('column') && errorMsg.includes('does not exist'))) {
             const fallbackBudgets = budgetsToUpsert.map((budget: any) => {
-              const { source_type, is_projected, ...rest } = budget;
+              const { source_type, is_projected, metadata, ...rest } = budget;
               return rest;
             });
             const { error: fallbackError } = await supabase

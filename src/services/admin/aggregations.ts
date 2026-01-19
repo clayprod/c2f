@@ -103,7 +103,7 @@ export async function getAggregatedTransactions(
     toDate = range.toDate;
   }
 
-  // Build base query
+  // Build base query - fetch transactions first
   let query = supabase
     .from('transactions')
     .select(`
@@ -111,8 +111,7 @@ export async function getAggregatedTransactions(
       amount,
       posted_at,
       categories(id, name),
-      user_id,
-      profiles!inner(id, birth_date, gender, city, state)
+      user_id
     `)
     .gte('posted_at', fromDate)
     .lte('posted_at', toDate);
@@ -136,9 +135,27 @@ export async function getAggregatedTransactions(
     return [];
   }
 
+  // Get unique user IDs
+  const userIds = [...new Set(transactions.map((tx: any) => tx.user_id))];
+
+  // Fetch profiles separately to avoid relationship ambiguity
+  const { data: profilesData, error: profilesError } = await supabase
+    .from('profiles')
+    .select('id, birth_date, gender, city, state')
+    .in('id', userIds);
+
+  if (profilesError) {
+    throw profilesError;
+  }
+
+  // Create a map for quick profile lookup
+  const profilesMap = new Map(
+    (profilesData || []).map((p: any) => [p.id, p])
+  );
+
   // Filter by age and gender in memory (more efficient than complex SQL)
   let filteredTransactions = transactions.filter((tx: any) => {
-    const profile = tx.profiles;
+    const profile = profilesMap.get(tx.user_id);
     if (!profile) return false;
 
     // Age filter
@@ -168,7 +185,7 @@ export async function getAggregatedTransactions(
 
   for (const tx of filteredTransactions) {
     const amount = typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount;
-    const profile = Array.isArray(tx.profiles) ? tx.profiles[0] : tx.profiles;
+    const profile = profilesMap.get(tx.user_id);
 
     let groupKey: string;
 
@@ -225,4 +242,5 @@ export async function getAggregatedTransactions(
 
   return result;
 }
+
 

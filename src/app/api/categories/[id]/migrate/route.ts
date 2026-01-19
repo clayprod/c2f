@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientFromRequest } from '@/lib/supabase/server';
 import { getUserId } from '@/lib/auth';
 import { createErrorResponse } from '@/lib/errors';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const body = await request.json();
     const { target_category_id } = body;
@@ -30,14 +32,14 @@ export async function POST(
       );
     }
 
-    const supabase = await createClient();
+    const { supabase } = createClientFromRequest(request);
 
     // Verify source category exists and belongs to user
     const { data: sourceCategory, error: sourceError } = await supabase
       .from('categories')
       .select('id, name')
       .eq('id', params.id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .single();
 
     if (sourceError || !sourceCategory) {
@@ -52,7 +54,7 @@ export async function POST(
       .from('categories')
       .select('id, name, is_active')
       .eq('id', target_category_id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .single();
 
     if (targetError || !targetCategory) {
@@ -74,7 +76,7 @@ export async function POST(
       .from('transactions')
       .select('*', { count: 'exact', head: true })
       .eq('category_id', params.id)
-      .eq('user_id', userId);
+      .eq('user_id', ownerId);
 
     if (!transactionCount || transactionCount === 0) {
       return NextResponse.json(
@@ -88,7 +90,7 @@ export async function POST(
       .from('transactions')
       .update({ category_id: target_category_id })
       .eq('category_id', params.id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .select('id');
 
     if (migrateError) {

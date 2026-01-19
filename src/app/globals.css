@@ -43,14 +43,14 @@
     --gradient-secondary: linear-gradient(135deg, hsl(260 60% 55%), hsl(280 60% 55%));
     --gradient-text: linear-gradient(135deg, hsl(175 80% 60%), hsl(200 80% 70%));
     --gradient-hero: linear-gradient(180deg, hsl(222 47% 8%) 0%, hsl(222 47% 4%) 100%);
-    
+
     --glass-bg: hsl(222 47% 10% / 0.6);
     --glass-border: hsl(175 80% 50% / 0.15);
     --glass-blur: 20px;
-    
+
     --glow-primary: 0 0 40px hsl(175 80% 50% / 0.3);
     --glow-secondary: 0 0 40px hsl(260 60% 55% / 0.3);
-    
+
     --shadow-card: 0 8px 32px hsl(0 0% 0% / 0.3);
     --shadow-elevated: 0 20px 60px hsl(0 0% 0% / 0.4);
 
@@ -62,6 +62,60 @@
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 222 30% 18%;
     --sidebar-ring: 175 80% 50%;
+  }
+
+  :root[data-theme="light"] {
+    --background: 210 20% 98%;
+    --foreground: 222 47% 6%;
+
+    --card: 210 20% 98%;
+    --card-foreground: 222 47% 6%;
+
+    --popover: 210 20% 98%;
+    --popover-foreground: 222 47% 6%;
+
+    --primary: 200 85% 42%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 260 60% 55%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 210 20% 95%;
+    --muted-foreground: 215 16% 35%;
+
+    --accent: 175 80% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 20% 90%;
+    --input: 214 20% 90%;
+    --ring: 200 85% 42%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(200 85% 42%), hsl(210 80% 45%));
+    --gradient-secondary: linear-gradient(135deg, hsl(260 60% 55%), hsl(280 60% 55%));
+    --gradient-text: linear-gradient(135deg, hsl(200 85% 42%), hsl(210 80% 45%));
+    --gradient-hero: linear-gradient(180deg, hsl(210 20% 98%) 0%, hsl(210 20% 96%) 100%);
+
+    --glass-bg: hsl(0 0% 100% / 0.6);
+    --glass-border: hsl(200 85% 42% / 0.2);
+    --glass-blur: 20px;
+
+    --glow-primary: 0 0 40px hsl(200 85% 42% / 0.2);
+    --glow-secondary: 0 0 40px hsl(260 60% 55% / 0.2);
+
+    --shadow-card: 0 8px 32px hsl(222 47% 6% / 0.08);
+    --shadow-elevated: 0 20px 60px hsl(222 47% 6% / 0.12);
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 47% 6%;
+    --sidebar-primary: 200 85% 42%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 40% 96%;
+    --sidebar-accent-foreground: 222 47% 6%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 200 85% 42%;
   }
 }
 
@@ -75,7 +129,12 @@
     font-family: 'Inter', sans-serif;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: 'Sora', sans-serif;
   }
 }
@@ -156,18 +215,36 @@
       opacity: 0;
       transform: translateY(20px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
     }
   }
 
-  .stagger-1 { animation-delay: 0.1s; }
-  .stagger-2 { animation-delay: 0.2s; }
-  .stagger-3 { animation-delay: 0.3s; }
-  .stagger-4 { animation-delay: 0.4s; }
-  .stagger-5 { animation-delay: 0.5s; }
-  .stagger-6 { animation-delay: 0.6s; }
+  .stagger-1 {
+    animation-delay: 0.1s;
+  }
+
+  .stagger-2 {
+    animation-delay: 0.2s;
+  }
+
+  .stagger-3 {
+    animation-delay: 0.3s;
+  }
+
+  .stagger-4 {
+    animation-delay: 0.4s;
+  }
+
+  .stagger-5 {
+    animation-delay: 0.5s;
+  }
+
+  .stagger-6 {
+    animation-delay: 0.6s;
+  }
 }
 
 @layer utilities {
@@ -178,6 +255,7 @@
 
 /* Custom Scrollbar Styles - Padronizado para toda a aplicação */
 @layer base {
+
   /* Webkit browsers (Chrome, Safari, Edge) */
   * {
     scrollbar-width: thin;
@@ -296,18 +374,22 @@
 
   /* Classe para esconder completamente a scrollbar */
   .scrollbar-hide {
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE e Edge */
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* IE e Edge */
   }
 
   .scrollbar-hide::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, Opera */
+    display: none;
+    /* Chrome, Safari, Opera */
   }
 
   /* Estilos para spinners de inputs numéricos - Padronizado com o tema */
   /* Esconder spinners nativos e aplicar estilo consistente */
   input[type="number"] {
-    -moz-appearance: textfield; /* Remove spinners no Firefox */
+    -moz-appearance: textfield;
+    /* Remove spinners no Firefox */
   }
 
   /* Webkit browsers (Chrome, Safari, Edge) - esconder spinners nativos */
@@ -570,4 +652,3 @@
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
 }
-

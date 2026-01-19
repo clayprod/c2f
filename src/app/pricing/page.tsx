@@ -9,61 +9,48 @@ const plans = [
     name: 'Free',
     price: 'Grátis',
     period: 'para sempre',
-    description: 'Para começar a organizar suas finanças',
+    description: 'Comece a organizar suas finanças',
     features: [
       { text: 'Até 100 transações/mês', included: true },
       { text: 'Dashboard básico', included: true },
       { text: 'Importação CSV', included: true },
-      { text: '3 consultas ao Advisor/mês', included: true },
-      { text: 'Suporte por email', included: true },
-      { text: 'Importação OFX', included: false },
-      { text: 'Orçamentos e metas', included: false },
-      { text: 'Relatórios detalhados', included: false },
-      { text: 'Integração bancária', included: false },
+      { text: 'Controle de contas e cartões', included: true },
+      { text: 'AI Advisor', included: false },
     ],
-    cta: 'Começar grátis',
+    cta: 'Começar agora',
     popular: false,
   },
   {
     name: 'Pro',
     price: 'R$29',
     period: '/mês',
-    description: 'Para quem quer controle total',
+    description: 'O poder da IA para suas finanças',
     features: [
       { text: 'Transações ilimitadas', included: true },
-      { text: 'Dashboard avançado', included: true },
-      { text: 'Importação CSV + OFX', included: true },
-      { text: 'Advisor ilimitado', included: true },
+      { text: 'AI Advisor (10 consultas/mês)', included: true },
+      { text: 'Importação OFX', included: true },
       { text: 'Orçamentos e Projeções', included: true },
-      { text: 'Dívidas', included: true },
-      { text: 'Investimentos', included: true },
-      { text: 'Patrimônio', included: true },
-      { text: 'Objetivos', included: true },
-      { text: 'Relatórios detalhados', included: true },
-      { text: 'Categorias personalizadas', included: true },
-      { text: 'Suporte prioritário', included: true },
-      { text: 'Integração bancária', included: false },
+      { text: 'Investimentos e Dívidas', included: true },
+      { text: 'Patrimônio e Objetivos', included: true },
+      { text: 'Suporte por email', included: true },
     ],
     cta: 'Assinar Pro',
     popular: true,
   },
   {
-    name: 'Business',
+    name: 'Premium',
     price: 'R$79',
     period: '/mês',
-    description: 'Para equipes e empresas',
+    description: 'Análise avançada e IA ilimitada',
     features: [
       { text: 'Tudo do Pro', included: true },
-      { text: 'Múltiplos usuários (até 5)', included: true },
-      { text: 'Integração bancária (Pluggy)', included: true },
-      { text: 'Auditoria e logs', included: true },
-      { text: 'API de integração', included: true },
-      { text: 'Onboarding dedicado', included: true },
-      { text: 'SLA garantido', included: true },
-      { text: 'Suporte via chat', included: true },
-      { text: 'White-label (em breve)', included: false },
+      { text: 'AI Advisor (100 consultas/mês)', included: true },
+      { text: 'Relatórios Executivos', included: true },
+      { text: 'Categorização inteligente via IA', included: true },
+      { text: 'Análise preditiva de gastos', included: true },
+      { text: 'Suporte prioritário via WhatsApp', included: true },
     ],
-    cta: 'Falar com vendas',
+    cta: 'Assinar Premium',
     popular: false,
   },
 ];
@@ -72,7 +59,7 @@ export default function PricingPage() {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
+
       <main className="pt-32 pb-20">
         <div className="container-custom">
           <div className="text-center mb-16">
@@ -92,9 +79,8 @@ export default function PricingPage() {
             {plans.map((plan) => (
               <div
                 key={plan.name}
-                className={`glass-card p-6 md:p-8 relative ${
-                  plan.popular ? 'border-primary/50 md:scale-105' : ''
-                }`}
+                className={`glass-card p-6 md:p-8 relative ${plan.popular ? 'border-primary/50 md:scale-105' : ''
+                  }`}
               >
                 {plan.popular && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">

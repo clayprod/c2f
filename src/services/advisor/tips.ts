@@ -40,11 +40,12 @@ export async function getOrGenerateDailyTip(userId: string): Promise<{
     let existingTip = null;
     let fetchError = null;
 
-    // First try with insight_type (if migration 024 was run)
+    // First try with insight_type filter to get only daily tips (not chat responses)
     const result = await supabase
       .from('advisor_insights')
       .select('*')
       .eq('user_id', userId)
+      .eq('insight_type', 'daily_tip')
       .gte('created_at', todayStart)
       .lt('created_at', todayEnd)
       .order('created_at', { ascending: false })

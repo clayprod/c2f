@@ -223,7 +223,7 @@ export async function updateSession(
 
 /**
  * Optimize message history when token count exceeds limit
- * Keeps system messages and recent conversations, summarizes older ones
+ * Keeps system messages and recent conversations, summarizes older ones with semantic extraction
  */
 export async function optimizeHistory(
   session: ChatSession,
@@ -235,7 +235,7 @@ export async function optimizeHistory(
     return messages;
   }
 
-  // Strategy: Keep last 5 user-assistant pairs, summarize the rest
+  // Strategy: Keep last 5 user-assistant pairs, summarize the rest with semantic extraction
   const systemMessages = messages.filter(m => m.role === 'system');
   const conversationMessages = messages.filter(m => m.role !== 'system');
 
@@ -248,17 +248,77 @@ export async function optimizeHistory(
     return [...systemMessages, ...recentMessages.slice(-6)];
   }
 
-  // Create a summary of old messages if they exist
+  // Create a semantic summary of old messages if they exist
   if (oldMessages.length > 0) {
-    const summary: ChatMessage = {
+    const summary = createConversationSummary(oldMessages);
+    const summaryMessage: ChatMessage = {
       role: 'system',
-      content: `[Resumo da conversa anterior: O usuário fez ${oldMessages.filter(m => m.role === 'user').length} perguntas sobre suas finanças. Principais tópicos discutidos foram analisados e as recomendações já foram fornecidas.]`,
+      content: summary,
       timestamp: new Date().toISOString(),
     };
-    return [...systemMessages, summary, ...recentMessages];
+    return [...systemMessages, summaryMessage, ...recentMessages];
   }
 
   return [...systemMessages, ...recentMessages];
+}
+
+/**
+ * Create a semantic summary of conversation messages
+ * Extracts topics, decisions, and key numbers mentioned
+ */
+function createConversationSummary(messages: ChatMessage[]): string {
+  const userMessages = messages.filter(m => m.role === 'user');
+  const assistantMessages = messages.filter(m => m.role === 'assistant');
+  
+  // Extract potential topics from user messages
+  const topics: string[] = [];
+  const keywords = [
+    'orçamento', 'meta', 'dívida', 'investimento', 'gasto', 'economia', 
+    'poupança', 'salário', 'renda', 'despesa', 'cartão', 'fatura',
+    'reserva', 'emergência', 'aposentadoria', 'compra', 'viagem'
+  ];
+  
+  for (const msg of userMessages) {
+    const content = msg.content.toLowerCase();
+    for (const keyword of keywords) {
+      if (content.includes(keyword) && !topics.includes(keyword)) {
+        topics.push(keyword);
+        if (topics.length >= 5) break;
+      }
+    }
+  }
+
+  // Extract numbers that might be monetary values (R$ or high numbers)
+  const numbers: string[] = [];
+  const numberPattern = /R?\$?\s*(\d{1,3}(?:\.\d{3})*(?:,\d{2})?|\d+(?:,\d{2})?)/g;
+  for (const msg of [...userMessages, ...assistantMessages]) {
+    const matches = msg.content.match(numberPattern);
+    if (matches) {
+      for (const match of matches.slice(0, 3)) {
+        if (!numbers.includes(match)) {
+          numbers.push(match);
+          if (numbers.length >= 5) break;
+        }
+      }
+    }
+  }
+
+  // Build summary
+  const parts: string[] = [
+    `[Resumo da conversa anterior: ${userMessages.length} pergunta(s), ${assistantMessages.length} resposta(s).`,
+  ];
+  
+  if (topics.length > 0) {
+    parts.push(`Tópicos: ${topics.join(', ')}.`);
+  }
+  
+  if (numbers.length > 0) {
+    parts.push(`Valores mencionados: ${numbers.join(', ')}.`);
+  }
+  
+  parts.push('Recomendações anteriores já foram fornecidas.]');
+
+  return parts.join(' ');
 }
 
 /**
@@ -341,19 +401,32 @@ export async function isRedisAvailable(): Promise<boolean> {
 
 /**
  * Build messages array for LLM call including session history
+ * Optimizes context by sending summarized version when context hash hasn't changed
  */
 export function buildMessagesForLLM(
   session: ChatSession,
   systemPrompt: string,
   newUserMessage: string,
-  financialContext: string
+  financialContext: string,
+  contextHash: string,
+  summarizedContext?: string
 ): ChatMessage[] {
   const messages: ChatMessage[] = [];
 
-  // System prompt with financial context
+  // Determine if we need full context or can use summarized version
+  const isFirstMessage = session.messages.length === 0;
+  const contextChanged = session.contextHash !== contextHash;
+  const useFullContext = isFirstMessage || contextChanged || !summarizedContext;
+
+  // System prompt with financial context (full or summarized)
+  const contextToUse = useFullContext ? financialContext : summarizedContext;
+  const contextLabel = useFullContext 
+    ? 'DADOS FINANCEIROS DO USUÁRIO' 
+    : 'RESUMO FINANCEIRO (contexto completo enviado anteriormente)';
+
   messages.push({
     role: 'system',
-    content: `${systemPrompt}\n\n---\n\nDADOS FINANCEIROS DO USUÁRIO:\n${financialContext}`,
+    content: `${systemPrompt}\n\n---\n\n${contextLabel}:\n${contextToUse}`,
   });
 
   // Add conversation history (already optimized)
@@ -373,4 +446,27 @@ export function buildMessagesForLLM(
   });
 
   return messages;
+}
+
+/**
+ * Create a summarized version of the financial context for subsequent messages
+ * Includes only snapshot, alerts, and key metrics to reduce tokens
+ */
+export function createSummarizedContext(fullContext: Record<string, unknown>): string {
+  const summary: Record<string, unknown> = {
+    user: fullContext.user,
+    snapshot: fullContext.snapshot,
+    alerts: fullContext.alerts,
+    // Include counts for reference
+    _counts: {
+      accounts: Array.isArray(fullContext.accounts) ? fullContext.accounts.length : 0,
+      budgets: Array.isArray(fullContext.budgets) ? fullContext.budgets.length : 0,
+      goals: Array.isArray(fullContext.goals) ? fullContext.goals.length : 0,
+      debts: Array.isArray(fullContext.debts) ? fullContext.debts.length : 0,
+      receivables: Array.isArray(fullContext.receivables) ? fullContext.receivables.length : 0,
+      investments: Array.isArray(fullContext.investments) ? fullContext.investments.length : 0,
+    },
+  };
+
+  return JSON.stringify(summary, null, 2);
 }

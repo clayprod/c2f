@@ -21,7 +21,7 @@ export async function generateAutoBudgetsForGoal(
   goal: {
     id: string;
     category_id: string | null;
-    include_in_budget: boolean;
+    include_in_plan: boolean;
     status: string;
     contribution_frequency: string | null;
     monthly_contribution_cents: number | null;
@@ -33,11 +33,62 @@ export async function generateAutoBudgetsForGoal(
   options: GenerateBudgetsOptions
 ): Promise<{ created: number; updated: number; skipped: number }> {
   // Validate goal can generate budgets
-  if (!goal.include_in_budget || goal.status !== 'active' || !goal.contribution_frequency) {
+  if (!goal.include_in_plan || goal.status !== 'active') {
     return { created: 0, updated: 0, skipped: 0 };
   }
 
   if (!goal.category_id) {
+    return { created: 0, updated: 0, skipped: 0 };
+  }
+
+  // Check for custom plan entries
+  const [rangeStart, rangeEnd] = [
+    `${options.startMonth}-01`,
+    `${options.endMonth}-31`,
+  ];
+  const { data: planEntries } = await supabase
+    .from('goal_plan_entries')
+    .select('entry_month, amount_cents')
+    .eq('user_id', userId)
+    .eq('goal_id', goal.id)
+    .gte('entry_month', rangeStart)
+    .lte('entry_month', rangeEnd);
+
+  if (planEntries && planEntries.length > 0) {
+    const budgetsToUpsert = planEntries.map((entry) => {
+      const entryDate = new Date(entry.entry_month + 'T12:00:00');
+      return {
+        user_id: userId,
+        category_id: goal.category_id,
+        year: entryDate.getFullYear(),
+        month: entryDate.getMonth() + 1,
+        amount_planned_cents: entry.amount_cents,
+        amount_actual: 0,
+        source_type: 'goal',
+        source_id: goal.id,
+        is_projected: entryDate > new Date(),
+        is_auto_generated: true,
+      };
+    });
+
+    const { error } = await supabase
+      .from('budgets')
+      .upsert(budgetsToUpsert, {
+        onConflict: 'user_id,category_id,year,month',
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    return {
+      created: budgetsToUpsert.length,
+      updated: 0,
+      skipped: 0,
+    };
+  }
+
+  if (!goal.contribution_frequency) {
     return { created: 0, updated: 0, skipped: 0 };
   }
 
@@ -105,7 +156,7 @@ export async function generateAutoBudgetsForGoal(
       category_id: goal.category_id,
       year: current.getFullYear(),
       month: current.getMonth() + 1,
-      amount_planned: amountCents,
+      amount_planned_cents: amountCents,
       amount_actual: 0,
       source_type: 'goal',
       source_id: goal.id,
@@ -192,7 +243,7 @@ export async function generateAutoBudgetsForDebt(
   debt: {
     id: string;
     category_id: string | null;
-    include_in_budget: boolean;
+    include_in_plan: boolean;
     is_negotiated: boolean;
     status: string;
     contribution_frequency: string | null;
@@ -207,11 +258,11 @@ export async function generateAutoBudgetsForDebt(
   options: GenerateBudgetsOptions
 ): Promise<{ created: number; updated: number; skipped: number }> {
   // Validate debt can generate budgets
-  if (!debt.include_in_budget || !debt.is_negotiated || !debt.category_id) {
+  if (!debt.include_in_plan || !debt.is_negotiated || !debt.category_id) {
     return { created: 0, updated: 0, skipped: 0 };
   }
 
-  if (!['active', 'negotiating', 'negociando'].includes(debt.status)) {
+  if (debt.status !== 'negociada') {
     return { created: 0, updated: 0, skipped: 0 };
   }
 
@@ -228,6 +279,63 @@ export async function generateAutoBudgetsForDebt(
   const startDate = debt.start_date
     ? (typeof debt.start_date === 'string' ? new Date(debt.start_date + 'T12:00:00') : debt.start_date)
     : new Date();
+
+  const [rangeStart, rangeEnd] = [
+    `${options.startMonth}-01`,
+    `${options.endMonth}-31`,
+  ];
+  const { data: planEntries } = await supabase
+    .from('debt_plan_entries')
+    .select('entry_month, amount_cents')
+    .eq('user_id', userId)
+    .eq('debt_id', debt.id)
+    .gte('entry_month', rangeStart)
+    .lte('entry_month', rangeEnd);
+
+  if (planEntries && planEntries.length > 0) {
+    const budgetsToUpsert = planEntries.map((entry) => {
+      const entryDate = new Date(entry.entry_month + 'T12:00:00');
+      return {
+        user_id: userId,
+        category_id: debt.category_id,
+        year: entryDate.getFullYear(),
+        month: entryDate.getMonth() + 1,
+        amount_planned_cents: entry.amount_cents,
+        amount_actual: 0,
+        source_type: 'debt',
+        source_id: debt.id,
+        is_projected: entryDate > new Date(),
+        is_auto_generated: true,
+      };
+    });
+
+    const { error } = await supabase
+      .from('budgets')
+      .upsert(budgetsToUpsert, {
+        onConflict: 'user_id,category_id,year,month',
+      });
+
+    if (error) {
+      if (error.message?.includes('is_auto_generated') || error.code === '42703') {
+        const fallbackBudgets = budgetsToUpsert.map(({ is_auto_generated, ...rest }) => rest);
+        const { error: fallbackError } = await supabase
+          .from('budgets')
+          .upsert(fallbackBudgets, {
+            onConflict: 'user_id,category_id,year,month',
+          });
+
+        if (fallbackError) throw fallbackError;
+      } else {
+        throw error;
+      }
+    }
+
+    return {
+      created: budgetsToUpsert.length,
+      updated: 0,
+      skipped: 0,
+    };
+  }
 
       // Use installment system if available
       if (debt.installment_count && debt.installment_amount_cents) {
@@ -253,7 +361,7 @@ export async function generateAutoBudgetsForDebt(
             category_id: debt.category_id,
             year: current.getFullYear(),
             month: current.getMonth() + 1,
-            amount_planned: amountCents,
+            amount_planned_cents: amountCents,
             amount_actual: 0,
             source_type: 'debt',
             source_id: debt.id,
@@ -286,7 +394,7 @@ export async function generateAutoBudgetsForDebt(
         category_id: debt.category_id,
         year: current.getFullYear(),
         month: current.getMonth() + 1,
-        amount_planned: amountCents,
+        amount_planned_cents: amountCents,
         amount_actual: 0,
         source_type: 'debt',
         source_id: debt.id,
@@ -368,6 +476,247 @@ export async function generateAutoBudgetsForDebt(
 }
 
 /**
+ * Generate automatic budgets for a negotiated receivable
+ */
+export async function generateAutoBudgetsForReceivable(
+  supabase: SupabaseClient,
+  userId: string,
+  receivable: {
+    id: string;
+    category_id: string | null;
+    include_in_plan: boolean;
+    is_negotiated: boolean;
+    status: string;
+    contribution_frequency: string | null;
+    monthly_payment_cents: number | null;
+    installment_count: number | null;
+    installment_amount_cents: number | null;
+    installment_day: number | null;
+    total_amount_cents: number;
+    received_amount_cents: number;
+    start_date: string | Date | null;
+  },
+  options: GenerateBudgetsOptions
+): Promise<{ created: number; updated: number; skipped: number }> {
+  // Validate receivable can generate budgets
+  if (!receivable.include_in_plan || !receivable.is_negotiated || !receivable.category_id) {
+    return { created: 0, updated: 0, skipped: 0 };
+  }
+
+  if (receivable.status !== 'negociada') {
+    return { created: 0, updated: 0, skipped: 0 };
+  }
+
+  const remainingAmount = receivable.total_amount_cents - (receivable.received_amount_cents || 0);
+  if (remainingAmount <= 0) {
+    return { created: 0, updated: 0, skipped: 0 };
+  }
+
+  // Parse month range
+  const [startYear, startMonth] = options.startMonth.split('-').map(Number);
+  const [endYear, endMonth] = options.endMonth.split('-').map(Number);
+
+  const budgetsToUpsert: any[] = [];
+  const startDate = receivable.start_date
+    ? (typeof receivable.start_date === 'string' ? new Date(receivable.start_date + 'T12:00:00') : receivable.start_date)
+    : new Date();
+
+  const [rangeStart, rangeEnd] = [
+    `${options.startMonth}-01`,
+    `${options.endMonth}-31`,
+  ];
+  const { data: planEntries } = await supabase
+    .from('receivable_plan_entries')
+    .select('entry_month, amount_cents')
+    .eq('user_id', userId)
+    .eq('receivable_id', receivable.id)
+    .gte('entry_month', rangeStart)
+    .lte('entry_month', rangeEnd);
+
+  if (planEntries && planEntries.length > 0) {
+    const budgetsToUpsert = planEntries.map((entry) => {
+      const entryDate = new Date(entry.entry_month + 'T12:00:00');
+      return {
+        user_id: userId,
+        category_id: receivable.category_id,
+        year: entryDate.getFullYear(),
+        month: entryDate.getMonth() + 1,
+        amount_planned_cents: entry.amount_cents,
+        amount_actual: 0,
+        source_type: 'receivable',
+        source_id: receivable.id,
+        is_projected: entryDate > new Date(),
+        is_auto_generated: true,
+      };
+    });
+
+    const { error } = await supabase
+      .from('budgets')
+      .upsert(budgetsToUpsert, {
+        onConflict: 'user_id,category_id,year,month',
+      });
+
+    if (error) {
+      if (error.message?.includes('is_auto_generated') || error.code === '42703') {
+        const fallbackBudgets = budgetsToUpsert.map(({ is_auto_generated, ...rest }) => rest);
+        const { error: fallbackError } = await supabase
+          .from('budgets')
+          .upsert(fallbackBudgets, {
+            onConflict: 'user_id,category_id,year,month',
+          });
+
+        if (fallbackError) throw fallbackError;
+      } else {
+        throw error;
+      }
+    }
+
+    return {
+      created: budgetsToUpsert.length,
+      updated: 0,
+      skipped: 0,
+    };
+  }
+
+      // Use installment system if available
+      if (receivable.installment_count && receivable.installment_amount_cents) {
+        const today = new Date();
+        const installmentDay = receivable.installment_day || 1; // Default to day 1 if not specified
+        let installmentNumber = 1;
+        let current = new Date(today.getFullYear(), today.getMonth(), installmentDay);
+
+        // Find first installment date
+        while (current < startDate) {
+          current.setMonth(current.getMonth() + 1);
+          installmentNumber++;
+        }
+
+        while (installmentNumber <= receivable.installment_count && current <= new Date(endYear, endMonth - 1, 1)) {
+          const remaining = receivable.total_amount_cents - (receivable.received_amount_cents || 0);
+          if (remaining <= 0) break;
+
+          const amountCents = Math.min(receivable.installment_amount_cents, remaining);
+
+          budgetsToUpsert.push({
+            user_id: userId,
+            category_id: receivable.category_id,
+            year: current.getFullYear(),
+            month: current.getMonth() + 1,
+            amount_planned_cents: amountCents,
+            amount_actual: 0,
+            source_type: 'receivable',
+            source_id: receivable.id,
+            is_projected: current > new Date(),
+            is_auto_generated: true,
+          });
+
+          current.setMonth(current.getMonth() + 1);
+          installmentNumber++;
+        }
+      }
+  // Use frequency-based system
+  else if (receivable.contribution_frequency && receivable.monthly_payment_cents) {
+    const frequency = receivable.contribution_frequency as ContributionFrequency;
+    let current = new Date(startYear, startMonth - 1, 1);
+
+    while (current <= new Date(endYear, endMonth - 1, 1)) {
+      if (!shouldIncludeInMonth(frequency, startDate, current)) {
+        current.setMonth(current.getMonth() + 1);
+        continue;
+      }
+
+      const remaining = receivable.total_amount_cents - (receivable.received_amount_cents || 0);
+      if (remaining <= 0) break;
+
+      const amountCents = Math.min(receivable.monthly_payment_cents, remaining);
+
+      budgetsToUpsert.push({
+        user_id: userId,
+        category_id: receivable.category_id,
+        year: current.getFullYear(),
+        month: current.getMonth() + 1,
+        amount_planned_cents: amountCents,
+        amount_actual: 0,
+        source_type: 'receivable',
+        source_id: receivable.id,
+        is_projected: current > new Date(),
+        is_auto_generated: true,
+      });
+
+      current.setMonth(current.getMonth() + 1);
+    }
+  } else {
+    return { created: 0, updated: 0, skipped: 0 };
+  }
+
+  if (budgetsToUpsert.length === 0) {
+    return { created: 0, updated: 0, skipped: 0 };
+  }
+
+  // Check existing budgets
+  const existingBudgets = new Map<string, boolean>();
+  if (!options.overwrite) {
+    const uniqueYears = [...new Set(budgetsToUpsert.map(b => b.year))];
+    const { data: existing } = await supabase
+      .from('budgets')
+      .select('year, month')
+      .eq('user_id', userId)
+      .eq('category_id', receivable.category_id)
+      .eq('source_type', 'receivable')
+      .eq('source_id', receivable.id)
+      .in('year', uniqueYears);
+
+    if (existing) {
+      for (const budget of existing) {
+        existingBudgets.set(`${budget.year}-${budget.month}`, true);
+      }
+    }
+  }
+
+  // Filter out existing if not overwriting
+  const toInsert = options.overwrite
+    ? budgetsToUpsert
+    : budgetsToUpsert.filter(b => !existingBudgets.has(`${b.year}-${b.month}`));
+
+  if (toInsert.length === 0) {
+    return {
+      created: 0,
+      updated: 0,
+      skipped: budgetsToUpsert.length,
+    };
+  }
+
+  // Upsert budgets
+  const { error } = await supabase
+    .from('budgets')
+    .upsert(toInsert, {
+      onConflict: 'user_id,category_id,year,month',
+    });
+
+  if (error) {
+    // Try without is_auto_generated if column doesn't exist
+    if (error.message?.includes('is_auto_generated') || error.code === '42703') {
+      const fallbackBudgets = toInsert.map(({ is_auto_generated, ...rest }) => rest);
+      const { error: fallbackError } = await supabase
+        .from('budgets')
+        .upsert(fallbackBudgets, {
+          onConflict: 'user_id,category_id,year,month',
+        });
+      
+      if (fallbackError) throw fallbackError;
+    } else {
+      throw error;
+    }
+  }
+
+  const created = toInsert.length;
+  const updated = options.overwrite ? budgetsToUpsert.length - created : 0;
+  const skipped = budgetsToUpsert.length - created;
+
+  return { created, updated, skipped };
+}
+
+/**
  * Generate automatic budgets for an investment
  */
 export async function generateAutoBudgetsForInvestment(
@@ -376,7 +725,7 @@ export async function generateAutoBudgetsForInvestment(
   investment: {
     id: string;
     category_id: string | null;
-    include_in_budget: boolean;
+    include_in_plan: boolean;
     status: string;
     contribution_frequency: string | null;
     monthly_contribution_cents: number | null;
@@ -385,8 +734,70 @@ export async function generateAutoBudgetsForInvestment(
   options: GenerateBudgetsOptions
 ): Promise<{ created: number; updated: number; skipped: number }> {
   // Validate investment can generate budgets
-  if (!investment.include_in_budget || investment.status !== 'active' || !investment.category_id) {
+  if (!investment.include_in_plan || investment.status !== 'active' || !investment.category_id) {
     return { created: 0, updated: 0, skipped: 0 };
+  }
+
+  // Parse month range
+  const [startYear, startMonth] = options.startMonth.split('-').map(Number);
+  const [endYear, endMonth] = options.endMonth.split('-').map(Number);
+
+  const budgetsToUpsert: any[] = [];
+  const [rangeStart, rangeEnd] = [
+    `${options.startMonth}-01`,
+    `${options.endMonth}-31`,
+  ];
+  const { data: planEntries } = await supabase
+    .from('investment_plan_entries')
+    .select('entry_month, amount_cents')
+    .eq('user_id', userId)
+    .eq('investment_id', investment.id)
+    .gte('entry_month', rangeStart)
+    .lte('entry_month', rangeEnd);
+
+  if (planEntries && planEntries.length > 0) {
+    const budgetsToUpsert = planEntries.map((entry) => {
+      const entryDate = new Date(entry.entry_month + 'T12:00:00');
+      return {
+        user_id: userId,
+        category_id: investment.category_id,
+        year: entryDate.getFullYear(),
+        month: entryDate.getMonth() + 1,
+        amount_planned_cents: entry.amount_cents,
+        amount_actual: 0,
+        source_type: 'investment',
+        source_id: investment.id,
+        is_projected: entryDate > new Date(),
+        is_auto_generated: true,
+      };
+    });
+
+    const { error } = await supabase
+      .from('budgets')
+      .upsert(budgetsToUpsert, {
+        onConflict: 'user_id,category_id,year,month',
+      });
+
+    if (error) {
+      if (error.message?.includes('is_auto_generated') || error.code === '42703') {
+        const fallbackBudgets = budgetsToUpsert.map(({ is_auto_generated, ...rest }) => rest);
+        const { error: fallbackError } = await supabase
+          .from('budgets')
+          .upsert(fallbackBudgets, {
+            onConflict: 'user_id,category_id,year,month',
+          });
+
+        if (fallbackError) throw fallbackError;
+      } else {
+        throw error;
+      }
+    }
+
+    return {
+      created: budgetsToUpsert.length,
+      updated: 0,
+      skipped: 0,
+    };
   }
 
   if (!investment.contribution_frequency || !investment.monthly_contribution_cents) {
@@ -403,11 +814,6 @@ export async function generateAutoBudgetsForInvestment(
     ? new Date(investment.purchase_date + 'T12:00:00')
     : investment.purchase_date;
 
-  // Parse month range
-  const [startYear, startMonth] = options.startMonth.split('-').map(Number);
-  const [endYear, endMonth] = options.endMonth.split('-').map(Number);
-
-  const budgetsToUpsert: any[] = [];
   let current = new Date(startYear, startMonth - 1, 1);
 
   while (current <= new Date(endYear, endMonth - 1, 1)) {
@@ -422,7 +828,7 @@ export async function generateAutoBudgetsForInvestment(
       category_id: investment.category_id,
       year: current.getFullYear(),
       month: current.getMonth() + 1,
-      amount_planned: monthlyCents,
+      amount_planned_cents: monthlyCents,
       amount_actual: 0,
       source_type: 'investment',
       source_id: investment.id,
@@ -526,6 +932,18 @@ export async function recalculateGoalBudgets(
     throw new Error('Goal has no category');
   }
 
+  const { data: customPlanEntries } = await supabase
+    .from('goal_plan_entries')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('goal_id', goalId)
+    .limit(1);
+
+  if (customPlanEntries && customPlanEntries.length > 0) {
+    // Custom plans are managed explicitly by the user
+    return { updated: 0 };
+  }
+
   // Calculate new monthly contribution based on adjusted amount
   const [adjustedYear, adjustedMonthNum] = adjustedMonth.split('-').map(Number);
   const adjustedDate = new Date(adjustedYear, adjustedMonthNum - 1, 1);
@@ -605,7 +1023,7 @@ export async function recalculateGoalBudgets(
 
     const { error: updateError } = await supabase
       .from('budgets')
-      .update({ amount_planned: amountCents })
+    .update({ amount_planned_cents: amountCents })
       .eq('id', budget.id);
 
     if (updateError) throw updateError;

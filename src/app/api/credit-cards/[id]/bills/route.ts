@@ -1,31 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientFromRequest } from '@/lib/supabase/server';
 import { getUserId } from '@/lib/auth';
 import { createErrorResponse } from '@/lib/errors';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { id } = await params;
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const limit = parseInt(searchParams.get('limit') || '12');
 
-    const supabase = await createClient();
+    const { supabase } = createClientFromRequest(request);
 
     // Verify card belongs to user
     const { data: card, error: cardError } = await supabase
       .from('accounts')
       .select('id')
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .eq('type', 'credit_card')
       .single();
 
@@ -38,7 +40,7 @@ export async function GET(
       .from('credit_card_bills')
       .select('*')
       .eq('account_id', id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .order('reference_month', { ascending: false })
       .limit(limit);
 
@@ -69,7 +71,7 @@ export async function GET(
           installment_total
         `)
         .in('credit_card_bill_id', billIds)
-        .eq('user_id', userId);
+        .eq('user_id', ownerId);
 
       if (txError) throw txError;
 
@@ -118,10 +120,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { id } = await params;
     const body = await request.json();
@@ -134,14 +137,14 @@ export async function POST(
       );
     }
 
-    const supabase = await createClient();
+    const { supabase } = createClientFromRequest(request);
 
     // Get card details
     const { data: card, error: cardError } = await supabase
       .from('accounts')
       .select('id, closing_day, due_day')
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .eq('type', 'credit_card')
       .single();
 
@@ -172,7 +175,7 @@ export async function POST(
     const { data, error } = await supabase
       .from('credit_card_bills')
       .insert({
-        user_id: userId,
+        user_id: ownerId,
         account_id: id,
         reference_month: reference_month + '-01',
         closing_date: closingDate.toISOString().split('T')[0],

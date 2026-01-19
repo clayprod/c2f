@@ -1,24 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientFromRequest } from '@/lib/supabase/server';
 import { getUserId } from '@/lib/auth';
 import { createErrorResponse } from '@/lib/errors';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
-    const supabase = await createClient();
+    const { supabase } = createClientFromRequest(request);
     const { data, error } = await supabase
       .from('categories')
       .select('*')
       .eq('id', params.id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .single();
 
     if (error) throw error;
@@ -38,13 +40,14 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const body = await request.json();
-    const supabase = await createClient();
+    const { supabase } = createClientFromRequest(request);
 
     // Build update object with only provided fields
     const updateData: Record<string, any> = {};
@@ -59,7 +62,7 @@ export async function PATCH(
           .from('budgets')
           .select('*', { count: 'exact', head: true })
           .eq('category_id', params.id)
-          .eq('user_id', userId);
+          .eq('user_id', ownerId);
         
         if (budgetCount && budgetCount > 0) {
           return NextResponse.json(
@@ -75,7 +78,7 @@ export async function PATCH(
       .from('categories')
       .update(updateData)
       .eq('id', params.id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .select()
       .single();
 
@@ -96,26 +99,27 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = await createClient();
+    const ownerId = await getEffectiveOwnerId(request, userId);
+    const { supabase } = createClientFromRequest(request);
 
     // Check if category has transactions
     const { count: transactionCount } = await supabase
       .from('transactions')
       .select('*', { count: 'exact', head: true })
       .eq('category_id', params.id)
-      .eq('user_id', userId);
+      .eq('user_id', ownerId);
 
     // Check if category has budgets
     const { count: budgetCount } = await supabase
       .from('budgets')
       .select('*', { count: 'exact', head: true })
       .eq('category_id', params.id)
-      .eq('user_id', userId);
+      .eq('user_id', ownerId);
 
     if (transactionCount && transactionCount > 0) {
       return NextResponse.json(
@@ -141,7 +145,7 @@ export async function DELETE(
       .from('categories')
       .delete()
       .eq('id', params.id)
-      .eq('user_id', userId);
+      .eq('user_id', ownerId);
 
     if (error) throw error;
 

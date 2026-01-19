@@ -27,12 +27,18 @@ export const logoConfig = {
  * Returns appropriate logo for the theme or fallback
  */
 export function getLogo(theme: 'light' | 'dark' | 'auto' = 'auto'): string {
-  // For auto theme, default to light logo (for dark backgrounds)
-  if (theme === 'auto' || theme === 'light') {
-    return logoConfig.light;
+  if (theme === 'auto') {
+    const documentTheme =
+      typeof document !== 'undefined' ? document.documentElement.dataset.theme : null;
+    return documentTheme === 'light' ? logoConfig.dark : logoConfig.light;
   }
-  
-  // For dark theme, use dark logo (for light backgrounds)
-  return logoConfig.dark;
+
+  // For light theme, use dark logo (for light backgrounds)
+  if (theme === 'light') {
+    return logoConfig.dark;
+  }
+
+  // For dark theme, use light logo (for dark backgrounds)
+  return logoConfig.light;
 }
 

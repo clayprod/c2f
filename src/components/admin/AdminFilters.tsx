@@ -16,7 +16,7 @@ export default function AdminFilters({ onFiltersChange }: AdminFiltersProps) {
   const [search, setSearch] = useState('');
   const [minAge, setMinAge] = useState<number | undefined>();
   const [maxAge, setMaxAge] = useState<number | undefined>();
-  const [gender, setGender] = useState<string>('');
+  const [gender, setGender] = useState<string>('all');
   const [groupBy, setGroupBy] = useState<string>('state');
 
   const handleApplyFilters = () => {
@@ -25,7 +25,7 @@ export default function AdminFilters({ onFiltersChange }: AdminFiltersProps) {
       search: search || undefined,
       min_age: minAge,
       max_age: maxAge,
-      gender: gender || undefined,
+      gender: gender === 'all' ? undefined : gender,
       group_by: groupBy,
     };
     onFiltersChange?.(filters);
@@ -104,12 +104,10 @@ export default function AdminFilters({ onFiltersChange }: AdminFiltersProps) {
                 <SelectValue placeholder="Todos" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos</SelectItem>
-                <SelectItem value="male_cis">Homem (Cisgênero)</SelectItem>
-                <SelectItem value="male_trans">Homem (Transgênero)</SelectItem>
-                <SelectItem value="female_cis">Mulher (Cisgênero)</SelectItem>
-                <SelectItem value="female_trans">Mulher (Transgênero)</SelectItem>
-                <SelectItem value="non_binary">Não Binário</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="male_cis">Homem</SelectItem>
+                <SelectItem value="female_cis">Mulher</SelectItem>
+                <SelectItem value="non_binary">Não-binário</SelectItem>
                 <SelectItem value="other">Outro</SelectItem>
                 <SelectItem value="prefer_not_to_say">Prefiro não responder</SelectItem>
               </SelectContent>
@@ -122,4 +120,5 @@ export default function AdminFilters({ onFiltersChange }: AdminFiltersProps) {
     </Card>
   );
 }
+
 

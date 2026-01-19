@@ -11,11 +11,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user has paid plan (Business plan required for Pluggy)
+    // Check if user has paid plan (Premium plan required for Pluggy)
     const plan = await getUserPlan(userId);
-    if (plan.plan !== 'business') {
+    if (plan.plan !== 'premium') {
       return NextResponse.json(
-        { error: 'Pluggy integration requires Business plan' },
+        { error: 'Pluggy integration requires Premium plan' },
         { status: 403 }
       );
     }
@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
 
 
 

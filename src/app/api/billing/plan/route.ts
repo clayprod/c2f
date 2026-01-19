@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserId } from '@/lib/auth';
-import { getUserPlan } from '@/services/stripe/subscription';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
+import { getUserPlanAdmin } from '@/services/stripe/subscription';
 import { createErrorResponse } from '@/lib/errors';
 
 export async function GET(request: NextRequest) {
@@ -10,13 +11,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const plan = await getUserPlan(userId);
+    const ownerId = await getEffectiveOwnerId(request, userId);
+    const plan = await getUserPlanAdmin(ownerId);
+
+    // Get limits from global settings
+    const { getGlobalSettings } = await import('@/services/admin/globalSettings');
+    const settings = await getGlobalSettings();
 
     // Define limits based on plan
     const limits = {
       free: {
         transactions_per_month: 100,
-        advisor_queries_per_month: 3,
+        advisor_queries_per_month: 0,
         accounts: 5,
         categories: 20,
         budgets: 0,
@@ -25,16 +31,16 @@ export async function GET(request: NextRequest) {
       },
       pro: {
         transactions_per_month: -1, // unlimited
-        advisor_queries_per_month: -1, // unlimited
+        advisor_queries_per_month: settings.advisor_limit_pro ?? 10,
         accounts: -1, // unlimited
         categories: -1, // unlimited
         budgets: -1, // unlimited
         pluggy_integration: false,
         reports: true,
       },
-      business: {
+      premium: {
         transactions_per_month: -1, // unlimited
-        advisor_queries_per_month: -1, // unlimited
+        advisor_queries_per_month: settings.advisor_limit_premium ?? 100,
         accounts: -1, // unlimited
         categories: -1, // unlimited
         budgets: -1, // unlimited

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientFromRequest } from '@/lib/supabase/server';
 import { getUserId } from '@/lib/auth';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 import { debtPaymentSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
 
@@ -9,17 +10,18 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = await createClient();
+    const ownerId = await getEffectiveOwnerId(request, userId);
+    const { supabase } = createClientFromRequest(request);
     const { data, error } = await supabase
       .from('debt_payments')
       .select('*, transactions(*)')
       .eq('debt_id', params.id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .order('payment_date', { ascending: false });
 
     if (error) throw error;
@@ -39,7 +41,7 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -50,14 +52,15 @@ export async function POST(
       debt_id: params.id,
     });
 
-    const supabase = await createClient();
+    const ownerId = await getEffectiveOwnerId(request, userId);
+    const { supabase } = createClientFromRequest(request);
 
     // Create payment
     const { data: payment, error: paymentError } = await supabase
       .from('debt_payments')
       .insert({
         ...validated,
-        user_id: userId,
+        user_id: ownerId,
         amount_cents: validated.amount_cents,
       })
       .select()
@@ -70,7 +73,7 @@ export async function POST(
       .from('debts')
       .select('paid_amount_cents')
       .eq('id', params.id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .single();
 
     if (debt) {
@@ -85,7 +88,7 @@ export async function POST(
           updated_at: new Date().toISOString(),
         })
         .eq('id', params.id)
-        .eq('user_id', userId);
+        .eq('user_id', ownerId);
     }
 
     return NextResponse.json({ data: payment }, { status: 201 });

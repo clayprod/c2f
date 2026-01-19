@@ -86,7 +86,7 @@ function calculateMonthsBetween(startDate: Date, endDate: Date): number {
  * Validate if goal can have automatic budget generation
  */
 export function canGenerateAutoBudgets(input: {
-  include_in_budget: boolean;
+  include_in_plan: boolean;
   status: string;
   contribution_frequency?: string | null;
   monthly_contribution_cents?: number | null;
@@ -95,7 +95,7 @@ export function canGenerateAutoBudgets(input: {
   current_amount_cents?: number;
 }): boolean {
   // Must be active and included in budget
-  if (!input.include_in_budget || input.status !== 'active') {
+  if (!input.include_in_plan || input.status !== 'active') {
     return false;
   }
 
@@ -117,4 +117,5 @@ export function canGenerateAutoBudgets(input: {
 
   return monthlyCents !== null && monthlyCents > 0;
 }
+
 

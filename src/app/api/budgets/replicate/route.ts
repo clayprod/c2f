@@ -160,9 +160,14 @@ export async function POST(request: NextRequest) {
         category_id: sourceBudget.category_id,
         year,
         month,
-        amount_planned: sourceBudget.amount_planned || 0,
+        amount_planned_cents: sourceBudget.amount_planned_cents || 0,
         amount_actual: 0,
       };
+      
+      // Copy metadata (e.g., budget_breakdown) if present
+      if (sourceBudget.metadata) {
+        budget.metadata = sourceBudget.metadata;
+      }
       
       // Only add new fields if they exist in the database
       if (hasNewColumns) {
@@ -190,10 +195,10 @@ export async function POST(request: NextRequest) {
           console.error('Upsert error:', upsertError);
           // If error is about missing columns, try without new fields
           const errorMsg = upsertError.message?.toLowerCase() || '';
-          if (errorMsg.includes('source_type') || errorMsg.includes('is_projected') || 
+          if (errorMsg.includes('source_type') || errorMsg.includes('is_projected') || errorMsg.includes('metadata') ||
               errorMsg.includes('column') && errorMsg.includes('does not exist')) {
             const fallbackBudgets = budgetsToUpsert.map((budget: any) => {
-              const { source_type, is_projected, ...rest } = budget;
+              const { source_type, is_projected, metadata, ...rest } = budget;
               return rest;
             });
             const { error: fallbackError } = await supabase
@@ -219,10 +224,10 @@ export async function POST(request: NextRequest) {
           console.error('Insert error:', insertError);
           // If error is about missing columns, try without new fields
           const errorMsg = insertError.message?.toLowerCase() || '';
-          if (errorMsg.includes('source_type') || errorMsg.includes('is_projected') ||
+          if (errorMsg.includes('source_type') || errorMsg.includes('is_projected') || errorMsg.includes('metadata') ||
               errorMsg.includes('column') && errorMsg.includes('does not exist')) {
             const fallbackBudgets = budgetsToUpsert.map((budget: any) => {
-              const { source_type, is_projected, ...rest } = budget;
+              const { source_type, is_projected, metadata, ...rest } = budget;
               return rest;
             });
             const { error: fallbackError } = await supabase

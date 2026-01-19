@@ -58,15 +58,23 @@ const Navbar = () => {
 
           {/* Desktop CTAs */}
           <div className="hidden md:flex items-center gap-4">
-            <Link
-              href="/login"
-              className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium"
-            >
-              Entrar
-            </Link>
-            <Link href="/signup" className="btn-primary text-sm py-2 px-5">
-              Começar grátis
-            </Link>
+            {isLoggedIn ? (
+              <Link href="/app" className="btn-primary text-sm py-2 px-5">
+                Acessar App
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium"
+                >
+                  Entrar
+                </Link>
+                <Link href="/signup" className="btn-primary text-sm py-2 px-5">
+                  Começar grátis
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -93,15 +101,32 @@ const Navbar = () => {
                 </a>
               ))}
               <div className="flex flex-col gap-3 pt-4 border-t border-border/50">
-                <Link
-                  href="/login"
-                  className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium py-2"
-                >
-                  Entrar
-                </Link>
-                <Link href="/signup" className="btn-primary text-sm py-2.5 text-center">
-                  Começar grátis
-                </Link>
+                {isLoggedIn ? (
+                  <Link
+                    href="/app"
+                    className="btn-primary text-sm py-2.5 text-center"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Acessar App
+                  </Link>
+                ) : (
+                  <>
+                    <Link
+                      href="/login"
+                      className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium py-2"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      Entrar
+                    </Link>
+                    <Link
+                      href="/signup"
+                      className="btn-primary text-sm py-2.5 text-center"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      Começar grátis
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </div>

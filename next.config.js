@@ -26,6 +26,20 @@ const nextConfig = {
         aggregateTimeout: 300,
       };
     }
+    // Garantir que react-simple-maps e suas dependências sejam resolvidas corretamente
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+    };
+    // Garantir resolução correta de módulos
+    config.resolve.alias = {
+      ...config.resolve.alias,
+    };
+    // Garantir que módulos sejam encontrados corretamente
+    config.resolve.modules = [
+      ...(config.resolve.modules || []),
+      'node_modules',
+    ];
     return config;
   },
 };

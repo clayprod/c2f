@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserId } from '@/lib/auth';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 import { getOrGenerateDailyTip, getRecentTips } from '@/services/advisor';
 import { createErrorResponse } from '@/lib/errors';
 
@@ -10,10 +11,11 @@ import { createErrorResponse } from '@/lib/errors';
  */
 export async function GET(request: NextRequest) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     // Check for recent tips query param
     const { searchParams } = new URL(request.url);
@@ -22,12 +24,12 @@ export async function GET(request: NextRequest) {
     if (recent) {
       // Return recent tips history
       const limit = parseInt(recent) || 7;
-      const tips = await getRecentTips(userId, Math.min(limit, 30));
+      const tips = await getRecentTips(ownerId, Math.min(limit, 30));
       return NextResponse.json({ tips });
     }
 
     // Get or generate daily tip
-    const result = await getOrGenerateDailyTip(userId);
+    const result = await getOrGenerateDailyTip(ownerId);
 
     if (result.error) {
       return NextResponse.json(

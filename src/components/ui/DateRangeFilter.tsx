@@ -47,9 +47,11 @@ export default function DateRangeFilter({
     if (!start || !end) return 1;
 
     try {
-      const startDay = new Date(start);
-      const endDay = new Date(end);
-      const today = new Date();
+      const [startYear, startMonth, startDayVal] = start.split('-').map(Number);
+      const [endYear, endMonth, endDayVal] = end.split('-').map(Number);
+
+      const startDay = new Date(startYear, startMonth - 1, startDayVal);
+      const endDay = new Date(endYear, endMonth - 1, endDayVal);
 
       for (const months of [1, 3, 6, 12] as const) {
         const { start: expectedStart, end: expectedEnd } = getDateRangeForMonths(months);

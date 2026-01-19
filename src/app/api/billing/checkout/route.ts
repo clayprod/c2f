@@ -6,7 +6,7 @@ import { createErrorResponse } from '@/lib/errors';
 import { z } from 'zod';
 
 const checkoutSchema = z.object({
-  plan: z.enum(['pro', 'business']),
+  plan: z.enum(['pro', 'premium']),
 });
 
 export async function POST(request: NextRequest) {
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     const validated = checkoutSchema.parse(body);
     console.log('[Billing] Plan requested:', validated.plan);
 
-    const priceId = validated.plan === 'pro' ? PLAN_PRICE_IDS.PRO : PLAN_PRICE_IDS.BUSINESS;
+    const priceId = validated.plan === 'pro' ? PLAN_PRICE_IDS.PRO : PLAN_PRICE_IDS.PREMIUM;
     console.log('[Billing] Price ID:', priceId || 'NOT CONFIGURED');
     console.log('[Billing] PLAN_PRICE_IDS:', JSON.stringify(PLAN_PRICE_IDS));
 

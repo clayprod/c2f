@@ -6,6 +6,7 @@ import { createErrorResponse } from '@/lib/errors';
 import { generateAutoBudgetsForDebt } from '@/services/budgets/autoGenerator';
 import { projectionCache } from '@/services/projections/cache';
 import { z } from 'zod';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
 export async function GET(
   request: NextRequest,
@@ -16,6 +17,7 @@ export async function GET(
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { id } = await params;
     const { supabase } = createClientFromRequest(request);
@@ -23,12 +25,24 @@ export async function GET(
       .from('debts')
       .select('*, accounts(*), categories(*), debt_payments(*)')
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .single();
 
     if (error) throw error;
 
-    return NextResponse.json({ data });
+    const { data: planEntries } = await supabase
+      .from('debt_plan_entries')
+      .select('entry_month, amount_cents, description')
+      .eq('user_id', ownerId)
+      .eq('debt_id', id)
+      .order('entry_month', { ascending: true });
+
+    return NextResponse.json({
+      data: {
+        ...data,
+        plan_entries: planEntries || [],
+      }
+    });
   } catch (error) {
     const errorResponse = createErrorResponse(error);
     return NextResponse.json(
@@ -47,6 +61,7 @@ export async function PATCH(
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { id } = await params;
     const body = await request.json();
@@ -63,7 +78,7 @@ export async function PATCH(
       interest_type: z.enum(['simple', 'compound']).default('simple').optional(),
       due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (use YYYY-MM-DD)').optional(),
       start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (use YYYY-MM-DD)').optional(),
-      status: z.enum(['active', 'paid', 'overdue', 'paga', 'negociando', 'negociada']).default('active').optional(),
+      status: z.enum(['pendente', 'negociada']).default('pendente').optional(),
       priority: z.enum(['low', 'medium', 'high', 'urgent']).default('medium').optional(),
       account_id: z.string().uuid('ID da conta inválido').optional(),
       category_id: z.string().uuid('ID da categoria inválido').optional(),
@@ -76,9 +91,13 @@ export async function PATCH(
       installment_day: z.number().int().min(1).max(31).optional(),
       payment_frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).optional(),
       payment_amount_cents: z.number().int().positive('Valor de pagamento deve ser positivo').optional(),
-      include_in_budget: z.boolean().default(false).optional(),
+      include_in_plan: z.boolean().default(true).optional(),
       contribution_frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).optional(),
       is_negotiated: z.boolean().optional(), // Added this field which might be needed for updates
+      plan_entries: z.array(z.object({
+        month: z.string().regex(/^\d{4}-\d{2}$/, 'Mês inválido (use YYYY-MM)'),
+        amount_cents: z.number().int().positive('Valor deve ser positivo'),
+      })).optional(),
     });
 
     const validated = partialDebtSchema.parse(body);
@@ -90,7 +109,7 @@ export async function PATCH(
       .from('debts')
       .select('*')
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .single();
 
     if (!currentDebt) {
@@ -100,27 +119,71 @@ export async function PATCH(
       );
     }
 
+    const hasCustomPlan = !!validated.plan_entries && validated.plan_entries.length > 0;
+    const { plan_entries, ...debtFields } = validated;
+    const updatePayload = {
+      ...debtFields,
+      include_in_plan: hasCustomPlan ? true : validated.include_in_plan,
+      contribution_frequency: hasCustomPlan
+        ? null
+        : (validated.contribution_frequency ?? validated.payment_frequency),
+      ...(validated.status ? { is_negotiated: validated.status === 'negociada' } : {}),
+      updated_at: new Date().toISOString(),
+    };
+
     const { data, error } = await supabase
       .from('debts')
-      .update({
-        ...validated,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .select('*, accounts(*), categories(*)')
       .single();
 
     if (error) throw error;
 
-    // Regenerate budgets if is_negotiated and include_in_budget changed or was enabled
-    const isNegotiatedChanged = validated.is_negotiated !== undefined && validated.is_negotiated !== currentDebt.is_negotiated;
-    const includeInBudgetChanged = validated.include_in_budget !== undefined && validated.include_in_budget !== currentDebt.include_in_budget;
-    const statusChanged = validated.status !== undefined && validated.status !== currentDebt.status;
+    if (validated.plan_entries) {
+      await supabase
+        .from('debt_plan_entries')
+        .delete()
+        .eq('user_id', ownerId)
+        .eq('debt_id', data.id);
 
-    if (data && data.is_negotiated && data.include_in_budget && data.category_id &&
-        (isNegotiatedChanged || includeInBudgetChanged || statusChanged ||
-         (data.status === 'active' || data.status === 'negotiating' || data.status === 'negociando'))) {
+      if (validated.plan_entries.length > 0) {
+        const planEntries = validated.plan_entries.map((entry) => ({
+          user_id: ownerId,
+          debt_id: data.id,
+          category_id: data.category_id || null,
+          entry_month: `${entry.month}-01`,
+          amount_cents: entry.amount_cents,
+          description: `Plano personalizado - ${data.name}`,
+        }));
+
+        const { error: planError } = await supabase
+          .from('debt_plan_entries')
+          .upsert(planEntries, {
+            onConflict: 'debt_id,entry_month',
+          });
+
+        if (planError) {
+          console.error('Error updating debt plan entries:', planError);
+        }
+      }
+    } else if (validated.category_id && validated.category_id !== currentDebt.category_id) {
+      await supabase
+        .from('debt_plan_entries')
+        .update({ category_id: validated.category_id })
+        .eq('user_id', ownerId)
+        .eq('debt_id', data.id);
+    }
+
+    // Regenerate budgets if is_negotiated and include_in_plan changed or was enabled
+    const isNegotiatedChanged = validated.is_negotiated !== undefined && validated.is_negotiated !== currentDebt.is_negotiated;
+    const includeInPlanChanged = validated.include_in_plan !== undefined && validated.include_in_plan !== currentDebt.include_in_plan;
+    const statusChanged = validated.status !== undefined && validated.status !== currentDebt.status;
+    const planEntriesChanged = validated.plan_entries !== undefined;
+
+    if (data && data.is_negotiated && data.include_in_plan && data.category_id &&
+        (isNegotiatedChanged || includeInPlanChanged || statusChanged || planEntriesChanged || data.status === 'negociada')) {
       try {
         const today = new Date();
         const startMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -135,11 +198,11 @@ export async function PATCH(
 
         await generateAutoBudgetsForDebt(
           supabase,
-          userId,
+          ownerId,
           {
             id: data.id,
             category_id: data.category_id,
-            include_in_budget: data.include_in_budget,
+            include_in_plan: data.include_in_plan,
             is_negotiated: data.is_negotiated,
             status: data.status,
             contribution_frequency: data.contribution_frequency,
@@ -158,25 +221,24 @@ export async function PATCH(
           }
         );
 
-        projectionCache.invalidateUser(userId);
+        projectionCache.invalidateUser(ownerId);
       } catch (budgetError) {
         console.error('Error regenerating auto budgets for debt:', budgetError);
         // Don't fail the debt update if budget generation fails
       }
-    } else if (data && (!data.is_negotiated || !data.include_in_budget || 
-               !['active', 'negotiating', 'negociando'].includes(data.status))) {
+    } else if (data && (!data.is_negotiated || !data.include_in_plan || data.status !== 'negociada')) {
       // Remove auto-generated budgets if conditions no longer met
       try {
         await supabase
           .from('budgets')
           .delete()
-          .eq('user_id', userId)
+          .eq('user_id', ownerId)
           .eq('category_id', data.category_id)
           .eq('source_type', 'debt')
           .eq('source_id', data.id)
           .eq('is_auto_generated', true);
         
-        projectionCache.invalidateUser(userId);
+        projectionCache.invalidateUser(ownerId);
       } catch (deleteError) {
         console.error('Error deleting auto budgets for debt:', deleteError);
       }
@@ -207,6 +269,7 @@ export async function DELETE(
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { id } = await params;
     const { supabase } = createClientFromRequest(request);
@@ -214,7 +277,7 @@ export async function DELETE(
       .from('debts')
       .delete()
       .eq('id', id)
-      .eq('user_id', userId);
+      .eq('user_id', ownerId);
 
     if (error) throw error;
 

@@ -1,25 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientFromRequest } from '@/lib/supabase/server';
 import { getUserId } from '@/lib/auth';
 import { assetSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type');
     const status = searchParams.get('status');
 
-    const supabase = await createClient();
+    const { supabase } = createClientFromRequest(request);
     let query = supabase
       .from('assets')
       .select('*, accounts(*), categories(*)')
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .order('created_at', { ascending: false });
 
     if (type) {
@@ -78,15 +80,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const body = await request.json();
     const validated = assetSchema.parse(body);
 
-    const supabase = await createClient();
+    const { supabase } = createClientFromRequest(request);
 
     // Create a category for this asset (using asset name directly)
     const categoryName = validated.name.toUpperCase();
@@ -97,7 +100,7 @@ export async function POST(request: NextRequest) {
       const { data: category, error: categoryError } = await supabase
         .from('categories')
         .insert({
-          user_id: userId,
+          user_id: ownerId,
           name: categoryName,
           type: 'expense', // Default, but can be 'income' depending on asset
           icon: '🏠',
@@ -113,7 +116,7 @@ export async function POST(request: NextRequest) {
           const { data: existingCategory } = await supabase
             .from('categories')
             .select('id')
-            .eq('user_id', userId)
+            .eq('user_id', ownerId)
             .eq('name', categoryName)
             .eq('source_type', 'asset')
             .single();
@@ -133,7 +136,7 @@ export async function POST(request: NextRequest) {
     const { data: asset, error } = await supabase
       .from('assets')
       .insert({
-        user_id: userId,
+        user_id: ownerId,
         name: validated.name,
         type: validated.type,
         description: validated.description || null,
@@ -169,7 +172,7 @@ export async function POST(request: NextRequest) {
       .from('asset_valuations')
       .insert({
         asset_id: asset.id,
-        user_id: userId,
+        user_id: ownerId,
         valuation_date: validated.purchase_date,
         value_cents: validated.purchase_price_cents,
         valuation_type: 'manual',
@@ -191,7 +194,7 @@ export async function POST(request: NextRequest) {
           const { data: defaultAccount } = await supabase
             .from('accounts')
             .select('id')
-            .eq('user_id', userId)
+            .eq('user_id', ownerId)
             .eq('type', 'checking')
             .order('created_at', { ascending: true })
             .limit(1)
@@ -203,7 +206,7 @@ export async function POST(request: NextRequest) {
           const { error: txError } = await supabase
             .from('transactions')
             .insert({
-              user_id: userId,
+              user_id: ownerId,
               account_id: accountId,
               category_id: asset.category_id,
               posted_at: validated.purchase_date,

@@ -4,6 +4,7 @@ import { getUserId } from '@/lib/auth';
 import { creditCardSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
 import { isCreditCardExpired } from '@/lib/utils';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,6 +12,7 @@ export async function GET(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { supabase } = createClientFromRequest(request);
 
@@ -18,7 +20,7 @@ export async function GET(request: NextRequest) {
     const { data: cards, error } = await supabase
       .from('accounts')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .eq('type', 'credit_card')
       .order('created_at', { ascending: false });
 
@@ -40,7 +42,7 @@ export async function GET(request: NextRequest) {
       const { data: bills, error: billsError } = await supabase
         .from('credit_card_bills')
         .select('id, account_id, reference_month, closing_date, due_date, total_cents, minimum_payment_cents, paid_cents, status')
-        .eq('user_id', userId)
+        .eq('user_id', ownerId)
         .in('account_id', cardIds)
         .in('status', ['open', 'closed']);
       
@@ -119,6 +121,7 @@ export async function POST(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const body = await request.json();
     const validated = creditCardSchema.parse(body);
@@ -129,7 +132,7 @@ export async function POST(request: NextRequest) {
     const { count } = await supabase
       .from('accounts')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .eq('type', 'credit_card');
 
     const isDefault = validated.is_default || count === 0;
@@ -139,7 +142,7 @@ export async function POST(request: NextRequest) {
       await supabase
         .from('accounts')
         .update({ is_default: false })
-        .eq('user_id', userId)
+        .eq('user_id', ownerId)
         .eq('type', 'credit_card');
     }
 
@@ -156,7 +159,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('accounts')
       .insert({
-        user_id: userId,
+        user_id: ownerId,
         name: validated.name,
         type: 'credit_card',
         institution: validated.institution || null,
@@ -186,7 +189,7 @@ export async function POST(request: NextRequest) {
     const { data: category, error: categoryError } = await supabase
       .from('categories')
       .insert({
-        user_id: userId,
+        user_id: ownerId,
         name: categoryName,
         type: 'expense',
         icon: '💳',
@@ -239,7 +242,7 @@ export async function POST(request: NextRequest) {
     const { error: billError } = await supabase
       .from('credit_card_bills')
       .insert({
-        user_id: userId,
+        user_id: ownerId,
         account_id: data.id,
         reference_month: referenceMonth.toISOString().split('T')[0],
         closing_date: closingDate.toISOString().split('T')[0],

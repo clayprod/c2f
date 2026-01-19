@@ -29,13 +29,14 @@ export async function buildFinancialContext(userId: string): Promise<FinancialCo
     budgetsResult,
     goalsResult,
     debtsResult,
+    receivablesResult,
     investmentsResult,
     assetsResult,
     creditCardBillsResult,
     planResult,
   ] = await Promise.all([
-    // User profile
-    supabase.from('profiles').select('id, full_name, created_at').eq('id', userId).single(),
+    // User profile (extended with income, location, and demographics)
+    supabase.from('profiles').select('id, full_name, created_at, monthly_income_cents, city, state, birth_date').eq('id', userId).single(),
 
     // Accounts
     supabase.from('accounts').select('*').eq('user_id', userId),
@@ -64,6 +65,9 @@ export async function buildFinancialContext(userId: string): Promise<FinancialCo
     // Debts
     supabase.from('debts').select('*').eq('user_id', userId).neq('status', 'paid'),
 
+    // Receivables
+    supabase.from('receivables').select('*').eq('user_id', userId).in('status', ['pending', 'partial']),
+
     // Investments
     supabase.from('investments').select('*').eq('user_id', userId).eq('status', 'active'),
 
@@ -90,6 +94,7 @@ export async function buildFinancialContext(userId: string): Promise<FinancialCo
   const budgets = budgetsResult.data || [];
   const goals = goalsResult.data || [];
   const debts = debtsResult.data || [];
+  const receivables = receivablesResult.data || [];
   const investments = investmentsResult.data || [];
   const assets = assetsResult.data || [];
   const creditCardBills = creditCardBillsResult.data || [];
@@ -110,8 +115,10 @@ export async function buildFinancialContext(userId: string): Promise<FinancialCo
 
   const totalLiabilities = debts.reduce((sum, d) => sum + (d.remaining_amount_cents || 0) / 100, 0) +
     creditCardBills.reduce((sum, b) => sum + ((b.total_cents || 0) - (b.paid_cents || 0)) / 100, 0);
+  
+  const totalReceivables = receivables.reduce((sum, r) => sum + (r.remaining_amount_cents || 0) / 100, 0);
 
-  const netWorth = totalAssets - totalLiabilities;
+  const netWorth = totalAssets - totalLiabilities + totalReceivables;
 
   // Current month income/expenses
   const currentMonthTxs = transactions.filter(t =>
@@ -131,10 +138,36 @@ export async function buildFinancialContext(userId: string): Promise<FinancialCo
     })
     .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount) || 0), 0);
 
-  const savingsRate = monthlyIncome > 0 ? ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100 : 0;
+  // Calculate average monthly income/expenses from last 6 months (more representative)
+  const allMonthlyData = aggregateByMonth(transactions, categoryMap, sixMonthsAgo);
+  const avgMonthlyIncome = allMonthlyData.length > 0
+    ? allMonthlyData.reduce((sum, m) => sum + m.income, 0) / allMonthlyData.length
+    : 0;
+  const avgMonthlyExpenses = allMonthlyData.length > 0
+    ? allMonthlyData.reduce((sum, m) => sum + m.expenses, 0) / allMonthlyData.length
+    : 0;
+
+  // Use current month data, but fall back to average if current month has no income
+  const effectiveIncome = monthlyIncome > 0 ? monthlyIncome : avgMonthlyIncome;
+  const savingsRate = effectiveIncome > 0 ? ((effectiveIncome - monthlyExpenses) / effectiveIncome) * 100 : 0;
+
+  // Calculate user age from birth_date
+  const userAge = profile?.birth_date
+    ? Math.floor((now.getTime() - new Date(profile.birth_date).getTime()) / (1000 * 60 * 60 * 24 * 365.25))
+    : null;
+
+  // Calculate declared monthly income
+  const monthlyIncomeDeclared = profile?.monthly_income_cents
+    ? (profile.monthly_income_cents / 100)
+    : null;
+
+  // Calculate income variance (positive = earning more than declared)
+  const incomeVariance = monthlyIncomeDeclared !== null && monthlyIncome > 0
+    ? monthlyIncome - monthlyIncomeDeclared
+    : null;
 
   // Generate alerts
-  const alerts = generateAlerts(budgets, goals, debts, creditCardBills, savingsRate, currentYear, currentMonthNum);
+  const alerts = generateAlerts(budgets, goals, debts, receivables, creditCardBills, savingsRate, currentYear, currentMonthNum);
 
   // Build context object
   const context: FinancialContext = {
@@ -143,14 +176,29 @@ export async function buildFinancialContext(userId: string): Promise<FinancialCo
       name: profile?.full_name || null,
       plan: planResult.plan || 'free',
       created_at: profile?.created_at || new Date().toISOString(),
+      // Extended profile fields
+      monthly_income_declared: monthlyIncomeDeclared,
+      location: {
+        city: profile?.city || null,
+        state: profile?.state || null,
+      },
+      age: userAge,
     },
     snapshot: {
       net_worth: Math.round(netWorth * 100) / 100,
       total_assets: Math.round(totalAssets * 100) / 100,
       total_liabilities: Math.round(totalLiabilities * 100) / 100,
+      total_receivables: Math.round(totalReceivables * 100) / 100,
+      // Current month
       monthly_income: Math.round(monthlyIncome * 100) / 100,
       monthly_expenses: Math.round(monthlyExpenses * 100) / 100,
+      // Average from last 6 months (more representative when current month is incomplete)
+      avg_monthly_income: Math.round(avgMonthlyIncome * 100) / 100,
+      avg_monthly_expenses: Math.round(avgMonthlyExpenses * 100) / 100,
+      // User declared
+      monthly_income_declared: monthlyIncomeDeclared !== null ? Math.round(monthlyIncomeDeclared * 100) / 100 : null,
       savings_rate: Math.round(savingsRate * 100) / 100,
+      income_variance: incomeVariance !== null ? Math.round(incomeVariance * 100) / 100 : null,
     },
     accounts: accounts.map(a => ({
       id: a.id,
@@ -170,7 +218,7 @@ export async function buildFinancialContext(userId: string): Promise<FinancialCo
       .filter(b => b.year === currentYear && b.month === currentMonthNum)
       .map(b => {
         const cat = categoryMap.get(b.category_id);
-        const planned = parseFloat(b.amount_planned) || 0;
+        const planned = (b.amount_planned_cents || 0) / 100;
         const actual = parseFloat(b.amount_actual) || 0;
         return {
           id: b.id,
@@ -198,6 +246,9 @@ export async function buildFinancialContext(userId: string): Promise<FinancialCo
         onTrack = monthlyNeeded <= (g.monthly_contribution_cents || 0) / 100 * 1.2; // 20% margin
       }
 
+      // Identify if this is the default emergency fund goal (created automatically based on 6x monthly income)
+      const isEmergencyFund = g.name === 'Reserva de Emergência';
+
       return {
         id: g.id,
         name: g.name,
@@ -207,6 +258,7 @@ export async function buildFinancialContext(userId: string): Promise<FinancialCo
         target_date: g.target_date,
         on_track: onTrack,
         status: g.status,
+        is_emergency_fund: isEmergencyFund,
       };
     }),
     debts: debts.map(d => ({
@@ -217,6 +269,15 @@ export async function buildFinancialContext(userId: string): Promise<FinancialCo
       due_date: d.due_date,
       status: d.status,
       priority: d.priority || 'medium',
+    })),
+    receivables: receivables.map(r => ({
+      id: r.id,
+      name: r.name,
+      remaining: (r.remaining_amount_cents || r.total_amount_cents - (r.received_amount_cents || 0)) / 100,
+      interest_rate: parseFloat(r.interest_rate) || 0,
+      due_date: r.due_date,
+      status: r.status,
+      priority: r.priority || 'medium',
     })),
     investments: investments.map(i => {
       const initial = (i.initial_investment_cents || 0) / 100;
@@ -352,6 +413,7 @@ function generateAlerts(
   budgets: any[],
   goals: any[],
   debts: any[],
+  receivables: any[],
   creditCardBills: any[],
   savingsRate: number,
   currentYear: number,
@@ -362,7 +424,7 @@ function generateAlerts(
   // Budget alerts
   const currentBudgets = budgets.filter(b => b.year === currentYear && b.month === currentMonth);
   for (const budget of currentBudgets) {
-    const planned = parseFloat(budget.amount_planned) || 0;
+    const planned = (budget.amount_planned_cents || 0) / 100;
     const actual = parseFloat(budget.amount_actual) || 0;
     if (planned > 0 && actual > planned) {
       const overPercent = ((actual - planned) / planned) * 100;
@@ -407,6 +469,27 @@ function generateAlerts(
         message: `Dívida "${debt.name}" com juros altos (${debt.interest_rate}%)`,
         severity: parseFloat(debt.interest_rate) > 10 ? 'high' : 'medium',
       });
+    }
+  }
+
+  // Receivable alerts
+  for (const receivable of receivables) {
+    if (receivable.due_date) {
+      const dueDate = new Date(receivable.due_date);
+      const daysUntilDue = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysUntilDue < 0) {
+        alerts.push({
+          type: 'receivable_overdue',
+          message: `Recebível "${receivable.name}" vencido há ${Math.abs(daysUntilDue)} dias`,
+          severity: 'high',
+        });
+      } else if (daysUntilDue <= 7) {
+        alerts.push({
+          type: 'receivable_due_soon',
+          message: `Recebível "${receivable.name}" vence em ${daysUntilDue} dias`,
+          severity: 'medium',
+        });
+      }
     }
   }
 

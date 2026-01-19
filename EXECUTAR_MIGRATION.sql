@@ -140,3 +140,4 @@ WHERE minimum_amount_planned > 0;
 -- ✅ Orçamentos automáticos com base em goals, debts e investments
 -- ✅ Validação de valores mínimos em orçamentos
 -- ============================================================================
+

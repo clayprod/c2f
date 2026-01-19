@@ -19,6 +19,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { useMembers } from '@/hooks/useMembers';
 
 export interface Transaction {
   id?: string;
@@ -28,10 +29,10 @@ export interface Transaction {
   account_id?: string;
   category_id?: string;
   notes?: string;
-  is_recurring?: boolean;
   recurrence_rule?: string;
   installment_number?: number;
   installment_total?: number;
+  assigned_to?: string | null;
 }
 
 interface Account {
@@ -66,24 +67,6 @@ const formSchema = z.object({
 
 type TransactionFormData = z.infer<typeof formSchema>;
 
-const RECURRENCE_OPTIONS = [
-  { value: '', label: 'Selecione a frequência' },
-  { value: 'FREQ=DAILY;INTERVAL=1', label: 'Diária' },
-  { value: 'FREQ=WEEKLY;INTERVAL=1', label: 'Semanal' },
-  { value: 'FREQ=MONTHLY;INTERVAL=1', label: 'Mensal' },
-  { value: 'FREQ=YEARLY;INTERVAL=1', label: 'Anual' },
-  { value: 'custom', label: 'Personalizada' },
-];
-
-const CONTRIBUTION_FREQUENCY_OPTIONS = [
-  { value: '', label: 'Selecione a frequência' },
-  { value: 'daily', label: 'Diário' },
-  { value: 'weekly', label: 'Semanal' },
-  { value: 'biweekly', label: 'Quinzenal' },
-  { value: 'monthly', label: 'Mensal' },
-  { value: 'quarterly', label: 'Trimestral' },
-  { value: 'yearly', label: 'Anual' },
-];
 
 export default function TransactionForm({
   open,
@@ -96,13 +79,11 @@ export default function TransactionForm({
 }: TransactionFormProps) {
   const [loading, setLoading] = useState(false);
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense');
-  const [isRecurring, setIsRecurring] = useState(false);
-  const [recurrenceType, setRecurrenceType] = useState('');
-  const [customRecurrence, setCustomRecurrence] = useState('');
-  const [contributionFrequency, setContributionFrequency] = useState<string>('');
   const [isInstallment, setIsInstallment] = useState(false);
   const [installmentNumber, setInstallmentNumber] = useState('1');
   const [installmentTotal, setInstallmentTotal] = useState('12');
+  const [assignedTo, setAssignedTo] = useState<string>('');
+  const { members, loading: loadingMembers } = useMembers();
 
   const {
     register,
@@ -148,20 +129,10 @@ export default function TransactionForm({
     if (transaction) {
       const amount = typeof transaction.amount === 'number' ? transaction.amount : parseFloat(String(transaction.amount));
       setTransactionType(amount >= 0 ? 'income' : 'expense');
-      setIsRecurring(transaction.is_recurring || false);
       setIsInstallment(!!(transaction.installment_number && transaction.installment_total));
       setInstallmentNumber(String(transaction.installment_number || 1));
       setInstallmentTotal(String(transaction.installment_total || 1));
-
-      if (transaction.recurrence_rule) {
-        const matchingOption = RECURRENCE_OPTIONS.find(opt => opt.value === transaction.recurrence_rule);
-        if (matchingOption) {
-          setRecurrenceType(transaction.recurrence_rule);
-        } else {
-          setRecurrenceType('custom');
-          setCustomRecurrence(transaction.recurrence_rule);
-        }
-      }
+      setAssignedTo(transaction.assigned_to || '');
 
       reset({
         account_id: transaction.account_id,
@@ -176,12 +147,10 @@ export default function TransactionForm({
       });
     } else {
       setTransactionType('expense');
-      setIsRecurring(false);
-      setRecurrenceType('');
-      setCustomRecurrence('');
       setIsInstallment(false);
       setInstallmentNumber('1');
       setInstallmentTotal('1');
+      setAssignedTo(members.length > 0 ? members[0].id : '');
       reset({
         account_id: '',
         category_id: '',
@@ -192,7 +161,7 @@ export default function TransactionForm({
         notes: '',
       });
     }
-  }, [transaction, reset, open]);
+  }, [transaction, reset, open, members]);
 
   const [showFutureDateDialog, setShowFutureDateDialog] = useState(false);
   const [pendingSubmitData, setPendingSubmitData] = useState<TransactionFormData | null>(null);
@@ -222,21 +191,15 @@ export default function TransactionForm({
       const amountInReais = parseFloat(data.amount.replace(/[^\d,.-]/g, '').replace(',', '.'));
       const amountCents = Math.round(Math.abs(amountInReais) * 100);
 
-      // Determine recurrence rule
-      let recurrence_rule: string | undefined;
-      if (isRecurring) {
-        recurrence_rule = recurrenceType === 'custom' ? customRecurrence : recurrenceType;
-      }
-
       await onSubmit({
         ...data,
         amount_cents: amountCents,
         type: transactionType,
-        is_recurring: isRecurring,
-        recurrence_rule: recurrence_rule,
-        contribution_frequency: isRecurring && contributionFrequency ? contributionFrequency : undefined,
+        recurrence_rule: undefined,
+        contribution_frequency: undefined,
         installment_number: isInstallment ? parseInt(installmentNumber) : undefined,
         installment_total: isInstallment ? parseInt(installmentTotal) : undefined,
+        assigned_to: assignedTo || undefined,
       } as any);
 
       onOpenChange(false);
@@ -341,16 +304,17 @@ export default function TransactionForm({
               <Label htmlFor="category_id">Categoria</Label>
               <Select
                 onValueChange={(value) => {
-                  const event = { target: { name: 'category_id', value } } as any;
+                  const actualValue = value === 'no-category' ? '' : value;
+                  const event = { target: { name: 'category_id', value: actualValue } } as any;
                   register('category_id').onChange(event);
                 }}
-                value={watch('category_id')}
+                value={watch('category_id') || 'no-category'}
               >
                 <SelectTrigger id="category_id" className="w-full">
                   <SelectValue placeholder="Sem categoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sem categoria</SelectItem>
+                  <SelectItem value="no-category">Sem categoria</SelectItem>
                   {generalIncome.length > 0 && (
                     <SelectItem value="group-income" disabled>
                       ────────────── Receitas ──────────────
@@ -482,6 +446,45 @@ export default function TransactionForm({
             />
           </div>
 
+          {/* Responsible Person */}
+          {members.length > 1 && (
+            <div>
+              <Label htmlFor="assigned_to">Responsável</Label>
+              <Select
+                value={assignedTo}
+                onValueChange={setAssignedTo}
+                disabled={loadingMembers}
+              >
+                <SelectTrigger id="assigned_to" className="w-full">
+                  <SelectValue placeholder="Selecione o responsável" />
+                </SelectTrigger>
+                <SelectContent>
+                  {members.map((member) => (
+                    <SelectItem key={member.id} value={member.id}>
+                      <div className="flex items-center gap-2">
+                        {member.avatarUrl ? (
+                          <img
+                            src={member.avatarUrl}
+                            alt={member.fullName || 'Avatar'}
+                            className="w-5 h-5 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">
+                            {(member.fullName || member.email)[0].toUpperCase()}
+                          </div>
+                        )}
+                        <span>{member.fullName || member.email}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Quem é responsável por esta transação?
+              </p>
+            </div>
+          )}
+
           {/* Installment Section */}
           <div className="border-t border-border pt-4">
             <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
@@ -565,80 +568,6 @@ export default function TransactionForm({
             )}
           </div>
 
-          {/* Recurrence Section */}
-          <div className="border-t border-border pt-4">
-            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-              <Checkbox
-                id="isRecurring"
-                checked={isRecurring}
-                onCheckedChange={(checked) => setIsRecurring(checked === true)}
-                className="h-5 w-5"
-              />
-              <label htmlFor="isRecurring" className="flex items-center gap-2 text-sm font-medium cursor-pointer flex-1">
-                <i className='bx bx-repeat text-lg'></i>
-                <span>Transação Recorrente</span>
-              </label>
-            </div>
-
-            {isRecurring && (
-              <div className="space-y-3 pl-6 border-l-2 border-primary/30">
-                <div>
-                  <Label htmlFor="contribution_frequency">Frequência para Orçamento *</Label>
-                  <Select
-                    value={contributionFrequency}
-                    onValueChange={setContributionFrequency}
-                    required={isRecurring}
-                  >
-                    <SelectTrigger id="contribution_frequency" className="w-full">
-                      <SelectValue placeholder="Selecione a frequência" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CONTRIBUTION_FREQUENCY_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Esta frequência será usada para incluir automaticamente nos orçamentos
-                  </p>
-                </div>
-                <div>
-                  <Label>Frequência</Label>
-                  <Select
-                    value={recurrenceType}
-                    onValueChange={setRecurrenceType}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Selecione a frequência" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {RECURRENCE_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {recurrenceType === 'custom' && (
-                  <div>
-                    <Label>Regra Personalizada (RRULE)</Label>
-                    <Input
-                      value={customRecurrence}
-                      onChange={(e) => setCustomRecurrence(e.target.value)}
-                      placeholder="Ex: FREQ=MONTHLY;INTERVAL=2"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Formato iCalendar RRULE
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
 
           <DialogFooter>
             <Button

@@ -107,7 +107,7 @@ export async function getAPIConfig(userId?: string): Promise<{
   if (userId) {
     try {
       const plan = await getUserPlan(userId);
-      useGlobalKeys = plan.plan === 'pro' || plan.plan === 'business';
+      useGlobalKeys = plan.plan === 'pro' || plan.plan === 'premium';
     } catch (error) {
       console.error('Error checking user plan:', error);
     }

@@ -25,7 +25,7 @@ export interface AdvisorAction {
 }
 
 export interface AdvisorCitation {
-  type: 'transaction' | 'account' | 'budget' | 'category' | 'goal' | 'debt' | 'investment';
+  type: 'transaction' | 'account' | 'budget' | 'category' | 'goal' | 'debt' | 'receivable' | 'investment';
   id: string;
   reference: string;
 }
@@ -55,14 +55,30 @@ export interface FinancialContext {
     name: string | null;
     plan: string;
     created_at: string;
+    // Extended profile fields
+    monthly_income_declared: number | null;
+    location: {
+      city: string | null;
+      state: string | null;
+    };
+    age: number | null;
   };
   snapshot: {
     net_worth: number;
     total_assets: number;
     total_liabilities: number;
+    total_receivables: number;
+    // Current month values
     monthly_income: number;
     monthly_expenses: number;
+    // Average from last 6 months (more representative)
+    avg_monthly_income: number;
+    avg_monthly_expenses: number;
+    // User declared income
+    monthly_income_declared: number | null;
     savings_rate: number;
+    // Difference between declared and calculated income (positive = earning more than declared)
+    income_variance: number | null;
   };
   accounts: Array<{
     id: string;
@@ -105,8 +121,19 @@ export interface FinancialContext {
     target_date: string | null;
     on_track: boolean;
     status: string;
+    // True if this is the default emergency fund goal (6x monthly income)
+    is_emergency_fund: boolean;
   }>;
   debts: Array<{
+    id: string;
+    name: string;
+    remaining: number;
+    interest_rate: number;
+    due_date: string | null;
+    status: string;
+    priority: string;
+  }>;
+  receivables: Array<{
     id: string;
     name: string;
     remaining: number;

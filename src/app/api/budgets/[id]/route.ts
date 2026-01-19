@@ -5,6 +5,35 @@ import { budgetSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
 import { projectionCache } from '@/services/projections/cache';
 import { calculateMinimumBudget, formatSourcesForError } from '@/services/budgets/minimumCalculator';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
+
+type BudgetBreakdownItemInput = { id?: string; label: string; amount_cents: number };
+
+function getExistingBreakdown(existingBudget: any): { enabled: boolean; items: any[] } | null {
+  const meta = existingBudget?.metadata;
+  const breakdown = meta?.budget_breakdown;
+  if (!breakdown || typeof breakdown !== 'object') return null;
+  const enabled = !!breakdown.enabled;
+  const items = Array.isArray(breakdown.items) ? breakdown.items : [];
+  return { enabled, items };
+}
+
+function buildBudgetBreakdownMetadata(items: BudgetBreakdownItemInput[]) {
+  return {
+    budget_breakdown: {
+      enabled: true,
+      items: items.map((it) => ({
+        id: it.id,
+        label: it.label,
+        amount_cents: Math.round(it.amount_cents),
+      })),
+    },
+  };
+}
+
+function sumBreakdownItemsCents(items: BudgetBreakdownItemInput[]) {
+  return items.reduce((sum, it) => sum + Math.round(it.amount_cents || 0), 0);
+}
 
 export async function PATCH(
   request: NextRequest,
@@ -15,14 +44,15 @@ export async function PATCH(
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const body = await request.json();
     const budgetId = params.id;
 
-    // Validate input - only allow updating amount_planned for now
-    if (body.amount_planned === undefined && body.limit_cents === undefined) {
+    // Validate input - allow updating planned amount OR breakdown_items
+    if (body.limit_cents === undefined && body.amount_planned_cents === undefined && !Object.prototype.hasOwnProperty.call(body, 'breakdown_items')) {
       return NextResponse.json(
-        { error: 'amount_planned ou limit_cents é obrigatório' },
+        { error: 'amount_planned_cents ou limit_cents é obrigatório' },
         { status: 400 }
       );
     }
@@ -34,7 +64,7 @@ export async function PATCH(
       .from('budgets')
       .select('*, categories(source_type)')
       .eq('id', budgetId)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .single();
 
     if (fetchError || !existingBudget) {
@@ -43,6 +73,9 @@ export async function PATCH(
         { status: 404 }
       );
     }
+
+    const existingBreakdown = getExistingBreakdown(existingBudget);
+    const hasExistingBreakdown = !!(existingBreakdown?.enabled && existingBreakdown.items.length > 0);
 
     // Block editing auto-generated budgets (except for goal budgets which can be adjusted via special endpoint)
     if (existingBudget.is_auto_generated && existingBudget.source_type !== 'goal') {
@@ -84,23 +117,43 @@ export async function PATCH(
       );
     }
 
-    // Calculate amount_planned from limit_cents if provided
-    let amount_planned = body.amount_planned;
-    if (body.limit_cents !== undefined) {
-      const limitCents = Math.round(body.limit_cents);
-      if (limitCents <= 0) {
-        return NextResponse.json(
-          { error: 'Limite deve ser maior que zero' },
-          { status: 400 }
-        );
-      }
-      amount_planned = limitCents / 100;
+    const breakdownItemsProvided = Object.prototype.hasOwnProperty.call(body, 'breakdown_items');
+    const breakdownItems = (Array.isArray(body.breakdown_items) ? body.breakdown_items : []) as BudgetBreakdownItemInput[];
+    const wantsBreakdownEnabled = breakdownItemsProvided && breakdownItems.length > 0;
+    const wantsBreakdownCleared = breakdownItemsProvided && breakdownItems.length === 0;
+
+    // Enforce force_subs: if there are existing subs, user must edit via breakdown_items (or explicitly clear them)
+    if (hasExistingBreakdown && !breakdownItemsProvided) {
+      return NextResponse.json(
+        { error: 'Este orçamento possui sub-itens. Para alterar, edite os sub-itens.' },
+        { status: 400 }
+      );
     }
+
+    // Determine amount_planned_cents
+    let amountPlannedCents: number | undefined;
+    if (wantsBreakdownEnabled) {
+      amountPlannedCents = sumBreakdownItemsCents(breakdownItems);
+    } else {
+      // If clearing breakdown, fall back to direct amount
+      amountPlannedCents = body.amount_planned_cents;
+      if (body.limit_cents !== undefined) {
+        amountPlannedCents = Math.round(body.limit_cents);
+      }
+    }
+
+    if (amountPlannedCents === undefined || Math.round(amountPlannedCents) <= 0) {
+      return NextResponse.json(
+        { error: 'Limite deve ser maior que zero' },
+        { status: 400 }
+      );
+    }
+    amountPlannedCents = Math.round(amountPlannedCents);
 
     // Calculate minimum amount based on automatic contributions
     const { minimum_cents, sources } = await calculateMinimumBudget(
       supabase,
-      userId,
+      ownerId,
       existingBudget.category_id,
       existingBudget.year,
       existingBudget.month
@@ -109,7 +162,7 @@ export async function PATCH(
     const minimumAmount = minimum_cents / 100; // Convert to reais
 
     // Validate that new amount is not below minimum
-    if (amount_planned < minimumAmount) {
+    if ((amountPlannedCents ?? 0) < minimum_cents) {
       const sourcesText = formatSourcesForError(sources);
       return NextResponse.json(
         { 
@@ -128,13 +181,21 @@ export async function PATCH(
 
     // Prepare update data - start with required field
     const updateData: any = {
-      amount_planned: amount_planned,
+      amount_planned_cents: amountPlannedCents,
     };
 
     // Try to add new fields (will be ignored if columns don't exist)
     // Check if columns exist by trying to update with them first
-    updateData.minimum_amount_planned = minimumAmount;
+    updateData.minimum_amount_planned_cents = minimum_cents;
     updateData.auto_contributions_cents = minimum_cents;
+
+    // Update breakdown metadata if provided
+    if (wantsBreakdownEnabled) {
+      updateData.metadata = buildBudgetBreakdownMetadata(breakdownItems);
+    } else if (wantsBreakdownCleared) {
+      // Clear breakdown by removing metadata entry (set to empty object)
+      updateData.metadata = {};
+    }
 
     // Only update optional fields if provided
     if (body.source_type !== undefined) {
@@ -144,39 +205,35 @@ export async function PATCH(
       updateData.is_projected = body.is_projected;
     }
 
-    // Update the budget - try with new fields first
-    let { data, error } = await supabase
+    let data: any = null;
+    let error: any = null;
+
+    // Try update with metadata; fallback if column doesn't exist
+    const initialUpdate = await supabase
       .from('budgets')
       .update(updateData)
       .eq('id', budgetId)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .select('*, categories(*)')
       .single();
 
-    // If error is about missing columns, try without them
-    if (error && (error.message?.includes('auto_contributions_cents') || error.message?.includes('minimum_amount_planned') || error.code === '42703')) {
-      console.log('New budget columns not found, updating without them');
-      const fallbackData: any = {
-        amount_planned: amount_planned,
-      };
-      
-      if (body.source_type !== undefined) {
-        fallbackData.source_type = body.source_type;
-      }
-      if (body.is_projected !== undefined) {
-        fallbackData.is_projected = body.is_projected;
-      }
+    data = initialUpdate.data;
+    error = initialUpdate.error;
 
-      const fallbackResult = await supabase
-        .from('budgets')
-        .update(fallbackData)
-        .eq('id', budgetId)
-        .eq('user_id', userId)
-        .select('*, categories(*)')
-        .single();
-
-      data = fallbackResult.data;
-      error = fallbackResult.error;
+    if (error) {
+      const errorMsg = error.message?.toLowerCase?.() || '';
+      if (errorMsg.includes('metadata') && errorMsg.includes('column') && errorMsg.includes('does not exist')) {
+        const { metadata, ...fallback } = updateData;
+        const fallbackUpdate = await supabase
+          .from('budgets')
+          .update(fallback)
+          .eq('id', budgetId)
+          .eq('user_id', ownerId)
+          .select('*, categories(*)')
+          .single();
+        data = fallbackUpdate.data;
+        error = fallbackUpdate.error;
+      }
     }
 
     if (error) {
@@ -196,12 +253,12 @@ export async function PATCH(
     }
 
     // Clear cache for this user
-    projectionCache.invalidateUser(userId);
+    projectionCache.invalidateUser(ownerId);
 
     // Transform response
     const transformedData = {
       ...data,
-      limit_cents: Math.round((data.amount_planned || 0) * 100),
+      limit_cents: data.amount_planned_cents || 0,
       amount_actual_cents: Math.round((data.amount_actual || 0) * 100),
     };
 
@@ -225,6 +282,7 @@ export async function DELETE(
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const budgetId = params.id;
     const { supabase } = createClientFromRequest(request);
@@ -234,7 +292,7 @@ export async function DELETE(
       .from('budgets')
       .select('id, is_auto_generated, source_type, categories(source_type)')
       .eq('id', budgetId)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .single();
 
     if (fetchError || !existingBudget) {
@@ -270,7 +328,7 @@ export async function DELETE(
       .from('budgets')
       .delete()
       .eq('id', budgetId)
-      .eq('user_id', userId);
+      .eq('user_id', ownerId);
 
     if (deleteError) {
       console.error('Database error deleting budget:', deleteError);
@@ -281,7 +339,7 @@ export async function DELETE(
     }
 
     // Clear cache for this user
-    projectionCache.invalidateUser(userId);
+    projectionCache.invalidateUser(ownerId);
 
     return NextResponse.json({ message: 'Orçamento excluído com sucesso' }, { status: 200 });
   } catch (error: any) {

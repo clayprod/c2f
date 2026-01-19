@@ -251,20 +251,17 @@ export default function CreditCardsPage() {
           lastHistoricalTotal = totalToPay / 100;
           lastHistoricalPaid = totalPaid / 100;
         } else {
-          // Calcular projeção baseada em transações recorrentes e parceladas
+          // Calcular projeção baseada em transações parceladas futuras
           for (const card of cardsList) {
             try {
-              // Buscar transações recorrentes e parceladas futuras
+              // Buscar transações parceladas futuras
               const txRes = await fetch(`/api/transactions?account_id=${card.id}&limit=500`);
               const txData = await txRes.json();
               const transactions = txData.data || [];
 
-              // Filtrar transações recorrentes e parceladas que se aplicam a este mês
+              // Filtrar transações parceladas que se aplicam a este mês
               transactions.forEach((tx: any) => {
-                if (tx.is_recurring) {
-                  // Transações recorrentes - incluir no mês futuro
-                  projected += Math.abs(Math.round((tx.amount || 0) * 100));
-                } else if (tx.installment_number && tx.installment_total && tx.installment_number < tx.installment_total) {
+                if (tx.installment_number && tx.installment_total && tx.installment_number < tx.installment_total) {
                   // Transações parceladas - calcular se esta parcela cai neste mês
                   const txDate = new Date(tx.posted_at);
                   const monthsDiff = (monthDate.getFullYear() - txDate.getFullYear()) * 12 + 
@@ -717,7 +714,7 @@ export default function CreditCardsPage() {
                     <p className="font-semibold">Sobre esta seção:</p>
                     <ul className="space-y-1.5 text-xs list-disc list-inside">
                       <li><strong>Gráfico de Linha:</strong> Mostra histórico dos últimos meses e projeção dos próximos meses.</li>
-                      <li>As projeções são baseadas em transações recorrentes e parceladas futuras.</li>
+                      <li>As projeções são baseadas em transações parceladas futuras.</li>
                       <li>A linha tracejada representa valores projetados.</li>
                     </ul>
                   </div>

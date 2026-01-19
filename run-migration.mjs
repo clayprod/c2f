@@ -182,6 +182,144 @@ async function runMigration() {
     }
     console.log('Comments added');
 
+    // ============================================
+    // MIGRATION 041: Add WhatsApp Evolution API settings
+    // ============================================
+    console.log('\n=== MIGRATION 041: Adding WhatsApp Evolution API settings ===');
+
+    const whatsappSettingsQueries = [
+      `ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS evolution_api_url TEXT;`,
+      `ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS evolution_api_key TEXT;`,
+      `ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS evolution_instance_name TEXT;`,
+      `ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS evolution_webhook_secret TEXT;`,
+      `ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS n8n_api_key TEXT;`,
+      `ALTER TABLE global_settings ADD COLUMN IF NOT EXISTS whatsapp_enabled BOOLEAN DEFAULT FALSE;`,
+    ];
+
+    for (const query of whatsappSettingsQueries) {
+      console.log('Executing:', query.substring(0, 60) + '...');
+      await client.query(query);
+      console.log('OK');
+    }
+
+    // ============================================
+    // MIGRATION 042: Create whatsapp_verifications table
+    // ============================================
+    console.log('\n=== MIGRATION 042: Creating whatsapp_verifications table ===');
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS public.whatsapp_verifications (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+        phone_number TEXT NOT NULL,
+        phone_number_normalized TEXT NOT NULL,
+        verification_code TEXT,
+        verification_code_expires_at TIMESTAMP WITH TIME ZONE,
+        verified_at TIMESTAMP WITH TIME ZONE,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'verified', 'expired', 'revoked')),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        UNIQUE(user_id),
+        UNIQUE(phone_number_normalized)
+      );
+    `);
+    console.log('Table whatsapp_verifications created');
+
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_whatsapp_verifications_user_id ON public.whatsapp_verifications(user_id);`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_whatsapp_verifications_phone ON public.whatsapp_verifications(phone_number_normalized);`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_whatsapp_verifications_status ON public.whatsapp_verifications(status);`);
+    console.log('Indexes created');
+
+    await client.query(`ALTER TABLE public.whatsapp_verifications ENABLE ROW LEVEL SECURITY;`);
+    console.log('RLS enabled');
+
+    // RLS Policies for whatsapp_verifications
+    const verificationPolicies = [
+      { name: 'Users can view own verification', sql: `CREATE POLICY "Users can view own verification" ON public.whatsapp_verifications FOR SELECT USING (user_id = auth.uid());` },
+      { name: 'Users can insert own verification', sql: `CREATE POLICY "Users can insert own verification" ON public.whatsapp_verifications FOR INSERT WITH CHECK (user_id = auth.uid());` },
+      { name: 'Users can update own verification', sql: `CREATE POLICY "Users can update own verification" ON public.whatsapp_verifications FOR UPDATE USING (user_id = auth.uid());` },
+      { name: 'Users can delete own verification', sql: `CREATE POLICY "Users can delete own verification" ON public.whatsapp_verifications FOR DELETE USING (user_id = auth.uid());` },
+      { name: 'Admins can view all verifications', sql: `CREATE POLICY "Admins can view all verifications" ON public.whatsapp_verifications FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin'));` },
+    ];
+
+    for (const policy of verificationPolicies) {
+      try {
+        await client.query(`DROP POLICY IF EXISTS "${policy.name}" ON public.whatsapp_verifications;`);
+        await client.query(policy.sql);
+        console.log(`Policy "${policy.name}" created`);
+      } catch (e) {
+        console.log(`Policy "${policy.name}": ${e.message}`);
+      }
+    }
+
+    // Trigger for whatsapp_verifications
+    await client.query(`
+      CREATE OR REPLACE FUNCTION update_whatsapp_verifications_updated_at()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.updated_at = NOW();
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+    `);
+    await client.query(`DROP TRIGGER IF EXISTS update_whatsapp_verifications_updated_at ON public.whatsapp_verifications;`);
+    await client.query(`
+      CREATE TRIGGER update_whatsapp_verifications_updated_at
+        BEFORE UPDATE ON public.whatsapp_verifications
+        FOR EACH ROW
+        EXECUTE FUNCTION update_whatsapp_verifications_updated_at();
+    `);
+    console.log('Trigger created');
+
+    // ============================================
+    // MIGRATION 043: Create whatsapp_messages_log table
+    // ============================================
+    console.log('\n=== MIGRATION 043: Creating whatsapp_messages_log table ===');
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS public.whatsapp_messages_log (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+        phone_number TEXT NOT NULL,
+        direction TEXT NOT NULL CHECK (direction IN ('incoming', 'outgoing')),
+        message_type TEXT NOT NULL CHECK (message_type IN ('text', 'audio', 'image', 'document', 'verification')),
+        content_summary TEXT,
+        transaction_id UUID REFERENCES public.transactions(id) ON DELETE SET NULL,
+        action_type TEXT CHECK (action_type IN ('create', 'update', 'delete', 'query', 'clarify', 'verification')),
+        processed_at TIMESTAMP WITH TIME ZONE,
+        status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processed', 'failed', 'ignored')),
+        error_message TEXT,
+        metadata JSONB DEFAULT '{}'::jsonb,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+    console.log('Table whatsapp_messages_log created');
+
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_user_id ON public.whatsapp_messages_log(user_id);`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_phone ON public.whatsapp_messages_log(phone_number);`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_created_at ON public.whatsapp_messages_log(created_at DESC);`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_status ON public.whatsapp_messages_log(status);`);
+    console.log('Indexes created');
+
+    await client.query(`ALTER TABLE public.whatsapp_messages_log ENABLE ROW LEVEL SECURITY;`);
+    console.log('RLS enabled');
+
+    // RLS Policies for whatsapp_messages_log
+    const logPolicies = [
+      { name: 'Users can view own message logs', sql: `CREATE POLICY "Users can view own message logs" ON public.whatsapp_messages_log FOR SELECT USING (user_id = auth.uid());` },
+      { name: 'Admins can view all message logs', sql: `CREATE POLICY "Admins can view all message logs" ON public.whatsapp_messages_log FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin'));` },
+    ];
+
+    for (const policy of logPolicies) {
+      try {
+        await client.query(`DROP POLICY IF EXISTS "${policy.name}" ON public.whatsapp_messages_log;`);
+        await client.query(policy.sql);
+        console.log(`Policy "${policy.name}" created`);
+      } catch (e) {
+        console.log(`Policy "${policy.name}": ${e.message}`);
+      }
+    }
+
     console.log('\n=== All migrations completed successfully! ===');
 
     // Verify
@@ -193,6 +331,14 @@ async function runMigration() {
     `);
     console.log('\nGlobal settings columns:');
     verify.rows.forEach(r => console.log(`  - ${r.column_name}: ${r.data_type}`));
+
+    // Verify new tables
+    const whatsappTables = await client.query(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name LIKE 'whatsapp%';
+    `);
+    console.log('\nWhatsApp tables:');
+    whatsappTables.rows.forEach(r => console.log(`  - ${r.table_name}`));
 
   } catch (error) {
     console.error('Migration failed:', error.message);

@@ -13,11 +13,11 @@ export async function GET(request: NextRequest) {
     // List products
     const productsResponse = await stripe.products.list({ limit: 100 });
     const products = productsResponse.data;
-    
+
     // List all prices
     const pricesResponse = await stripe.prices.list({ limit: 100 });
     const allPrices = pricesResponse.data;
-    
+
     // Combine products with their prices
     const productsWithPrices = products.map((product) => {
       const productPrices = allPrices.filter((price) => price.product === product.id);
@@ -66,13 +66,15 @@ export async function POST(request: NextRequest) {
       currency: currency.toLowerCase(),
     });
 
-    return NextResponse.json({ price: {
-      id: newPrice.id,
-      product: newPrice.product as string,
-      unit_amount: newPrice.unit_amount,
-      currency: newPrice.currency,
-      active: newPrice.active,
-    } });
+    return NextResponse.json({
+      price: {
+        id: newPrice.id,
+        product: newPrice.product as string,
+        unit_amount: newPrice.unit_amount,
+        currency: newPrice.currency,
+        active: newPrice.active,
+      }
+    });
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || 'Failed to create price' },
@@ -107,11 +109,11 @@ export async function PUT(request: NextRequest) {
     // Update global settings if this is a plan price
     if (plan_type === 'pro') {
       await updateGlobalSettings({ stripe_price_id_pro: newPrice.id });
-    } else if (plan_type === 'business') {
+    } else if (plan_type === 'premium' || plan_type === 'business') {
       await updateGlobalSettings({ stripe_price_id_business: newPrice.id });
     }
-    
-    return NextResponse.json({ 
+
+    return NextResponse.json({
       new_price: {
         id: newPrice.id,
         product: newPrice.product as string,

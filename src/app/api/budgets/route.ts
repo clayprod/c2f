@@ -6,10 +6,30 @@ import { createErrorResponse } from '@/lib/errors';
 import { generateProjections } from '@/services/projections/generator';
 import { projectionCache } from '@/services/projections/cache';
 import { calculateMinimumBudget } from '@/services/budgets/minimumCalculator';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
 const MAX_PROJECTION_YEARS = 10;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 const RATE_LIMIT_MAX_REQUESTS = 10;
+
+type BudgetBreakdownItemInput = { id?: string; label: string; amount_cents: number };
+
+function buildBudgetBreakdownMetadata(items: BudgetBreakdownItemInput[]) {
+  return {
+    budget_breakdown: {
+      enabled: true,
+      items: items.map((it) => ({
+        id: it.id,
+        label: it.label,
+        amount_cents: Math.round(it.amount_cents),
+      })),
+    },
+  };
+}
+
+function sumBreakdownItemsCents(items: BudgetBreakdownItemInput[]) {
+  return items.reduce((sum, it) => sum + Math.round(it.amount_cents || 0), 0);
+}
 
 // Simple rate limiting (in production, use Redis or similar)
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -37,6 +57,7 @@ export async function GET(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { searchParams } = new URL(request.url);
     const month = searchParams.get('month');
@@ -49,7 +70,7 @@ export async function GET(request: NextRequest) {
       let query = supabase
         .from('budgets')
         .select('*, categories(*)')
-        .eq('user_id', userId)
+        .eq('user_id', ownerId)
         .order('created_at', { ascending: false });
 
       if (month) {
@@ -69,7 +90,7 @@ export async function GET(request: NextRequest) {
           // Calculate start and end dates for the budget month
           const startDate = new Date(budget.year, budget.month - 1, 1);
           const endDate = new Date(budget.year, budget.month, 0); // Last day of the month
-          
+
           const startDateStr = startDate.toISOString().split('T')[0];
           const endDateStr = endDate.toISOString().split('T')[0];
 
@@ -77,7 +98,7 @@ export async function GET(request: NextRequest) {
           const { data: transactions, error: txError } = await supabase
             .from('transactions')
             .select('amount')
-            .eq('user_id', userId)
+            .eq('user_id', ownerId)
             .eq('category_id', budget.category_id)
             .gte('posted_at', startDateStr)
             .lte('posted_at', endDateStr);
@@ -87,7 +108,7 @@ export async function GET(request: NextRequest) {
             // Continue with stored amount_actual if query fails
             return {
               ...budget,
-              limit_cents: Math.round((budget.amount_planned || 0) * 100),
+              limit_cents: budget.amount_planned_cents || 0,
               amount_actual_cents: Math.round((budget.amount_actual || 0) * 100),
             };
           }
@@ -113,7 +134,7 @@ export async function GET(request: NextRequest) {
 
           return {
             ...budget,
-            limit_cents: Math.round((budget.amount_planned || 0) * 100),
+            limit_cents: budget.amount_planned_cents || 0,
             amount_actual_cents: Math.round(actualAmount * 100), // Convert to cents
             amount_actual: actualAmount, // Also include in reais for consistency
           };
@@ -134,7 +155,7 @@ export async function GET(request: NextRequest) {
     const validated = budgetQuerySchema.parse(queryParams);
 
     // Rate limiting
-    if (!checkRateLimit(userId)) {
+    if (!checkRateLimit(ownerId)) {
       return NextResponse.json(
         { error: 'Muitas requisições. Tente novamente em alguns instantes.' },
         { status: 429 }
@@ -158,14 +179,14 @@ export async function GET(request: NextRequest) {
       // Default: 5 months back, 6 months forward
       const projectionYears = validated.projection_years || 0.5;
       const monthsForward = Math.min(Math.round(projectionYears * 12), MAX_PROJECTION_YEARS * 12);
-      
+
       startDate = new Date(currentYear, currentMonth - 5, 1);
       endDate = new Date(currentYear, currentMonth + monthsForward + 1, 0);
     }
 
     // Validate period
-    const monthsDiff = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
-                       (endDate.getMonth() - startDate.getMonth());
+    const monthsDiff = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+      (endDate.getMonth() - startDate.getMonth());
     if (monthsDiff > MAX_PROJECTION_YEARS * 12) {
       return NextResponse.json(
         { error: `Período máximo de projeção é ${MAX_PROJECTION_YEARS} anos` },
@@ -183,7 +204,7 @@ export async function GET(request: NextRequest) {
     // Check cache
     const startMonthKey = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`;
     const endMonthKey = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}`;
-    const cached = projectionCache.get(userId, startMonthKey, endMonthKey);
+    const cached = projectionCache.get(ownerId, startMonthKey, endMonthKey);
 
     if (cached) {
       return NextResponse.json({ data: cached });
@@ -198,7 +219,7 @@ export async function GET(request: NextRequest) {
     const { data: budgets, error: budgetsError } = await supabase
       .from('budgets')
       .select('*, categories(*)')
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .gte('year', startYear)
       .lte('year', endYear)
       .order('year', { ascending: true })
@@ -218,7 +239,7 @@ export async function GET(request: NextRequest) {
     const { data: transactions, error: transactionsError } = await supabase
       .from('transactions')
       .select('amount, posted_at, category_id, categories(type)')
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .gte('posted_at', startDate.toISOString().split('T')[0])
       .lte('posted_at', endDate.toISOString().split('T')[0]);
 
@@ -232,7 +253,7 @@ export async function GET(request: NextRequest) {
       for (const tx of transactions) {
         const txDate = new Date(tx.posted_at);
         const monthKey = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}`;
-        
+
         if (!actualMonthlyTotals[monthKey]) {
           actualMonthlyTotals[monthKey] = { income: 0, expenses: 0 };
         }
@@ -259,7 +280,7 @@ export async function GET(request: NextRequest) {
     try {
       const projectionResult = await generateProjections(
         supabase,
-        userId,
+        ownerId,
         startDate,
         endDate
       );
@@ -277,7 +298,7 @@ export async function GET(request: NextRequest) {
         // Calculate start and end dates for the budget month
         const budgetStartDate = new Date(budget.year, budget.month - 1, 1);
         const budgetEndDate = new Date(budget.year, budget.month, 0); // Last day of the month
-        
+
         const budgetStartStr = budgetStartDate.toISOString().split('T')[0];
         const budgetEndStr = budgetEndDate.toISOString().split('T')[0];
 
@@ -285,13 +306,13 @@ export async function GET(request: NextRequest) {
         const { data: transactions, error: txError } = await supabase
           .from('transactions')
           .select('amount')
-          .eq('user_id', userId)
+          .eq('user_id', ownerId)
           .eq('category_id', budget.category_id)
           .gte('posted_at', budgetStartStr)
           .lte('posted_at', budgetEndStr);
 
         let actualAmount = budget.amount_actual || 0;
-        
+
         if (!txError && transactions) {
           // Sum up transaction amounts (negative for expenses, positive for income)
           actualAmount = transactions.reduce((sum, tx) => {
@@ -314,7 +335,7 @@ export async function GET(request: NextRequest) {
 
         return {
           ...budget,
-          limit_cents: Math.round((budget.amount_planned || 0) * 100),
+          limit_cents: budget.amount_planned_cents || 0,
           amount_actual_cents: Math.round(actualAmount * 100),
           amount_actual: actualAmount, // Include in reais for consistency
           source_type: budget.source_type || 'manual',
@@ -326,26 +347,38 @@ export async function GET(request: NextRequest) {
     // Convert projections to budget-like format for consistency
     const projectionBudgets = projections.map((proj) => {
       const date = new Date(proj.date + 'T12:00:00');
+      const plannedCents = Math.abs(proj.amount_cents);
+      // Determine if this is income based on amount sign
+      // proj.amount_cents > 0 means income, < 0 means expense
+      const isIncome = proj.amount_cents > 0;
       return {
         id: proj.id,
         category_id: proj.category_id || null,
         year: date.getFullYear(),
         month: date.getMonth() + 1,
-        amount_planned: Math.abs(proj.amount_cents) / 100,
+        amount_planned_cents: plannedCents,
         amount_actual: 0,
-        limit_cents: Math.abs(proj.amount_cents),
+        limit_cents: plannedCents,
         amount_actual_cents: 0,
         source_type: proj.source_type,
         source_id: proj.source_id,
         is_projected: true,
-        categories: proj.category_name ? { name: proj.category_name } : null,
+        // Include type in categories so the totals calculation can distinguish income/expense
+        categories: proj.category_name 
+          ? { name: proj.category_name, type: isIncome ? 'income' : 'expense' } 
+          : { type: isIncome ? 'income' : 'expense' },
         metadata: proj.metadata,
         description: proj.description,
       };
     });
 
+    // Filter out projections with zero or invalid amounts
+    const validProjectionBudgets = projectionBudgets.filter(
+      (proj) => proj.amount_planned_cents > 0
+    );
+
     // Combine budgets and projections
-    const allBudgets = [...transformedBudgets, ...projectionBudgets];
+    const allBudgets = [...transformedBudgets, ...validProjectionBudgets];
 
     // Calculate monthly totals including actuals
     const allMonthlyTotals: Record<string, {
@@ -373,15 +406,15 @@ export async function GET(request: NextRequest) {
       const monthKey = `${budget.year}-${String(budget.month).padStart(2, '0')}`;
       if (!allMonthlyTotals[monthKey]) continue;
 
-      const amount = budget.amount_planned || 0;
+      const amountCents = budget.amount_planned_cents || 0;
       const category = budget.categories;
       const isIncome = category?.type === 'income';
 
       // Use category type to determine income vs expense, not the sign of the amount
       if (isIncome) {
-        allMonthlyTotals[monthKey].planned_income += Math.abs(amount) * 100; // Convert to cents
+        allMonthlyTotals[monthKey].planned_income += Math.abs(amountCents);
       } else {
-        allMonthlyTotals[monthKey].planned_expenses += Math.abs(amount) * 100;
+        allMonthlyTotals[monthKey].planned_expenses += Math.abs(amountCents);
       }
 
       const actual = budget.amount_actual || 0;
@@ -403,7 +436,11 @@ export async function GET(request: NextRequest) {
     // Also check if there are recurring income transactions in projections
     const hasRecurringIncome = Object.values(monthlyTotals).some(totals => totals.income > 0);
 
-    // Add projection totals to planned
+    // Add projection totals to planned - REMOVED TO FIX DOUBLE COUNTING
+    // The monthlyTotals are already included via projectionBudgets which are merged into allBudgets
+    // and then processed into allMonthlyTotals in the loop above (lines ~267)
+
+    /* 
     for (const [monthKey, totals] of Object.entries(monthlyTotals)) {
       if (allMonthlyTotals[monthKey]) {
         // Only add income if there are income budgets OR recurring income transactions
@@ -413,6 +450,7 @@ export async function GET(request: NextRequest) {
         allMonthlyTotals[monthKey].planned_expenses += totals.expenses;
       }
     }
+    */
 
     // Add actual transactions to actual totals
     for (const [monthKey, totals] of Object.entries(actualMonthlyTotals)) {
@@ -429,7 +467,7 @@ export async function GET(request: NextRequest) {
     };
 
     // Cache result
-    projectionCache.set(userId, startMonthKey, endMonthKey, result);
+    projectionCache.set(ownerId, startMonthKey, endMonthKey, result);
 
     return NextResponse.json({ data: result });
   } catch (error) {
@@ -453,9 +491,10 @@ export async function POST(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const body = await request.json();
-    
+
     // Validate and transform
     let validated;
     try {
@@ -485,8 +524,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Ensure limit_cents is a positive integer
-    const limitCents = Math.round(validated.limit_cents);
+    const hasBreakdown = Array.isArray(validated.breakdown_items) && validated.breakdown_items.length > 0;
+    const breakdownItems = (validated.breakdown_items || []) as BudgetBreakdownItemInput[];
+
+    // Determine planned amount in cents (either direct limit or sum of breakdown)
+    const limitCents = hasBreakdown
+      ? sumBreakdownItemsCents(breakdownItems)
+      : Math.round(validated.limit_cents || 0);
+
     if (limitCents <= 0) {
       return NextResponse.json(
         { error: 'Limite deve ser maior que zero' },
@@ -510,9 +555,9 @@ export async function POST(request: NextRequest) {
         investment: 'investimento',
       };
       const typeLabel = typeLabels[category.source_type] || category.source_type;
-      
+
       return NextResponse.json(
-        { 
+        {
           error: `Orçamentos de ${typeLabel} são gerados automaticamente. Não é possível criar manualmente.`,
           source_type: category.source_type,
         },
@@ -523,26 +568,25 @@ export async function POST(request: NextRequest) {
     // Calculate minimum amount based on automatic contributions
     const { minimum_cents, sources } = await calculateMinimumBudget(
       supabase,
-      userId,
+      ownerId,
       validated.category_id,
       monthDate.getFullYear(),
       monthDate.getMonth() + 1
     );
 
-    const minimumAmount = minimum_cents / 100; // Convert to reais
-    const plannedAmount = limitCents / 100;
+    const minimumAmount = minimum_cents / 100; // For display
 
     // Validate that planned amount is not below minimum
-    if (plannedAmount < minimumAmount) {
+    if (limitCents < minimum_cents) {
       const sourcesText = sources.map(s => s.description).join(', ');
       return NextResponse.json(
-        { 
+        {
           error: `O orçamento deve ser no mínimo ${minimumAmount.toFixed(2)} devido a contribuições automáticas.`,
           minimum_amount: minimumAmount,
           minimum_cents: minimum_cents,
           sources: sources,
           sources_text: sourcesText,
-          suggestion: sourcesText 
+          suggestion: sourcesText
             ? `Há contribuições automáticas: ${sourcesText}. O orçamento deve cobrir pelo menos esse valor.`
             : 'Verifique as transações recorrentes, objetivos, dívidas e investimentos marcados para incluir no orçamento.'
         },
@@ -555,90 +599,63 @@ export async function POST(request: NextRequest) {
       category_id: validated.category_id,
       year: monthDate.getFullYear(),
       month: monthDate.getMonth() + 1,
-      amount_planned: plannedAmount,
-      user_id: userId,
+      amount_planned_cents: limitCents,
+      user_id: ownerId,
     };
 
     // Try to add new fields (will be ignored if columns don't exist)
-    insertData.minimum_amount_planned = minimumAmount;
+    insertData.minimum_amount_planned_cents = minimum_cents;
     insertData.auto_contributions_cents = minimum_cents;
+
+    // Add breakdown metadata if present
+    if (hasBreakdown) {
+      insertData.metadata = buildBudgetBreakdownMetadata(breakdownItems);
+    }
 
     // Add new fields (will be ignored if columns don't exist)
     insertData.source_type = validated.source_type || 'manual';
     insertData.is_projected = validated.is_projected ?? false;
-    
+
     if (validated.source_id) {
       insertData.source_id = validated.source_id;
     }
 
     console.log('Attempting to insert budget with data:', {
       ...insertData,
-      amount_planned: `${insertData.amount_planned} (${limitCents} cents)`,
+      amount_planned_cents: limitCents,
     });
 
-    const { data, error } = await supabase
+    let data: any = null;
+    let error: any = null;
+
+    // Try insert with metadata; fallback if column doesn't exist
+    const initialInsert = await supabase
       .from('budgets')
       .insert(insertData)
       .select('*, categories(*)')
       .single();
 
+    data = initialInsert.data;
+    error = initialInsert.error;
+
+    if (error) {
+      const errorMsg = error.message?.toLowerCase?.() || '';
+      if (errorMsg.includes('metadata') && errorMsg.includes('column') && errorMsg.includes('does not exist')) {
+        const { metadata, ...fallback } = insertData;
+        const fallbackInsert = await supabase
+          .from('budgets')
+          .insert(fallback)
+          .select('*, categories(*)')
+          .single();
+        data = fallbackInsert.data;
+        error = fallbackInsert.error;
+      }
+    }
+
     if (error) {
       console.error('Database error creating budget:', error);
       console.error('Error details:', JSON.stringify(error, null, 2));
-      
-      // If error is about missing columns or constraint violations, try without new fields
-      const errorMsg = error.message?.toLowerCase() || '';
-      const isColumnError = (errorMsg.includes('column') && 
-                           (errorMsg.includes('does not exist') || 
-                            errorMsg.includes('auto_contributions_cents') ||
-                            errorMsg.includes('minimum_amount_planned') ||
-                            errorMsg.includes('source_type') || 
-                            errorMsg.includes('is_projected'))) ||
-                           error.code === '42703'; // PostgreSQL error code for undefined column
-      const isConstraintError = error.code === '23514' && 
-                                (errorMsg.includes('source_type') || errorMsg.includes('check'));
-      
-      if (isColumnError || isConstraintError) {
-        // Migration not applied yet, try without new fields
-        const fallbackData = {
-          category_id: validated.category_id,
-          year: monthDate.getFullYear(),
-          month: monthDate.getMonth() + 1,
-          amount_planned: limitCents / 100,
-          user_id: userId,
-        };
-        
-        const { data: fallbackResult, error: fallbackError } = await supabase
-          .from('budgets')
-          .insert(fallbackData)
-          .select('*, categories(*)')
-          .single();
-          
-        if (fallbackError) {
-          if (fallbackError.code === '23505') {
-            return NextResponse.json(
-              { error: 'Já existe um orçamento para esta categoria neste mês' },
-              { status: 400 }
-            );
-          }
-          return NextResponse.json(
-            { error: fallbackError.message || 'Erro ao criar orçamento' },
-            { status: 500 }
-          );
-        }
-        
-        // Transform response
-        const transformedData = {
-          ...fallbackResult,
-          limit_cents: Math.round((fallbackResult.amount_planned || 0) * 100),
-          amount_actual_cents: Math.round((fallbackResult.amount_actual || 0) * 100),
-          source_type: 'manual',
-          is_projected: false,
-        };
-        
-        return NextResponse.json({ data: transformedData }, { status: 201 });
-      }
-      
+
       // Check for unique constraint violation
       if (error.code === '23505') {
         return NextResponse.json(
@@ -659,10 +676,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Convert amount_planned (NUMERIC) to limit_cents (BIGINT) for API response
+    // Convert planned amount to limit_cents for API response
     const transformedData = {
       ...data,
-      limit_cents: Math.round((data.amount_planned || 0) * 100),
+      limit_cents: data.amount_planned_cents || 0,
       amount_actual_cents: Math.round((data.amount_actual || 0) * 100),
     };
 

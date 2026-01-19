@@ -3,6 +3,7 @@ import { createClientFromRequest } from '@/lib/supabase/server';
 import { getUserId } from '@/lib/auth';
 import { categorySchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,6 +11,7 @@ export async function GET(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { searchParams } = new URL(request.url);
     const sourceType = searchParams.get('source_type'); // Filter by source type
@@ -20,7 +22,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('categories')
       .select('*')
-      .eq('user_id', userId);
+      .eq('user_id', ownerId);
 
     if (sourceType) {
       query = query.eq('source_type', sourceType);
@@ -67,6 +69,7 @@ export async function POST(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const body = await request.json();
     const validated = categorySchema.parse(body);
@@ -76,7 +79,7 @@ export async function POST(request: NextRequest) {
       .from('categories')
       .insert({
         ...validated,
-        user_id: userId,
+        user_id: ownerId,
         // If source_type is not provided, default to 'general'
         source_type: validated.source_type || 'general',
         // If is_active is not provided, default to true

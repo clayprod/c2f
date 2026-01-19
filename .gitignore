@@ -47,3 +47,7 @@ gemini.md
 
 # Qwen (if exists)
 .qwen/
+.env.backup
+
+# Windows reserved names
+nul

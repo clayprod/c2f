@@ -29,18 +29,14 @@ export const transactionSchema = z.object({
   type: z.enum(['income', 'expense']).optional(),
   source: z.enum(['manual', 'pluggy', 'import']).default('manual'),
   provider_tx_id: z.string().optional(),
-  is_recurring: z.boolean().default(false),
   recurrence_rule: z.string().optional().or(z.literal('')).transform(val => val || undefined),
+  include_in_plan: z.boolean().optional(),
   contribution_frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).optional(),
   installment_number: z.number().int().positive().optional(),
   installment_total: z.number().int().positive().optional(),
-}).refine(
-  (data) => !data.is_recurring || data.contribution_frequency || data.recurrence_rule,
-  {
-    message: 'Frequência de contribuição é obrigatória para transações recorrentes',
-    path: ['contribution_frequency'],
-  }
-);
+  // Assigned to (for shared accounts)
+  assigned_to: z.string().uuid('ID do responsável inválido').optional().or(z.literal('')).transform(val => val || undefined),
+});
 
 export const budgetSchema = z.object({
   category_id: z.string().uuid('ID da categoria inválido'),
@@ -52,13 +48,30 @@ export const budgetSchema = z.object({
       }
       return val;
     }),
+  // When using breakdown_items, limit_cents may be omitted (computed as sum of items)
   limit_cents: z.number()
     .positive('Limite deve ser positivo')
-    .transform((val) => Math.round(val)), // Convert to integer
-  source_type: z.enum(['manual', 'credit_card', 'goal', 'debt', 'recurring', 'installment']).optional(),
+    .transform((val) => Math.round(val)) // Convert to integer
+    .optional(),
+  breakdown_items: z.array(z.object({
+    id: z.string().optional(),
+    label: z.string().min(1, 'Nome do sub-item é obrigatório'),
+    amount_cents: z.number().int('Valor deve ser em centavos (número inteiro)').positive('Valor deve ser positivo'),
+  })).optional(),
+  source_type: z.enum(['manual', 'credit_card', 'goal', 'debt', 'receivable', 'installment', 'investment']).optional(),
   source_id: z.string().uuid('ID da origem inválido').optional(),
   is_projected: z.boolean().optional(),
-});
+}).refine(
+  (data) => {
+    const hasBreakdown = Array.isArray(data.breakdown_items) && data.breakdown_items.length > 0;
+    const hasLimit = typeof data.limit_cents === 'number' && data.limit_cents > 0;
+    return hasBreakdown || hasLimit;
+  },
+  {
+    message: 'Informe um limite (limit_cents) ou detalhe em sub-itens (breakdown_items)',
+    path: ['limit_cents'],
+  }
+);
 
 export const budgetReplicateSchema = z.object({
   budget_id: z.string().uuid('ID do orçamento inválido'),
@@ -104,7 +117,7 @@ export const debtSchema = z.object({
   interest_type: z.enum(['simple', 'compound']).default('simple'),
   due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (use YYYY-MM-DD)').optional(),
   start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (use YYYY-MM-DD)').optional(),
-  status: z.enum(['active', 'paid', 'overdue', 'paga', 'negociando', 'negociada']).default('active'),
+  status: z.enum(['pendente', 'negociada']).default('pendente'),
   priority: z.enum(['low', 'medium', 'high', 'urgent']).default('medium'),
   account_id: z.string().uuid('ID da conta inválido').optional(),
   category_id: z.string().uuid('ID da categoria inválido').optional(),
@@ -121,49 +134,103 @@ export const debtSchema = z.object({
   // Negotiation fields (for status 'negociada')
   payment_frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).optional(),
   payment_amount_cents: z.number().int().positive('Valor de pagamento deve ser positivo').optional(),
-  // Budget inclusion and frequency (legacy, kept for compatibility)
-  include_in_budget: z.boolean().default(false),
+  // Plan inclusion and frequency
+  include_in_plan: z.boolean().default(true),
   contribution_frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).optional(),
+  plan_entries: z.array(z.object({
+    month: z.string().regex(/^\d{4}-\d{2}$/, 'Mês inválido (use YYYY-MM)'),
+    amount_cents: z.number().int().positive('Valor deve ser positivo'),
+  })).optional(),
   // Negotiation status
   is_negotiated: z.boolean().optional(),
   // Monthly payment amount for budgeting
   monthly_payment_cents: z.number().int().positive().optional(),
 }).refine(
   (data) => {
-    // If status is 'negociada', payment fields are required
     if (data.status === 'negociada') {
       return data.payment_frequency !== undefined &&
              data.payment_amount_cents !== undefined &&
-             data.installment_count !== undefined;
+             data.installment_count !== undefined &&
+             (data.contribution_frequency !== undefined || (data.plan_entries && data.plan_entries.length > 0));
     }
     return true;
   },
   {
-    message: 'Frequência, valor de pagamento e número de parcelas são obrigatórios para dívidas negociadas',
+    message: 'Para dívidas negociadas, informe frequência, valor, parcelas e contribuição (ou plano personalizado)',
     path: ['payment_frequency'],
-  }
-).refine(
-  (data) => !data.include_in_budget || data.contribution_frequency !== undefined,
-  {
-    message: 'Frequência de pagamento é obrigatória quando incluir no orçamento',
-    path: ['contribution_frequency'],
-  }
-).refine(
-  (data) => {
-    // If is_negotiated is true, then include_in_budget and contribution_frequency are required
-    if (data.is_negotiated) {
-      return data.include_in_budget !== undefined && data.contribution_frequency !== undefined;
-    }
-    return true;
-  },
-  {
-    message: 'Para dívidas negociadas, incluir no orçamento e frequência de contribuição são obrigatórios',
-    path: ['include_in_budget'],
   }
 );
 
 export const debtPaymentSchema = z.object({
   debt_id: z.string().uuid('ID da dívida inválido'),
+  amount_cents: z.number().int().positive('Valor deve ser positivo'),
+  payment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (use YYYY-MM-DD)'),
+  transaction_id: z.string().uuid('ID da transação inválido').optional(),
+  notes: z.string().optional(),
+});
+
+// Receivables schemas
+export const receivableSchema = z.object({
+  name: z.string().min(1, 'Nome é obrigatório'),
+  description: z.string().optional(),
+  debtor_name: z.string().optional(),
+  // Principal is the original amount (present value)
+  principal_amount_cents: z.number().int().positive('Valor principal deve ser positivo'),
+  // Total amount is the full receivable with interest (future value)
+  total_amount_cents: z.number().int().positive('Valor total deve ser positivo'),
+  received_amount_cents: z.number().int().min(0).default(0),
+  // Interest rate is monthly
+  interest_rate_monthly: z.number().min(0).max(100).default(0),
+  // Interest type: simple or compound
+  interest_type: z.enum(['simple', 'compound']).default('simple'),
+  due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (use YYYY-MM-DD)').optional(),
+  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (use YYYY-MM-DD)').optional(),
+  status: z.enum(['pendente', 'negociada']).default('pendente'),
+  priority: z.enum(['low', 'medium', 'high', 'urgent']).default('medium'),
+  account_id: z.string().uuid('ID da conta inválido').optional(),
+  category_id: z.string().uuid('ID da categoria inválido').optional(),
+  notes: z.string().optional(),
+  // Option to add principal to cash when receivable is created
+  adds_to_cash: z.boolean().default(false),
+  // Account to receive the principal (if adds_to_cash is true)
+  destination_account_id: z.string().uuid('ID da conta de destino inválido').optional(),
+  // Installment fields
+  installment_amount_cents: z.number().int().positive().optional(),
+  installment_count: z.number().int().positive().optional(),
+  current_installment: z.number().int().positive().default(1),
+  installment_day: z.number().int().min(1).max(31).optional(),
+  // Negotiation fields (for status 'negociada')
+  payment_frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).optional(),
+  payment_amount_cents: z.number().int().positive('Valor de pagamento deve ser positivo').optional(),
+  // Plan inclusion and frequency
+  include_in_plan: z.boolean().default(true),
+  contribution_frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).optional(),
+  plan_entries: z.array(z.object({
+    month: z.string().regex(/^\d{4}-\d{2}$/, 'Mês inválido (use YYYY-MM)'),
+    amount_cents: z.number().int().positive('Valor deve ser positivo'),
+  })).optional(),
+  // Negotiation status
+  is_negotiated: z.boolean().optional(),
+  // Monthly payment amount for budgeting
+  monthly_payment_cents: z.number().int().positive().optional(),
+}).refine(
+  (data) => {
+    if (data.status === 'negociada') {
+      return data.payment_frequency !== undefined &&
+             data.payment_amount_cents !== undefined &&
+             data.installment_count !== undefined &&
+             (data.contribution_frequency !== undefined || (data.plan_entries && data.plan_entries.length > 0));
+    }
+    return true;
+  },
+  {
+    message: 'Para recebíveis negociados, informe frequência, valor, parcelas e contribuição (ou plano personalizado)',
+    path: ['payment_frequency'],
+  }
+);
+
+export const receivablePaymentSchema = z.object({
+  receivable_id: z.string().uuid('ID do recebível inválido'),
   amount_cents: z.number().int().positive('Valor deve ser positivo'),
   payment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (use YYYY-MM-DD)'),
   transaction_id: z.string().uuid('ID da transação inválido').optional(),
@@ -188,13 +255,17 @@ export const investmentSchema = z.object({
   // Monthly contribution fields
   monthly_contribution_cents: z.number().int().positive().optional(),
   contribution_day: z.number().int().min(1).max(31).optional(),
-  // Budget inclusion and frequency
-  include_in_budget: z.boolean().default(false),
+  // Plan inclusion and frequency
+  include_in_plan: z.boolean().default(true),
   contribution_frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).optional(),
+  plan_entries: z.array(z.object({
+    month: z.string().regex(/^\d{4}-\d{2}$/, 'Mês inválido (use YYYY-MM)'),
+    amount_cents: z.number().int().positive('Valor deve ser positivo'),
+  })).optional(),
 }).refine(
-  (data) => !data.include_in_budget || data.contribution_frequency !== undefined,
+  (data) => !data.include_in_plan || data.contribution_frequency !== undefined || (data.plan_entries && data.plan_entries.length > 0),
   {
-    message: 'Frequência de aporte é obrigatória quando incluir no orçamento',
+    message: 'Frequência de aporte é obrigatória quando incluir no plano, a menos que use um plano personalizado',
     path: ['contribution_frequency'],
   }
 );
@@ -236,15 +307,17 @@ export const goalSchema = z.object({
   // Monthly contribution fields
   monthly_contribution_cents: z.number().int().positive().optional(),
   contribution_day: z.number().int().min(1).max(31).optional(),
-  // Projection flag
-  include_in_projection: z.boolean().default(true),
-  // Budget inclusion and frequency
-  include_in_budget: z.boolean().default(false),
+  // Plan inclusion and frequency
+  include_in_plan: z.boolean().default(true),
   contribution_frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).optional(),
+  plan_entries: z.array(z.object({
+    month: z.string().regex(/^\d{4}-\d{2}$/, 'Mês inválido (use YYYY-MM)'),
+    amount_cents: z.number().int().positive('Valor deve ser positivo'),
+  })).optional(),
 }).refine(
-  (data) => !data.include_in_budget || data.contribution_frequency !== undefined,
+  (data) => !data.include_in_plan || data.contribution_frequency !== undefined,
   {
-    message: 'Frequência de aporte é obrigatória quando incluir no orçamento',
+    message: 'Frequência de aporte é obrigatória quando incluir no plano',
     path: ['contribution_frequency'],
   }
 );
@@ -263,6 +336,7 @@ export const reportFiltersSchema = z.object({
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data final inválida'),
   accountIds: z.array(z.string().uuid()).optional(),
   categoryIds: z.array(z.string().uuid()).optional(),
+  assignedTo: z.string().uuid().optional().or(z.literal('')).transform(val => val || undefined),
   reportType: z.enum([
     'overview',
     'categories',
@@ -386,10 +460,44 @@ export const assetSchema = z.object({
   registration_number: z.string().optional(),
   insurance_company: z.string().optional(),
   insurance_policy_number: z.string().optional(),
-  insurance_expiry_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (use YYYY-MM-DD)').optional(),
+  insurance_expiry_date: z.preprocess(
+    (val) => {
+      if (val === '' || val === null || val === undefined) {
+        return undefined;
+      }
+      return val;
+    },
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (use YYYY-MM-DD)').optional()
+  ),
   status: z.enum(['active', 'sold', 'disposed']).default('active'),
-  sale_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (use YYYY-MM-DD)').optional(),
-  sale_price_cents: z.number().int().min(0).optional(),
+  sale_date: z.preprocess(
+    (val) => {
+      if (val === '' || val === null || val === undefined) {
+        return undefined;
+      }
+      return val;
+    },
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (use YYYY-MM-DD)').optional()
+  ),
+  sale_price_cents: z.preprocess(
+    (val) => {
+      if (val === null || val === undefined || val === '') {
+        return undefined;
+      }
+      if (typeof val === 'number') {
+        if (isNaN(val) || !isFinite(val)) return undefined;
+        return Math.round(val * 100);
+      }
+      if (typeof val === 'string') {
+        const trimmed = val.trim();
+        if (trimmed === '') return undefined;
+        const parsed = parseFloat(trimmed);
+        return isNaN(parsed) ? undefined : Math.round(parsed * 100);
+      }
+      return undefined;
+    },
+    z.number().int().min(0).optional()
+  ),
   depreciation_method: z.enum(['linear', 'declining_balance', 'none']).default('none'),
   depreciation_rate: z.number().min(0).max(100).optional(),
   useful_life_years: z.number().int().positive().optional(),

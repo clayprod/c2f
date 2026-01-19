@@ -19,6 +19,18 @@
       "type": "local",
       "command": "npx",
       "args": ["-y", "chrome-devtools-mcp@latest"]
+    },
+    "n8n-mcp": {
+      "type": "local",
+      "command": "npx",
+      "args": ["-y", "n8n-mcp"],
+      "env": {
+        "MCP_MODE": "stdio",
+        "LOG_LEVEL": "error",
+        "DISABLE_CONSOLE_OUTPUT": "true",
+        "N8N_API_URL": "https://n8n.tenryu.com.br/",
+        "N8N_API_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMTE1OGVkMy0yNDFhLTRkNjYtYWJiYi1jYTQ0Mjg1NThmYjMiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzY4MjYzNTg0fQ.GFMxaCV3Waevro3XBeGI1fHv7H2iupShFzONfa1q7W0"
+      }
     }
   }
 }

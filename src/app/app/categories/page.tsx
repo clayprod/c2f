@@ -725,7 +725,7 @@ export default function CategoriesPage() {
                 }}
                 className="w-full sm:w-auto"
               >
-                <i className='bx bx-transfer mr-2'></i>
+                <i className='bx bx-arrow-right-left mr-2'></i>
                 Migrar Transações
               </Button>
             )}
@@ -791,7 +791,7 @@ export default function CategoriesPage() {
                   handleOpenMigration(categoryToDelete);
                 }}
               >
-                <i className='bx bx-transfer mr-2'></i>
+                <i className='bx bx-arrow-right-left mr-2'></i>
                 Migrar Transações
               </Button>
             )}
@@ -896,7 +896,7 @@ function CategoryCard({
                 className="p-1.5 hover:bg-blue-500/10 text-blue-500 rounded-lg transition-colors"
                 title={transactionCount > 0 ? "Migrar transações" : "Migrar categoria"}
               >
-                <i className='bx bx-transfer text-sm'></i>
+                <i className='bx bx-arrow-right-left text-sm'></i>
               </button>
             )}
             {isGeneralCategory && (

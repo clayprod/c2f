@@ -5,6 +5,7 @@ import { debtSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
 import { generateAutoBudgetsForDebt } from '@/services/budgets/autoGenerator';
 import { projectionCache } from '@/services/projections/cache';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,6 +13,7 @@ export async function GET(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
@@ -23,7 +25,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('debts')
       .select('*, accounts(*), categories(*)')
-      .eq('user_id', userId);
+      .eq('user_id', ownerId);
 
     if (status) {
       query = query.eq('status', status);
@@ -55,7 +57,7 @@ export async function GET(request: NextRequest) {
           const { data: transactions } = await supabase
             .from('transactions')
             .select('amount')
-            .eq('user_id', userId)
+            .eq('user_id', ownerId)
             .eq('category_id', debt.category_id)
             .lt('amount', 0); // Only expenses (payments)
 
@@ -69,8 +71,7 @@ export async function GET(request: NextRequest) {
               await supabase
                 .from('debts')
                 .update({ 
-                  paid_amount_cents: totalPaidCents,
-                  status: totalPaidCents >= (debt.total_amount_cents || 0) ? 'paga' : debt.status
+                  paid_amount_cents: totalPaidCents
                 })
                 .eq('id', debt.id);
               
@@ -99,6 +100,7 @@ export async function POST(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const body = await request.json();
     const validated = debtSchema.parse(body);
@@ -110,7 +112,7 @@ export async function POST(request: NextRequest) {
     const { data: category, error: categoryError } = await supabase
       .from('categories')
       .insert({
-        user_id: userId,
+        user_id: ownerId,
         name: categoryName,
         type: 'expense',
         icon: '💳',
@@ -124,10 +126,13 @@ export async function POST(request: NextRequest) {
       console.error('Error creating debt category:', categoryError);
     }
 
+    const hasCustomPlan = !!validated.plan_entries && validated.plan_entries.length > 0;
+    const includeInPlan = hasCustomPlan ? true : validated.include_in_plan;
+
     // Create the debt
     // Extract only the fields that exist in the database schema
     const debtData: any = {
-      user_id: userId,
+      user_id: ownerId,
       name: validated.name,
       description: validated.description || null,
       creditor_name: validated.creditor_name || null,
@@ -136,7 +141,7 @@ export async function POST(request: NextRequest) {
       interest_rate: validated.interest_rate_monthly || 0,
       due_date: validated.due_date || null,
       start_date: validated.start_date || null,
-      status: validated.status || 'active',
+      status: validated.status || 'pendente',
       priority: validated.priority || 'medium',
       account_id: validated.account_id || null,
       category_id: category?.id || validated.category_id || null,
@@ -144,16 +149,22 @@ export async function POST(request: NextRequest) {
       payment_frequency: validated.payment_frequency || null,
       payment_amount_cents: validated.payment_amount_cents || null,
       installment_count: validated.installment_count || null,
+      include_in_plan: includeInPlan ?? true,
     };
 
-    // Add fields for budget generation if negotiated
-    if (validated.is_negotiated) {
+    // Add fields for plan inclusion if negotiated
+    if (validated.status === 'negociada') {
       debtData.is_negotiated = true;
-      debtData.include_in_budget = validated.include_in_budget || false;
-      debtData.contribution_frequency = validated.contribution_frequency || null;
+      debtData.include_in_plan = includeInPlan ?? true;
+      debtData.contribution_frequency = hasCustomPlan
+        ? null
+        : (validated.contribution_frequency || validated.payment_frequency || null);
       debtData.monthly_payment_cents = validated.monthly_payment_cents || validated.payment_amount_cents || null;
       debtData.installment_amount_cents = validated.installment_amount_cents || validated.payment_amount_cents || null;
       debtData.installment_day = validated.installment_day || null;
+    } else {
+      debtData.is_negotiated = false;
+      debtData.include_in_plan = includeInPlan ?? false;
     }
 
     const { data, error } = await supabase
@@ -164,9 +175,29 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
-    // Generate automatic budgets if is_negotiated and include_in_budget is true
-    if (data.is_negotiated && data.include_in_budget && data.category_id && 
-        (data.status === 'active' || data.status === 'negotiating' || data.status === 'negociando')) {
+    if (data && validated.plan_entries && validated.plan_entries.length > 0) {
+      const planEntries = validated.plan_entries.map((entry) => ({
+        user_id: ownerId,
+        debt_id: data.id,
+        category_id: data.category_id || null,
+        entry_month: `${entry.month}-01`,
+        amount_cents: entry.amount_cents,
+        description: `Plano personalizado - ${data.name}`,
+      }));
+
+      const { error: planError } = await supabase
+        .from('debt_plan_entries')
+        .upsert(planEntries, {
+          onConflict: 'debt_id,entry_month',
+        });
+
+      if (planError) {
+        console.error('Error inserting debt plan entries:', planError);
+      }
+    }
+
+    // Generate automatic budgets if is_negotiated and include_in_plan is true
+    if (data.is_negotiated && data.include_in_plan && data.category_id && data.status === 'negociada') {
       try {
         const today = new Date();
         const startMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -182,11 +213,11 @@ export async function POST(request: NextRequest) {
 
         await generateAutoBudgetsForDebt(
           supabase,
-          userId,
+          ownerId,
           {
             id: data.id,
             category_id: data.category_id,
-            include_in_budget: data.include_in_budget,
+            include_in_plan: data.include_in_plan,
             is_negotiated: data.is_negotiated,
             status: data.status,
             contribution_frequency: data.contribution_frequency,
@@ -205,7 +236,7 @@ export async function POST(request: NextRequest) {
           }
         );
 
-        projectionCache.invalidateUser(userId);
+        projectionCache.invalidateUser(ownerId);
       } catch (budgetError) {
         console.error('Error generating auto budgets for debt:', budgetError);
         // Don't fail the debt creation if budget generation fails
@@ -219,7 +250,7 @@ export async function POST(request: NextRequest) {
       const { data: existingCategory } = await supabase
         .from('categories')
         .select('id')
-        .eq('user_id', userId)
+        .eq('user_id', ownerId)
         .eq('name', 'EMPRESTIMOS RECEBIDOS')
         .single();
 
@@ -229,7 +260,7 @@ export async function POST(request: NextRequest) {
         const { data: newCategory } = await supabase
           .from('categories')
           .insert({
-            user_id: userId,
+            user_id: ownerId,
             name: 'EMPRESTIMOS RECEBIDOS',
             type: 'income',
             icon: '💰',
@@ -245,7 +276,7 @@ export async function POST(request: NextRequest) {
       const { error: txError } = await supabase
         .from('transactions')
         .insert({
-          user_id: userId,
+          user_id: ownerId,
           account_id: validated.destination_account_id,
           category_id: loanIncomeCategory?.id,
           posted_at: validated.start_date || new Date().toISOString().split('T')[0],

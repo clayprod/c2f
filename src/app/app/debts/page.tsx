@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { PlanGuard } from '@/components/app/PlanGuard';
 
 interface Debt {
   id: string;
@@ -46,7 +47,7 @@ export default function DebtsPage() {
       if (sortOrder) {
         params.append('order', sortOrder);
       }
-      
+
       const url = `/api/debts${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await fetch(url);
       const result = await response.json();
@@ -69,16 +70,10 @@ export default function DebtsPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'paid':
-      case 'paga':
-        return 'bg-green-500/10 text-green-500 border-green-500/20';
-      case 'overdue':
-        return 'bg-red-500/10 text-red-500 border-red-500/20';
-      case 'negotiating':
-      case 'negociando':
-        return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
       case 'negociada':
         return 'bg-blue-400/10 text-blue-400 border-blue-400/20';
+      case 'pendente':
+        return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
       default:
         return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
     }
@@ -86,11 +81,7 @@ export default function DebtsPage() {
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
-      active: 'Ativa',
-      paid: 'Paga',
-      overdue: 'Vencida',
-      paga: 'Paga',
-      negociando: 'Negociando',
+      pendente: 'Pendente',
       negociada: 'Negociada',
     };
     return labels[status] || status;
@@ -118,202 +109,200 @@ export default function DebtsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-2xl md:text-3xl font-bold">Dívidas</h1>
-          <p className="text-muted-foreground">Gerencie suas dívidas e pagamentos</p>
-        </div>
-        <Link href="/app/debts/new" className="btn-primary">
-          <i className='bx bx-plus'></i>
-          Nova Dívida
-        </Link>
-      </div>
-
-      <div className="glass-card p-4">
-        <div className="grid md:grid-cols-4 gap-4 items-end">
+    <PlanGuard minPlan="pro">
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
           <div>
-            <label className="block text-sm font-medium mb-2">Filtrar por Status</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-4 py-2 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <option value="">Todos os status</option>
-              <option value="active">Ativa</option>
-              <option value="paid">Paga</option>
-              <option value="overdue">Vencida</option>
-              <option value="paga">Paga</option>
-              <option value="negociando">Negociando</option>
-              <option value="negociada">Negociada</option>
-            </select>
+            <h1 className="font-display text-2xl md:text-3xl font-bold">Dívidas</h1>
+            <p className="text-muted-foreground">Gerencie suas dívidas e pagamentos</p>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Filtrar por Prioridade</label>
-            <select
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-              className="w-full px-4 py-2 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <option value="">Todas as prioridades</option>
-              <option value="low">Baixa</option>
-              <option value="medium">Média</option>
-              <option value="high">Alta</option>
-              <option value="urgent">Urgente</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Ordenar por</label>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="w-full px-4 py-2 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <option value="created_at">Data de criação</option>
-              <option value="total_amount_cents">Valor total</option>
-              <option value="remaining_amount_cents">Valor restante</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Ordem</label>
-            <select
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value)}
-              className="w-full px-4 py-2 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              <option value="desc">Maior para menor</option>
-              <option value="asc">Menor para maior</option>
-            </select>
-          </div>
+          <Link href="/app/debts/new" className="btn-primary">
+            <i className='bx bx-plus'></i>
+            Nova Dívida
+          </Link>
         </div>
 
-        {(statusFilter || priorityFilter) && (
-          <div className="mt-4">
-            <button
-              onClick={() => {
-                setStatusFilter('');
-                setPriorityFilter('');
-              }}
-              className="px-4 py-2 rounded-xl bg-muted hover:bg-muted/80 border border-border text-sm font-medium transition-colors"
-            >
-              <i className='bx bx-x'></i> Limpar Filtros
-            </button>
+        <div className="glass-card p-4">
+          <div className="grid md:grid-cols-4 gap-4 items-end">
+            <div>
+              <label className="block text-sm font-medium mb-2">Filtrar por Status</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-4 py-2 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="">Todos os status</option>
+                <option value="pendente">Pendente</option>
+                <option value="negociada">Negociada</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Filtrar por Prioridade</label>
+              <select
+                value={priorityFilter}
+                onChange={(e) => setPriorityFilter(e.target.value)}
+                className="w-full px-4 py-2 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="">Todas as prioridades</option>
+                <option value="low">Baixa</option>
+                <option value="medium">Média</option>
+                <option value="high">Alta</option>
+                <option value="urgent">Urgente</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Ordenar por</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="w-full px-4 py-2 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="created_at">Data de criação</option>
+                <option value="total_amount_cents">Valor total</option>
+                <option value="remaining_amount_cents">Valor restante</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Ordem</label>
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                className="w-full px-4 py-2 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="desc">Maior para menor</option>
+                <option value="asc">Menor para maior</option>
+              </select>
+            </div>
+          </div>
+
+          {(statusFilter || priorityFilter) && (
+            <div className="mt-4">
+              <button
+                onClick={() => {
+                  setStatusFilter('');
+                  setPriorityFilter('');
+                }}
+                className="px-4 py-2 rounded-xl bg-muted hover:bg-muted/80 border border-border text-sm font-medium transition-colors"
+              >
+                <i className='bx bx-x'></i> Limpar Filtros
+              </button>
+            </div>
+          )}
+        </div>
+
+        {debts.length === 0 ? (
+          <div className="glass-card p-12 text-center">
+            <i className='bx bx-credit-card text-4xl text-muted-foreground mb-4'></i>
+            <h3 className="font-display font-semibold mb-2">
+              {statusFilter || priorityFilter ? 'Nenhuma dívida encontrada' : 'Nenhuma dívida cadastrada'}
+            </h3>
+            <p className="text-muted-foreground mb-6">
+              {statusFilter || priorityFilter
+                ? 'Tente ajustar os filtros ou adicione uma nova dívida'
+                : 'Comece adicionando sua primeira dívida'}
+            </p>
+            {(statusFilter || priorityFilter) && (
+              <button
+                onClick={() => {
+                  setStatusFilter('');
+                  setPriorityFilter('');
+                }}
+                className="btn-secondary mb-4"
+              >
+                <i className='bx bx-x'></i> Limpar Filtros
+              </button>
+            )}
+            <Link href="/app/debts/new" className="btn-primary">
+              <i className='bx bx-plus'></i>
+              Adicionar Dívida
+            </Link>
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {debts.map((debt) => {
+              const progress = debt.total_amount_cents > 0
+                ? (debt.paid_amount_cents / debt.total_amount_cents) * 100
+                : 0;
+
+              return (
+                <div key={debt.id} className="glass-card p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="font-display font-semibold text-lg">{debt.name}</h3>
+                        <span className={`badge-pill text-xs ${getStatusColor(debt.status)}`}>
+                          {getStatusLabel(debt.status)}
+                        </span>
+                        {debt.priority && (
+                          <span className={`text-xs font-medium ${getPriorityColor(debt.priority)}`}>
+                            {debt.priority === 'urgent' ? 'Urgente' :
+                              debt.priority === 'high' ? 'Alta' :
+                                debt.priority === 'medium' ? 'Média' : 'Baixa'}
+                          </span>
+                        )}
+                      </div>
+                      {debt.creditor_name && (
+                        <p className="text-sm text-muted-foreground mb-2">
+                          Credor: {debt.creditor_name}
+                        </p>
+                      )}
+                      {debt.due_date && (
+                        <p className="text-sm text-muted-foreground">
+                          Vencimento: {new Date(debt.due_date).toLocaleDateString('pt-BR')}
+                        </p>
+                      )}
+                    </div>
+                    <Link
+                      href={`/app/debts/${debt.id}`}
+                      className="text-primary hover:underline text-sm"
+                    >
+                      Ver detalhes
+                    </Link>
+                  </div>
+
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="text-muted-foreground">Progresso</span>
+                      <span className="font-medium">
+                        {formatCurrency(debt.paid_amount_cents)} / {formatCurrency(debt.total_amount_cents)}
+                      </span>
+                    </div>
+                    <div className="w-full bg-muted/20 rounded-full h-2">
+                      <div
+                        className="bg-primary rounded-full h-2 transition-all"
+                        style={{ width: `${Math.min(progress, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Total</p>
+                      <p className="font-semibold">{formatCurrency(debt.total_amount_cents)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Pago</p>
+                      <p className="font-semibold text-green-500">
+                        {formatCurrency(debt.paid_amount_cents)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Restante</p>
+                      <p className="font-semibold text-red-500">
+                        {formatCurrency(debt.remaining_amount_cents)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
-
-      {debts.length === 0 ? (
-        <div className="glass-card p-12 text-center">
-          <i className='bx bx-credit-card text-4xl text-muted-foreground mb-4'></i>
-          <h3 className="font-display font-semibold mb-2">
-            {statusFilter || priorityFilter ? 'Nenhuma dívida encontrada' : 'Nenhuma dívida cadastrada'}
-          </h3>
-          <p className="text-muted-foreground mb-6">
-            {statusFilter || priorityFilter 
-              ? 'Tente ajustar os filtros ou adicione uma nova dívida'
-              : 'Comece adicionando sua primeira dívida'}
-          </p>
-          {(statusFilter || priorityFilter) && (
-            <button
-              onClick={() => {
-                setStatusFilter('');
-                setPriorityFilter('');
-              }}
-              className="btn-secondary mb-4"
-            >
-              <i className='bx bx-x'></i> Limpar Filtros
-            </button>
-          )}
-          <Link href="/app/debts/new" className="btn-primary">
-            <i className='bx bx-plus'></i>
-            Adicionar Dívida
-          </Link>
-        </div>
-      ) : (
-        <div className="grid gap-4">
-          {debts.map((debt) => {
-            const progress = debt.total_amount_cents > 0
-              ? (debt.paid_amount_cents / debt.total_amount_cents) * 100
-              : 0;
-
-            return (
-              <div key={debt.id} className="glass-card p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-display font-semibold text-lg">{debt.name}</h3>
-                      <span className={`badge-pill text-xs ${getStatusColor(debt.status)}`}>
-                        {getStatusLabel(debt.status)}
-                      </span>
-                      {debt.priority && (
-                        <span className={`text-xs font-medium ${getPriorityColor(debt.priority)}`}>
-                          {debt.priority === 'urgent' ? 'Urgente' :
-                           debt.priority === 'high' ? 'Alta' :
-                           debt.priority === 'medium' ? 'Média' : 'Baixa'}
-                        </span>
-                      )}
-                    </div>
-                    {debt.creditor_name && (
-                      <p className="text-sm text-muted-foreground mb-2">
-                        Credor: {debt.creditor_name}
-                      </p>
-                    )}
-                    {debt.due_date && (
-                      <p className="text-sm text-muted-foreground">
-                        Vencimento: {new Date(debt.due_date).toLocaleDateString('pt-BR')}
-                      </p>
-                    )}
-                  </div>
-                  <Link
-                    href={`/app/debts/${debt.id}`}
-                    className="text-primary hover:underline text-sm"
-                  >
-                    Ver detalhes
-                  </Link>
-                </div>
-
-                <div className="mb-4">
-                  <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-muted-foreground">Progresso</span>
-                    <span className="font-medium">
-                      {formatCurrency(debt.paid_amount_cents)} / {formatCurrency(debt.total_amount_cents)}
-                    </span>
-                  </div>
-                  <div className="w-full bg-muted/20 rounded-full h-2">
-                    <div
-                      className="bg-primary rounded-full h-2 transition-all"
-                      style={{ width: `${Math.min(progress, 100)}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <p className="text-muted-foreground">Total</p>
-                    <p className="font-semibold">{formatCurrency(debt.total_amount_cents)}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Pago</p>
-                    <p className="font-semibold text-green-500">
-                      {formatCurrency(debt.paid_amount_cents)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Restante</p>
-                    <p className="font-semibold text-red-500">
-                      {formatCurrency(debt.remaining_amount_cents)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+    </PlanGuard>
   );
 }
 

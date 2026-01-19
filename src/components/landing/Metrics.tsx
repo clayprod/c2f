@@ -5,7 +5,7 @@ const metrics = [
     label: 'usuários',
   },
   {
-    icon: 'bx-swap-horizontal',
+    icon: 'bx-arrow-right-left',
     value: '+120k',
     label: 'transações analisadas',
   },

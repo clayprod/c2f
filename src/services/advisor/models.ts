@@ -141,8 +141,7 @@ export async function fetchOpenAIModels(apiKey?: string): Promise<ModelInfo[]> {
       // Remove duplicates (keep first occurrence)
       .filter((model: ModelInfo, index: number, self: ModelInfo[]) =>
         index === self.findIndex(m => m.id === model.id)
-      )
-      .slice(0, 10); // Limit to top 10 models
+      );
 
     if (models.length > 0) {
       openaiModelsCache = models;

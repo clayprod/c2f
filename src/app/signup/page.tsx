@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { getLogo } from '@/lib/logo';
 import Image from 'next/image';
@@ -14,15 +14,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { DatePicker } from '@/components/ui/date-picker';
+import { Checkbox } from '@/components/ui/checkbox';
 import { buscarCep, buscarEstados, buscarCidadesPorEstado, type Estado, type Cidade } from '@/services/brasil-api/client';
 import { useToast } from '@/hooks/use-toast';
+import { processCurrencyInput, parseCurrencyToCents } from '@/lib/utils';
 
 const GENDER_OPTIONS = [
-  { label: 'Homem (Cisgênero)', value: 'male_cis' },
-  { label: 'Homem (Transgênero)', value: 'male_trans' },
-  { label: 'Mulher (Cisgênero)', value: 'female_cis' },
-  { label: 'Mulher (Transgênero)', value: 'female_trans' },
-  { label: 'Não Binário', value: 'non_binary' },
+  { label: 'Homem', value: 'male_cis' },
+  { label: 'Mulher', value: 'female_cis' },
+  { label: 'Não-binário', value: 'non_binary' },
   { label: 'Outro', value: 'other' },
   { label: 'Prefiro não responder', value: 'prefer_not_to_say' },
 ] as const;
@@ -36,12 +36,41 @@ export default function SignupPage() {
   const [city, setCity] = useState('');
   const [birthDate, setBirthDate] = useState<Date | undefined>(undefined);
   const [gender, setGender] = useState('');
+  const [monthlyIncome, setMonthlyIncome] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingCep, setLoadingCep] = useState(false);
   const [estados, setEstados] = useState<Estado[]>([]);
   const [cidades, setCidades] = useState<Cidade[]>([]);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
+  const [hasAutoFilledFromCep, setHasAutoFilledFromCep] = useState(false);
+  const inviteToken = searchParams?.get('invite');
+
+  // If user already has a session, don't force them through signup.
+  // Redirect to accept page (existing user flow).
+  useEffect(() => {
+    if (!inviteToken) return;
+    try {
+      localStorage.setItem('c2f_pending_invite_token', inviteToken);
+    } catch {
+      // ignore
+    }
+
+    const supabase = createClient();
+    supabase.auth
+      .getUser()
+      .then(({ data }) => {
+        if (data.user) {
+          router.replace(`/app/sharing/accept?token=${encodeURIComponent(inviteToken)}`);
+        }
+      })
+      .catch(() => {
+        // ignore
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inviteToken]);
 
   // Carregar estados ao montar o componente
   useEffect(() => {
@@ -92,8 +121,8 @@ export default function SignupPage() {
       .trim();
   };
 
-  // Buscar CEP quando o usuário terminar de digitar
-  const handleCepBlur = async () => {
+  const lookupCep = async (opts?: { silent?: boolean }): Promise<{ ok: boolean; state?: string; city?: string }> => {
+    const silent = opts?.silent === true;
     const cepLimpo = cep.replace(/\D/g, '');
     if (cepLimpo.length === 8) {
       setLoadingCep(true);
@@ -102,11 +131,12 @@ export default function SignupPage() {
         if (dados) {
           // Primeiro, carrega as cidades do estado retornado
           const cidadesData = await buscarCidadesPorEstado(dados.state);
+          const cidadeDoCep = (dados.city || '').trim();
           const cidadesSorted = cidadesData.sort((a, b) => a.nome.localeCompare(b.nome));
 
           // Tenta encontrar a cidade que corresponde ao nome retornado pela API
           const cidadeEncontrada = cidadesSorted.find(
-            (c) => normalizeCityName(c.nome) === normalizeCityName(dados.city)
+            (c) => normalizeCityName(c.nome) === normalizeCityName(cidadeDoCep)
           );
 
           let cidadeParaPreencher = '';
@@ -115,49 +145,114 @@ export default function SignupPage() {
           } else {
             // Se não encontrar exato, tenta encontrar por contém
             const cidadeParcial = cidadesSorted.find(
-              (c) => normalizeCityName(c.nome).includes(normalizeCityName(dados.city)) ||
-                    normalizeCityName(dados.city).includes(normalizeCityName(c.nome))
+              (c) => normalizeCityName(c.nome).includes(normalizeCityName(cidadeDoCep)) ||
+                normalizeCityName(cidadeDoCep).includes(normalizeCityName(c.nome))
             );
             if (cidadeParcial) {
               cidadeParaPreencher = cidadeParcial.nome;
             }
           }
 
+          // Importante: o Select só mostra valores que existam nas opções.
+          // Se a cidade do CEP não existir na lista (variação de nome), adiciona como fallback.
+          let cidadesFinal = cidadesSorted;
+          if (!cidadeParaPreencher && cidadeDoCep) {
+            const jaExiste = cidadesSorted.some((c) => normalizeCityName(c.nome) === normalizeCityName(cidadeDoCep));
+            if (!jaExiste) {
+              cidadesFinal = [
+                ...cidadesSorted,
+                { codigo_ibge: `cep:${cepLimpo}`, nome: cidadeDoCep },
+              ].sort((a, b) => a.nome.localeCompare(b.nome));
+            }
+            cidadeParaPreencher = cidadeDoCep;
+          }
+
+          // Preencher a lista de cidades AGORA para o Select conseguir renderizar o valor
+          setCidades(cidadesFinal);
+
           // Define estado e cidade
           setState(dados.state);
           setCity(cidadeParaPreencher);
+          setHasAutoFilledFromCep(true);
+          return { ok: true, state: dados.state, city: cidadeParaPreencher };
         } else {
           // CEP não encontrado ou inválido
-          toast({
-            variant: 'destructive',
-            title: 'CEP inválido',
-            description: 'CEP não encontrado. Verifique o CEP digitado e tente novamente.',
-          });
-          setCep(''); // Limpa o campo CEP
+          if (!silent) {
+            toast({
+              variant: 'destructive',
+              title: 'CEP inválido',
+              description: 'CEP não encontrado. Verifique o CEP digitado e tente novamente.',
+            });
+            setCep(''); // Limpa o campo CEP
+          }
+          setCity('');
+          setState('');
+          setCidades([]);
+          return { ok: false };
         }
       } catch (error) {
         console.error('Erro ao buscar CEP:', error);
-        toast({
-          variant: 'destructive',
-          title: 'Falha na busca de endereço',
-          description: 'Não foi possível buscar o endereço. Verifique o CEP e tente novamente.',
-        });
+        if (!silent) {
+          toast({
+            variant: 'destructive',
+            title: 'Falha na busca de endereço',
+            description: 'Não foi possível buscar o endereço. Verifique o CEP e tente novamente.',
+          });
+        }
+        return { ok: false };
       } finally {
         setLoadingCep(false);
       }
-    } else if (cepLimpo.length > 0) {
+    } else if (!silent && cepLimpo.length > 0) {
       toast({
         variant: 'destructive',
         title: 'CEP inválido',
         description: 'CEP deve conter 8 dígitos.',
       });
     }
+    return { ok: false };
+  };
+
+  // Preencher automaticamente assim que o CEP ficar completo (sem depender de blur)
+  useEffect(() => {
+    const cepLimpo = cep.replace(/\D/g, '');
+    if (loadingCep) return;
+    if (cepLimpo.length !== 8) {
+      setHasAutoFilledFromCep(false);
+      return;
+    }
+    if (hasAutoFilledFromCep) return;
+
+    const t = setTimeout(() => {
+      lookupCep({ silent: true });
+    }, 150);
+
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cep, loadingCep, hasAutoFilledFromCep]);
+
+  // Buscar CEP quando o usuário terminar de digitar
+  const handleCepBlur = async () => {
+    await lookupCep({ silent: false });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!city || !state) {
+    // Se o usuário digitou CEP completo e ainda não tem cidade/estado, tenta auto-preencher antes de bloquear o submit
+    const cepLimpo = cep.replace(/\D/g, '');
+    let resolvedCity = city;
+    let resolvedState = state;
+
+    if ((!resolvedCity || !resolvedState) && cepLimpo.length === 8 && !loadingCep) {
+      const res = await lookupCep({ silent: true });
+      if (res.ok) {
+        resolvedCity = res.city || resolvedCity;
+        resolvedState = res.state || resolvedState;
+      }
+    }
+
+    if (!resolvedCity || !resolvedState) {
       toast({
         variant: "destructive",
         title: "Campos obrigatórios",
@@ -166,25 +261,91 @@ export default function SignupPage() {
       return;
     }
 
+    const monthlyIncomeCents = parseCurrencyToCents(monthlyIncome);
+    if (!monthlyIncome || monthlyIncomeCents <= 0) {
+      toast({
+        variant: "destructive",
+        title: "Renda mensal obrigatória",
+        description: "Por favor, informe sua renda média mensal",
+      });
+      return;
+    }
+
+    if (!acceptedTerms) {
+      toast({
+        variant: "destructive",
+        title: "Aceite dos termos obrigatório",
+        description: "Você precisa aceitar os termos de uso e política de privacidade para continuar",
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signUp({
+      // Convert monthly income to cents
+      const monthlyIncomeCents = parseCurrencyToCents(monthlyIncome);
+      
+      const { data: signUpData, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: name,
-            city,
-            state,
+            city: resolvedCity,
+            state: resolvedState,
+            cep: cep || null,
             birth_date: birthDate ? birthDate.toISOString().split('T')[0] : null,
             gender: gender || null,
+            monthly_income_cents: monthlyIncomeCents,
           },
         },
       });
 
       if (error) throw error;
+
+      // If this signup came from an invite link, accept the invite after signup.
+      if (inviteToken) {
+        try {
+          const { data: userAfterSignup } = await supabase.auth.getUser();
+          if (userAfterSignup.user) {
+            const acceptRes = await fetch('/api/sharing/accept', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: inviteToken }),
+            });
+            if (!acceptRes.ok) {
+              const acceptData = await acceptRes.json().catch(() => ({}));
+              console.error('[Signup] Failed to accept invite:', acceptData);
+            }
+          } else {
+            // If no session (email confirmation flow), keep the token so we can accept later after login.
+            localStorage.setItem('c2f_pending_invite_token', inviteToken);
+          }
+        } catch (inviteErr) {
+          console.error('[Signup] Invite acceptance error:', inviteErr);
+        }
+      }
+
+      // Wait for profile to be created by trigger
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Update profile with monthly income if user was created
+      if (signUpData.user) {
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ monthly_income_cents: monthlyIncomeCents })
+          .eq('id', signUpData.user.id);
+
+        if (updateError) {
+          console.error('Error updating monthly income:', updateError);
+          // Don't throw, continue with signup
+        } else {
+          // Call setup_new_user to create emergency fund goal
+          await supabase.rpc('setup_new_user', { p_user_id: signUpData.user.id });
+        }
+      }
 
       router.push('/app');
       router.refresh();
@@ -321,10 +482,10 @@ export default function SignupPage() {
               <label htmlFor="city" className="block text-sm font-medium mb-2">
                 Cidade <span className="text-destructive">*</span>
               </label>
-              <Select 
-                value={city} 
-                onValueChange={setCity} 
-                disabled={loading || loadingCep || !state} 
+              <Select
+                value={city}
+                onValueChange={setCity}
+                disabled={loading || loadingCep || !state}
                 required
               >
                 <SelectTrigger className="w-full px-4 py-3 h-auto rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors">
@@ -352,9 +513,9 @@ export default function SignupPage() {
 
             <div>
               <label className="block text-sm font-medium mb-2">Gênero</label>
-              <Select 
-                value={gender} 
-                onValueChange={setGender} 
+              <Select
+                value={gender}
+                onValueChange={setGender}
                 disabled={loading}
               >
                 <SelectTrigger className="w-full px-4 py-3 h-auto rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors">
@@ -370,7 +531,66 @@ export default function SignupPage() {
               </Select>
             </div>
 
-            <button type="submit" className="btn-primary w-full" disabled={loading}>
+            <div>
+              <label htmlFor="monthlyIncome" className="block text-sm font-medium mb-2">
+                Renda Média Mensal <span className="text-destructive">*</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none select-none">
+                  R$
+                </span>
+                <input
+                  type="text"
+                  id="monthlyIncome"
+                  value={monthlyIncome}
+                  onChange={(e) => {
+                    // Digitação livre: NÃO formatar aqui (isso trava o cursor).
+                    // Formatação acontece apenas no blur.
+                    const raw = e.target.value.replace(/[^\d,.-]/g, '');
+                    setMonthlyIncome(raw);
+                  }}
+                  onBlur={(e) => {
+                    // Garante formatação completa ao perder o foco
+                    if (e.target.value) {
+                      const formatted = processCurrencyInput(e.target.value);
+                      setMonthlyIncome(formatted);
+                    }
+                  }}
+                  className="w-full pl-12 pr-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                  placeholder="0,00"
+                  required
+                  disabled={loading}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Com base nisso, criaremos automaticamente um objetivo de Reserva de Emergência
+              </p>
+            </div>
+
+            <div className="flex items-start space-x-2">
+              <Checkbox
+                id="terms"
+                checked={acceptedTerms}
+                onCheckedChange={(checked) => setAcceptedTerms(checked === true)}
+                disabled={loading}
+                className="mt-1"
+              />
+              <label
+                htmlFor="terms"
+                className="text-sm text-muted-foreground leading-relaxed cursor-pointer"
+              >
+                Li e concordo com os{' '}
+                <Link href="/terms-of-service" className="text-primary hover:underline font-medium">
+                  Termos de Uso
+                </Link>{' '}
+                e{' '}
+                <Link href="/privacy-policy" className="text-primary hover:underline font-medium">
+                  Política de Privacidade
+                </Link>
+              </label>
+            </div>
+
+            <button type="submit" className="btn-primary w-full" disabled={loading || !acceptedTerms}>
               <i className='bx bx-rocket'></i>
               {loading ? 'Criando conta...' : 'Criar conta grátis'}
             </button>
@@ -378,22 +598,20 @@ export default function SignupPage() {
 
           <div className="mt-6 text-center text-sm text-muted-foreground">
             Já tem uma conta?{' '}
-            <Link href="/login" className="text-primary hover:underline font-medium">
+            <Link
+              href={
+                inviteToken
+                  ? `/login?invite=${encodeURIComponent(inviteToken)}&next=${encodeURIComponent(
+                      `/app/sharing/accept?token=${inviteToken}`
+                    )}`
+                  : '/login'
+              }
+              className="text-primary hover:underline font-medium"
+            >
               Entrar
             </Link>
           </div>
         </div>
-
-        <p className="text-center text-xs text-muted-foreground mt-6">
-          Ao criar sua conta, você concorda com nossos{' '}
-          <Link href="/terms-of-service" className="text-primary hover:underline">
-            Termos de Uso
-          </Link>{' '}
-          e{' '}
-          <Link href="/privacy-policy" className="text-primary hover:underline">
-            Política de Privacidade
-          </Link>
-        </p>
       </div>
     </div>
   );

@@ -1,13 +1,9 @@
-import { AppLayout } from '@/components/app/AppLayout';
+export const dynamic = 'force-dynamic';
 
 export default function PrivacyPolicyAppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <AppLayout>
-      {children}
-    </AppLayout>
-  );
+  return <>{children}</>;
 }

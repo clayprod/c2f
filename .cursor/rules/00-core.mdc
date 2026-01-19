@@ -14,3 +14,8 @@ alwaysApply: true
 - Toda entrada externa deve ser validada (schema) e erros devem ser padronizados.
 - Toda lógica de dinheiro deve usar tipos/precisão correta (não usar float para valores monetários).
 - Observabilidade mínima: logs estruturados + rastreio de eventos críticos.
+
+## Regras de Segurança
+- **NUNCA** expor, vazar ou "commitar" chaves de API, segredos ou senhas.
+- Arquivos `.env`, `.env.local` e `.env.backup` são estritamente confidenciais e não devem ser lidos ou modificados sem instrução explícita do usuário.
+

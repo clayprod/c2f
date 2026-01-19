@@ -11,7 +11,7 @@ interface Stats {
   plan_distribution: {
     free: number;
     pro: number;
-    business: number;
+    premium: number;
   };
   user_growth: Array<{ month: string; count: number }>;
 }
@@ -108,8 +108,8 @@ export default function AdminDashboard() {
               <div className="text-sm text-muted-foreground mt-1">Pro</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-amber-500">{stats.plan_distribution.business}</div>
-              <div className="text-sm text-muted-foreground mt-1">Business</div>
+              <div className="text-3xl font-bold text-amber-500">{stats.plan_distribution.premium}</div>
+              <div className="text-sm text-muted-foreground mt-1">Premium</div>
             </div>
           </div>
         </CardContent>
@@ -134,4 +134,5 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import WhatsAppIntegration from '@/components/integrations/WhatsAppIntegration';
 
 interface PluggyItem {
   id: string;
@@ -178,7 +179,7 @@ export default function IntegrationsPage() {
     return new Date(date).toLocaleString('pt-BR');
   };
 
-  const canConnect = userPlan?.plan === 'business';
+  const canConnect = userPlan?.plan === 'premium';
 
   return (
     <div className="space-y-6">
@@ -204,11 +205,11 @@ export default function IntegrationsPage() {
             <div>
               <h3 className="font-semibold mb-1">Recurso Premium</h3>
               <p className="text-sm text-muted-foreground mb-3">
-                A integracao bancaria via Open Finance esta disponivel apenas no plano Business.
+                A integracao bancaria via Open Finance esta disponivel apenas no plano Premium.
                 Faca upgrade para conectar suas contas automaticamente.
               </p>
               <Button variant="outline" asChild>
-                <a href="/pricing">Ver Planos</a>
+                <a href="/app/settings">Fazer Upgrade</a>
               </Button>
             </div>
           </div>
@@ -274,7 +275,7 @@ export default function IntegrationsPage() {
                       {syncing === item.item_id ? (
                         <i className='bx bx-loader-alt bx-spin'></i>
                       ) : (
-                        <i className='bx bx-refresh'></i>
+                        <i className='bx bx-repeat'></i>
                       )}
                       Sincronizar
                     </Button>
@@ -296,7 +297,7 @@ export default function IntegrationsPage() {
                       <span>{lastSync.accounts_synced || 0} contas</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <i className='bx bx-transfer'></i>
+                      <i className='bx bx-arrow-right-left'></i>
                       <span>{lastSync.transactions_synced || 0} transações</span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -311,12 +312,42 @@ export default function IntegrationsPage() {
         </div>
       )}
 
+      {/* WhatsApp Integration - Premium Only */}
+      {canConnect && (
+        <div className="mt-8">
+          <h2 className="font-display text-xl font-semibold mb-4">WhatsApp</h2>
+          <WhatsAppIntegration onStatusChange={fetchItems} />
+        </div>
+      )}
+
+      {!canConnect && (
+        <div className="mt-8">
+          <h2 className="font-display text-xl font-semibold mb-4">WhatsApp</h2>
+          <div className="glass-card p-6 border-yellow-500/20 bg-yellow-500/5">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center flex-shrink-0">
+                <i className='bxl bx-whatsapp text-xl text-green-500'></i>
+              </div>
+              <div>
+                <h3 className="font-semibold mb-1">Recurso Premium</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Gerencie suas transacoes por mensagens de WhatsApp. Disponivel apenas no plano Premium.
+                </p>
+                <Button variant="outline" asChild>
+                  <a href="/app/settings">Fazer Upgrade</a>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="glass-card p-6">
         <h3 className="font-display font-semibold mb-4">Sobre o Open Finance</h3>
         <div className="grid sm:grid-cols-3 gap-4">
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center flex-shrink-0">
-              <i className='bx bx-shield-quarter text-green-500'></i>
+              <i className='bx bx-shield text-green-500'></i>
             </div>
             <div>
               <h4 className="font-medium text-sm">Seguro</h4>
@@ -325,7 +356,7 @@ export default function IntegrationsPage() {
           </div>
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-              <i className='bx bx-sync text-blue-500'></i>
+              <i className='bx bx-repeat text-blue-500'></i>
             </div>
             <div>
               <h4 className="font-medium text-sm">Automático</h4>
@@ -334,7 +365,7 @@ export default function IntegrationsPage() {
           </div>
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center flex-shrink-0">
-              <i className='bx bx-lock-alt text-purple-500'></i>
+              <i className='bx bx-lock text-purple-500'></i>
             </div>
             <div>
               <h4 className="font-medium text-sm">Privado</h4>

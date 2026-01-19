@@ -31,14 +31,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { buscarCep, buscarEstados, buscarCidadesPorEstado, type Estado, type Cidade } from '@/services/brasil-api/client';
+import SharingSection from '@/components/sharing/SharingSection';
+import { formatCurrency, processCurrencyInput, parseCurrencyToCents } from '@/lib/utils';
+import { useTheme } from '@/hooks/useTheme';
 
 const GENDER_OPTIONS = [
-  { label: 'Homem (Cisgênero)', value: 'male_cis' },
-  { label: 'Homem (Transgênero)', value: 'male_trans' },
-  { label: 'Mulher (Cisgênero)', value: 'female_cis' },
-  { label: 'Mulher (Transgênero)', value: 'female_trans' },
-  { label: 'Não Binário', value: 'non_binary' },
+  { label: 'Homem', value: 'male_cis' },
+  { label: 'Mulher', value: 'female_cis' },
+  { label: 'Não-binário', value: 'non_binary' },
   { label: 'Outro', value: 'other' },
   { label: 'Prefiro não responder', value: 'prefer_not_to_say' },
 ] as const;
@@ -59,6 +61,8 @@ interface UserProfile {
   state: string | null;
   birth_date: string | null;
   gender: string | null;
+  cep: string | null;
+  monthly_income_cents: number | null;
   created_at: string;
 }
 
@@ -82,6 +86,8 @@ export default function SettingsPage() {
     state: '',
     birth_date: '',
     gender: '',
+    cep: '',
+    monthly_income: '',
   });
   const [birthDate, setBirthDate] = useState<Date | undefined>(undefined);
   const [cep, setCep] = useState('');
@@ -93,7 +99,10 @@ export default function SettingsPage() {
   const [deleting, setDeleting] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const { toast } = useToast();
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     fetchProfile();
@@ -171,7 +180,7 @@ export default function SettingsPage() {
             // Se não encontrar exato, tenta encontrar por contém
             const cidadeParcial = cidadesSorted.find(
               (c) => normalizeCityName(c.nome).includes(normalizeCityName(dados.city)) ||
-                    normalizeCityName(dados.city).includes(normalizeCityName(c.nome))
+                normalizeCityName(dados.city).includes(normalizeCityName(c.nome))
             );
             if (cidadeParcial) {
               cidadeParaPreencher = cidadeParcial.nome;
@@ -234,6 +243,8 @@ export default function SettingsPage() {
             state: profileData.state,
             birth_date: profileData.birth_date,
             gender: profileData.gender,
+            cep: profileData.cep,
+            monthly_income_cents: profileData.monthly_income_cents,
             created_at: user.created_at,
           });
           setFormData({
@@ -243,7 +254,14 @@ export default function SettingsPage() {
             state: profileData.state || '',
             birth_date: profileData.birth_date || '',
             gender: profileData.gender || '',
+            cep: profileData.cep || '',
+            monthly_income: profileData.monthly_income_cents 
+              ? (profileData.monthly_income_cents / 100).toFixed(2) 
+              : '',
           });
+          if (profileData.cep) {
+            setCep(profileData.cep);
+          }
           if (profileData.birth_date) {
             // Treats date as local instead of UTC to prevent timezone shifts
             const [year, month, day] = profileData.birth_date.split('-').map(Number);
@@ -264,6 +282,8 @@ export default function SettingsPage() {
             state: null,
             birth_date: null,
             gender: null,
+            cep: null,
+            monthly_income_cents: null,
             created_at: user.created_at,
           });
         }
@@ -327,11 +347,11 @@ export default function SettingsPage() {
       }
 
       const result = await response.json();
-      
+
       // Update profile immediately with new avatar
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (user) {
         const { error: updateError } = await supabase
           .from('profiles')
@@ -342,6 +362,9 @@ export default function SettingsPage() {
           .eq('id', user.id);
 
         if (updateError) throw updateError;
+
+        // Notify other components that profile has been updated
+        window.dispatchEvent(new Event('profile-updated'));
 
         setFormData({ ...formData, avatar_url: result.url });
         setProfile(prev => prev ? { ...prev, avatar_url: result.url } : null);
@@ -380,6 +403,9 @@ export default function SettingsPage() {
 
       if (error) throw error;
 
+      // Notify other components that profile has been updated
+      window.dispatchEvent(new Event('profile-updated'));
+
       setFormData({ ...formData, avatar_url: '' });
       setProfile(prev => prev ? { ...prev, avatar_url: null } : null);
       setAvatarPreview(null);
@@ -406,6 +432,10 @@ export default function SettingsPage() {
       setSaving(true);
       const supabase = createClient();
 
+      const monthlyIncomeCents = formData.monthly_income 
+        ? parseCurrencyToCents(formData.monthly_income)
+        : null;
+
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -415,24 +445,40 @@ export default function SettingsPage() {
           state: formData.state || null,
           birth_date: birthDate ? format(birthDate, 'yyyy-MM-dd') : null,
           gender: formData.gender || null,
+          cep: cep || null,
+          monthly_income_cents: monthlyIncomeCents,
         })
         .eq('id', profile.id);
 
       if (error) throw error;
+
+      // If monthly income changed, update or create emergency fund goal
+      if (monthlyIncomeCents && monthlyIncomeCents > 0) {
+        const { error: rpcError } = await supabase.rpc('setup_new_user', { p_user_id: profile.id });
+        if (rpcError) {
+          console.error('Error updating emergency fund goal:', rpcError);
+          // Don't throw here, just log - profile update was successful
+        }
+      }
+
+      // Notify other components that profile has been updated
+      window.dispatchEvent(new Event('profile-updated'));
 
       toast({
         title: 'Perfil atualizado',
         description: 'Suas informacoes foram salvas com sucesso',
       });
 
-      setProfile(prev => prev ? { 
-        ...prev, 
-        full_name: formData.full_name, 
+      setProfile(prev => prev ? {
+        ...prev,
+        full_name: formData.full_name,
         avatar_url: formData.avatar_url || null,
         city: formData.city || null,
         state: formData.state || null,
         birth_date: birthDate ? birthDate.toISOString().split('T')[0] : null,
         gender: formData.gender || null,
+        cep: cep || null,
+        monthly_income_cents: monthlyIncomeCents,
       } : null);
     } catch (error: any) {
       console.error('Error saving profile:', JSON.stringify(error, null, 2));
@@ -469,7 +515,7 @@ export default function SettingsPage() {
     }
   };
 
-  const handleUpgrade = async () => {
+  const handleUpgrade = async (planType: 'pro' | 'premium') => {
     try {
       setUpgrading(true);
       const res = await fetch('/api/billing/checkout', {
@@ -477,7 +523,7 @@ export default function SettingsPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ plan: 'pro' }),
+        body: JSON.stringify({ plan: planType }),
       });
 
       if (!res.ok) {
@@ -499,11 +545,56 @@ export default function SettingsPage() {
     }
   };
 
+  const handleCancelSubscription = async () => {
+    try {
+      setCancelling(true);
+      const res = await fetch('/api/billing/cancel', {
+        method: 'POST',
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        const errorMessage = errorData.error || 'Erro ao cancelar assinatura';
+        
+        // If subscription was cleaned up automatically, refresh plan
+        if (errorMessage.includes('registro local foi limpo')) {
+          await fetchPlan();
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      const data = await res.json();
+      
+      toast({
+        title: 'Assinatura cancelada',
+        description: data.message || 'Sua assinatura foi cancelada. Você continuará com acesso até o fim do período atual.',
+      });
+
+      // Refresh plan data
+      await fetchPlan();
+      setShowCancelDialog(false);
+    } catch (error: any) {
+      toast({
+        title: 'Falha ao cancelar assinatura',
+        description: error.message || 'Não foi possível cancelar a assinatura. Tente novamente mais tarde.',
+        variant: 'destructive',
+      });
+      
+      // If error mentions cleanup, refresh plan anyway
+      if (error.message && error.message.includes('registro local foi limpo')) {
+        await fetchPlan();
+      }
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   const getPlanLabel = (planName: string) => {
     const plans: Record<string, { label: string; color: string }> = {
       free: { label: 'Gratuito', color: 'bg-muted text-muted-foreground' },
       pro: { label: 'Pro', color: 'bg-blue-500/10 text-blue-500' },
-      business: { label: 'Business', color: 'bg-purple-500/10 text-purple-500' },
+      premium: { label: 'Premium', color: 'bg-amber-500/10 text-amber-500' },
     };
     return plans[planName] || plans.free;
   };
@@ -517,284 +608,394 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-7xl">
+    <div className="space-y-4 md:space-y-6 max-w-7xl">
       <div>
-        <h1 className="font-display text-2xl md:text-3xl font-bold">Configurações</h1>
-        <p className="text-muted-foreground">Gerencie sua conta e preferencias</p>
+        <h1 className="font-display text-xl md:text-2xl lg:text-3xl font-bold">Configurações</h1>
+        <p className="text-muted-foreground text-sm md:text-base">Gerencie sua conta e preferencias</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Profile Section - Left Column */}
-        <div className="glass-card p-6">
-          <h2 className="font-display font-semibold text-lg mb-4 flex items-center gap-2">
-            <i className='bx bx-user text-xl text-primary'></i>
-            Perfil
-          </h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Foto de Perfil</label>
-              <div className="flex items-center gap-4">
-                {avatarPreview || profile?.avatar_url ? (
-                  <div className="relative">
-                    <img
-                      src={avatarPreview || profile?.avatar_url || ''}
-                      alt="Avatar"
-                      className="w-20 h-20 rounded-full object-cover border-2 border-border"
+      <Tabs defaultValue="profile" className="space-y-4 md:space-y-6">
+        <TabsList className="bg-muted/50 p-1 w-full sm:w-auto">
+          <TabsTrigger value="profile" className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm flex-1 sm:flex-initial">
+            <i className="bx bx-user"></i>
+            <span>Perfil</span>
+          </TabsTrigger>
+          <TabsTrigger value="sharing" className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm flex-1 sm:flex-initial">
+            <i className="bx bx-share-alt"></i>
+            <span>Compartilhamento</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="profile">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+            {/* Profile Section - Left Column */}
+            <div className="space-y-4 md:space-y-6">
+              <div className="glass-card p-4 md:p-6">
+                <h2 className="font-display font-semibold text-base md:text-lg mb-3 md:mb-4 flex items-center gap-2">
+                  <i className='bx bx-user text-lg md:text-xl text-primary'></i>
+                  Perfil
+                </h2>
+                <div className="space-y-3 md:space-y-4">
+                  <div>
+                    <label className="block text-xs md:text-sm font-medium mb-1.5 md:mb-2">Foto de Perfil</label>
+                    <div className="flex items-center gap-3 md:gap-4">
+                      {avatarPreview || profile?.avatar_url ? (
+                        <div className="relative flex-shrink-0">
+                          <img
+                            src={avatarPreview || profile?.avatar_url || ''}
+                            alt="Avatar"
+                            className="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover border-2 border-border"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleRemoveAvatar}
+                            className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground w-5 h-5 md:w-6 md:h-6 rounded-full flex items-center justify-center hover:bg-destructive/90 transition-colors"
+                            disabled={uploadingAvatar || saving}
+                            title="Remover foto"
+                          >
+                            <i className='bx bx-x text-xs md:text-sm'></i>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-muted flex items-center justify-center border-2 border-border flex-shrink-0">
+                          <i className='bx bx-user text-2xl md:text-3xl text-muted-foreground'></i>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <label className="inline-block cursor-pointer">
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept="image/*"
+                            onChange={handleAvatarUpload}
+                            disabled={uploadingAvatar}
+                          />
+                          <span className="btn-secondary inline-flex items-center gap-1.5 md:gap-2 text-xs md:text-sm">
+                            {uploadingAvatar ? (
+                              <>
+                                <i className='bx bx-loader-alt bx-spin'></i>
+                                <span className="hidden sm:inline">Fazendo upload...</span>
+                                <span className="sm:hidden">Upload...</span>
+                              </>
+                            ) : (
+                              <>
+                                <i className='bx bx-image-add'></i>
+                                {avatarPreview || profile?.avatar_url ? 'Alterar' : 'Adicionar'}
+                              </>
+                            )}
+                          </span>
+                        </label>
+                        <p className="text-[10px] md:text-xs text-muted-foreground mt-1">
+                          PNG, JPG, GIF ou WEBP (máx. 5MB)
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs md:text-sm font-medium mb-1.5 md:mb-2">Nome completo</label>
+                    <input
+                      type="text"
+                      value={formData.full_name}
+                      onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                      className="w-full px-3 md:px-4 py-2.5 md:py-3 text-sm md:text-base rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                      placeholder="Seu nome"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-xs md:text-sm font-medium mb-1.5 md:mb-2">Email</label>
+                    <input
+                      type="email"
+                      value={profile?.email || ''}
+                      disabled
+                      className="w-full px-3 md:px-4 py-2.5 md:py-3 text-sm md:text-base rounded-xl bg-muted/30 border border-border text-muted-foreground cursor-not-allowed"
+                    />
+                    <p className="text-[10px] md:text-xs text-muted-foreground mt-1">O email não pode ser alterado</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs md:text-sm font-medium mb-1.5 md:mb-2">CEP (opcional)</label>
+                    <input
+                      type="text"
+                      value={cep}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '');
+                        if (value.length <= 8) {
+                          setCep(value);
+                        }
+                      }}
+                      onBlur={handleCepBlur}
+                      className="w-full px-3 md:px-4 py-2.5 md:py-3 text-sm md:text-base rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                      placeholder="00000-000"
+                      disabled={saving || loadingCep}
+                      maxLength={8}
+                    />
+                    {loadingCep && (
+                      <p className="text-[10px] md:text-xs text-muted-foreground mt-1">Buscando endereço...</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs md:text-sm font-medium mb-1.5 md:mb-2">Estado</label>
+                    <Select
+                      value={formData.state}
+                      onValueChange={(value) => setFormData({ ...formData, state: value })}
+                      disabled={saving || loadingCep}
+                    >
+                      <SelectTrigger className="w-full px-3 md:px-4 py-2.5 md:py-3 h-auto rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors text-sm md:text-base">
+                        <SelectValue placeholder="Selecione o estado" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {estados.map((estado) => (
+                          <SelectItem key={estado.sigla} value={estado.sigla}>
+                            {estado.nome} ({estado.sigla})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs md:text-sm font-medium mb-1.5 md:mb-2">Cidade</label>
+                    <Select
+                      value={formData.city}
+                      onValueChange={(value) => setFormData({ ...formData, city: value })}
+                      disabled={saving || loadingCep || !formData.state}
+                    >
+                      <SelectTrigger className="w-full px-3 md:px-4 py-2.5 md:py-3 h-auto rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors text-sm md:text-base">
+                        <SelectValue placeholder={formData.state ? "Selecione a cidade" : "Selecione o estado primeiro"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cidades.map((cidade) => (
+                          <SelectItem key={cidade.codigo_ibge} value={cidade.nome}>
+                            {cidade.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs md:text-sm font-medium mb-1.5 md:mb-2">Data de Nascimento</label>
+                    <DatePicker
+                      date={birthDate}
+                      setDate={setBirthDate}
+                      placeholder="Selecione sua data de nascimento"
+                      disabled={saving}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs md:text-sm font-medium mb-1.5 md:mb-2">Gênero</label>
+                    <Select
+                      value={formData.gender}
+                      onValueChange={(value) => setFormData({ ...formData, gender: value })}
+                      disabled={saving}
+                    >
+                      <SelectTrigger className="w-full px-3 md:px-4 py-2.5 md:py-3 h-auto rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors text-sm md:text-base">
+                        <SelectValue placeholder="Selecione o gênero" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {GENDER_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label htmlFor="monthlyIncome" className="block text-xs md:text-sm font-medium mb-1.5 md:mb-2">
+                      Renda Média Mensal
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-muted-foreground text-sm md:text-base pointer-events-none select-none">
+                        R$
+                      </span>
+                      <input
+                        type="text"
+                        id="monthlyIncome"
+                        value={formData.monthly_income}
+                        onChange={(e) => {
+                          // Digitação livre: NÃO formatar aqui (isso trava o cursor).
+                          // Formatação acontece apenas no blur.
+                          const raw = e.target.value.replace(/[^\d,.-]/g, '');
+                          setFormData({ ...formData, monthly_income: raw });
+                        }}
+                        onBlur={(e) => {
+                          // Garante formatação completa ao perder o foco
+                          if (e.target.value) {
+                            const formatted = processCurrencyInput(e.target.value);
+                            setFormData({ ...formData, monthly_income: formatted });
+                          }
+                        }}
+                        className="w-full pl-12 md:pl-14 pr-3 md:pr-4 py-2.5 md:py-3 text-sm md:text-base rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                        placeholder="0,00"
+                        disabled={saving}
+                      />
+                    </div>
+                    <p className="text-[10px] md:text-xs text-muted-foreground mt-1">
+                      Com base nisso, atualizaremos automaticamente o objetivo de Reserva de Emergência (6x a renda mensal)
+                    </p>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button onClick={handleSaveProfile} disabled={saving} className="btn-primary text-sm">
+                      {saving ? 'Salvando...' : 'Salvar Alteracoes'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="glass-card p-4 md:p-6">
+                <h2 className="font-display font-semibold text-base md:text-lg mb-3 md:mb-4 flex items-center gap-2">
+                  <i className='bx bx-palette text-lg md:text-xl text-primary'></i>
+                  Tema
+                </h2>
+                <div className="flex flex-col gap-3 md:gap-4">
+                  <div>
+                    <p className="font-medium text-sm md:text-base">Aparência do app</p>
+                    <p className="text-xs md:text-sm text-muted-foreground">
+                      Escolha entre tema claro ou escuro. O padrão é escuro.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={handleRemoveAvatar}
-                      className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground w-6 h-6 rounded-full flex items-center justify-center hover:bg-destructive/90 transition-colors"
-                      disabled={uploadingAvatar || saving}
-                      title="Remover foto"
+                      onClick={() => setTheme('light')}
+                      className={`px-3 md:px-4 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-medium border transition-colors ${theme === 'light'
+                        ? 'bg-primary/10 text-primary border-primary/40'
+                        : 'text-muted-foreground border-border/60 hover:text-foreground hover:border-border'
+                        }`}
+                      aria-pressed={theme === 'light'}
                     >
-                      <i className='bx bx-x text-sm'></i>
+                      Claro
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTheme('dark')}
+                      className={`px-3 md:px-4 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-medium border transition-colors ${theme === 'dark'
+                        ? 'bg-primary/10 text-primary border-primary/40'
+                        : 'text-muted-foreground border-border/60 hover:text-foreground hover:border-border'
+                        }`}
+                      aria-pressed={theme === 'dark'}
+                    >
+                      Escuro
                     </button>
                   </div>
-                ) : (
-                  <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center border-2 border-border">
-                    <i className='bx bx-user text-3xl text-muted-foreground'></i>
-                  </div>
-                )}
-                <div className="flex-1">
-                  <label className="inline-block cursor-pointer">
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept="image/*"
-                      onChange={handleAvatarUpload}
-                      disabled={uploadingAvatar}
-                    />
-                    <span className="btn-secondary inline-flex items-center gap-2">
-                      {uploadingAvatar ? (
-                        <>
-                          <i className='bx bx-loader-alt bx-spin'></i>
-                          Fazendo upload...
-                        </>
-                      ) : (
-                        <>
-                          <i className='bx bx-image-add'></i>
-                          {avatarPreview || profile?.avatar_url ? 'Alterar foto' : 'Adicionar foto'}
-                        </>
-                      )}
-                    </span>
-                  </label>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    PNG, JPG, GIF ou WEBP (máx. 5MB)
-                  </p>
                 </div>
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-2">Nome completo</label>
-              <input
-                type="text"
-                value={formData.full_name}
-                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
-                placeholder="Seu nome"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Email</label>
-              <input
-                type="email"
-                value={profile?.email || ''}
-                disabled
-                className="w-full px-4 py-3 rounded-xl bg-muted/30 border border-border text-muted-foreground cursor-not-allowed"
-              />
-              <p className="text-xs text-muted-foreground mt-1">O email não pode ser alterado</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">CEP (opcional)</label>
-              <input
-                type="text"
-                value={cep}
-                onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, '');
-                  if (value.length <= 8) {
-                    setCep(value);
-                  }
-                }}
-                onBlur={handleCepBlur}
-                className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
-                placeholder="00000-000"
-                disabled={saving || loadingCep}
-                maxLength={8}
-              />
-              {loadingCep && (
-                <p className="text-xs text-muted-foreground mt-1">Buscando endereço...</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Estado</label>
-              <Select 
-                value={formData.state} 
-                onValueChange={(value) => setFormData({ ...formData, state: value })} 
-                disabled={saving || loadingCep}
-              >
-                <SelectTrigger className="w-full px-4 py-3 h-auto rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors">
-                  <SelectValue placeholder="Selecione o estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  {estados.map((estado) => (
-                    <SelectItem key={estado.sigla} value={estado.sigla}>
-                      {estado.nome} ({estado.sigla})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Cidade</label>
-              <Select 
-                value={formData.city} 
-                onValueChange={(value) => setFormData({ ...formData, city: value })} 
-                disabled={saving || loadingCep || !formData.state}
-              >
-                <SelectTrigger className="w-full px-4 py-3 h-auto rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors">
-                  <SelectValue placeholder={formData.state ? "Selecione a cidade" : "Selecione o estado primeiro"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {cidades.map((cidade) => (
-                    <SelectItem key={cidade.codigo_ibge} value={cidade.nome}>
-                      {cidade.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Data de Nascimento</label>
-              <DatePicker
-                date={birthDate}
-                setDate={setBirthDate}
-                placeholder="Selecione sua data de nascimento"
-                disabled={saving}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Gênero</label>
-              <Select 
-                value={formData.gender} 
-                onValueChange={(value) => setFormData({ ...formData, gender: value })} 
-                disabled={saving}
-              >
-                <SelectTrigger className="w-full px-4 py-3 h-auto rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors">
-                  <SelectValue placeholder="Selecione o gênero" />
-                </SelectTrigger>
-                <SelectContent>
-                  {GENDER_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex justify-end">
-              <Button onClick={handleSaveProfile} disabled={saving} className="btn-primary">
-                {saving ? 'Salvando...' : 'Salvar Alteracoes'}
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column - Subscription, Account Info, and Danger Zone */}
-        <div className="space-y-6">
-          {/* Subscription Section */}
-          <div className="glass-card p-6">
-            <h2 className="font-display font-semibold text-lg mb-4 flex items-center gap-2">
-              <i className='bx bx-credit-card text-xl text-primary'></i>
-              Assinatura
-            </h2>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="font-medium">Plano atual:</span>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPlanLabel(plan?.plan || 'free').color}`}>
-                  {getPlanLabel(plan?.plan || 'free').label}
-                </span>
+            {/* Right Column - Subscription, Account Info, and Danger Zone */}
+            <div className="space-y-4 md:space-y-6">
+              {/* Subscription Section */}
+              <div className="glass-card p-4 md:p-6">
+                <h2 className="font-display font-semibold text-base md:text-lg mb-3 md:mb-4 flex items-center gap-2">
+                  <i className='bx bx-credit-card text-lg md:text-xl text-primary'></i>
+                  Assinatura
+                </h2>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-sm md:text-base">Plano atual:</span>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPlanLabel(plan?.plan || 'free').color}`}>
+                      {getPlanLabel(plan?.plan || 'free').label}
+                    </span>
+                  </div>
+                  {plan?.current_period_end && (
+                    <p className="text-xs md:text-sm text-muted-foreground">
+                      Proxima cobranca: {new Date(plan.current_period_end).toLocaleDateString('pt-BR')}
+                    </p>
+                  )}
+                  <div className="flex flex-col gap-2 pt-2">
+                    <div className="flex gap-2 flex-wrap">
+                      {plan?.plan !== 'premium' && (
+                        <Button variant="default" onClick={() => setShowUpgradeModal(true)} className="flex-1 min-w-[120px] text-xs md:text-sm">
+                          Upgrade
+                        </Button>
+                      )}
+                      {plan?.plan !== 'free' && (
+                        <Button variant="outline" onClick={handleManageBilling} className="flex-1 min-w-[100px] text-xs md:text-sm">
+                          Gerenciar
+                        </Button>
+                      )}
+                    </div>
+                    {plan?.plan !== 'free' && (
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setShowCancelDialog(true)}
+                        className="w-full border-red-500/50 text-red-500 hover:bg-red-500/10 text-xs md:text-sm"
+                      >
+                        <i className='bx bx-x-circle mr-1.5 md:mr-2'></i>
+                        Cancelar Assinatura
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
-              {plan?.current_period_end && (
-                <p className="text-sm text-muted-foreground">
-                  Proxima cobranca: {new Date(plan.current_period_end).toLocaleDateString('pt-BR')}
+
+              {/* Account Info Section */}
+              <div className="glass-card p-4 md:p-6">
+                <h2 className="font-display font-semibold text-base md:text-lg mb-3 md:mb-4 flex items-center gap-2">
+                  <i className='bx bx-info-circle text-lg md:text-xl text-primary'></i>
+                  Informacoes da Conta
+                </h2>
+                <div className="space-y-3 text-xs md:text-sm">
+                  <div className="flex justify-between py-2 border-b border-border gap-2">
+                    <span className="text-muted-foreground">ID da conta</span>
+                    <span className="font-mono text-[10px] md:text-xs truncate max-w-[120px] md:max-w-none">{profile?.id}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-border">
+                    <span className="text-muted-foreground">Membro desde</span>
+                    <span>{profile?.created_at ? new Date(profile.created_at).toLocaleDateString('pt-BR') : '-'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Danger Zone */}
+              <div className="glass-card p-4 md:p-6 border-red-500/20">
+                <h2 className="font-display font-semibold text-base md:text-lg mb-3 md:mb-4 flex items-center gap-2 text-red-500">
+                  <i className='bx bx-error text-lg md:text-xl'></i>
+                  Zona de Perigo
+                </h2>
+                <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">
+                  Ações irreversíveis. Tenha cuidado ao utilizar estas opções.
                 </p>
-              )}
-              <div className="flex gap-2 pt-2">
-                {plan?.plan !== 'business' && (
-                  <Button variant="outline" onClick={() => setShowUpgradeModal(true)} className="flex-1">
-                    Fazer Upgrade
+                <div className="flex flex-col gap-2">
+                  <Button
+                    variant="outline"
+                    className="border-red-500/50 text-red-500 hover:bg-red-500/10 w-full text-xs md:text-sm"
+                    onClick={() => {
+                      toast({
+                        title: 'Funcionalidade em desenvolvimento',
+                        description: 'A exportação de dados estará disponível em breve',
+                      });
+                    }}
+                  >
+                    <i className='bx bx-download'></i>
+                    Exportar Dados
                   </Button>
-                )}
-                {plan?.plan !== 'free' && (
-                  <Button variant="outline" onClick={handleManageBilling} className="flex-1">
-                    Gerenciar
+                  <Button
+                    variant="outline"
+                    className="border-red-500/50 text-red-500 hover:bg-red-500/10 w-full text-xs md:text-sm"
+                    onClick={() => setShowDeleteDialog(true)}
+                  >
+                    <i className='bx bx-trash'></i>
+                    Excluir Conta
                   </Button>
-                )}
+                </div>
               </div>
             </div>
           </div>
+        </TabsContent>
 
-          {/* Account Info Section */}
+        <TabsContent value="sharing">
           <div className="glass-card p-6">
-            <h2 className="font-display font-semibold text-lg mb-4 flex items-center gap-2">
-              <i className='bx bx-info-circle text-xl text-primary'></i>
-              Informacoes da Conta
-            </h2>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between py-2 border-b border-border">
-                <span className="text-muted-foreground">ID da conta</span>
-                <span className="font-mono text-xs">{profile?.id}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-border">
-                <span className="text-muted-foreground">Membro desde</span>
-                <span>{profile?.created_at ? new Date(profile.created_at).toLocaleDateString('pt-BR') : '-'}</span>
-              </div>
-            </div>
+            <SharingSection />
           </div>
-
-          {/* Danger Zone */}
-          <div className="glass-card p-6 border-red-500/20">
-            <h2 className="font-display font-semibold text-lg mb-4 flex items-center gap-2 text-red-500">
-              <i className='bx bx-error text-xl'></i>
-              Zona de Perigo
-            </h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Ações irreversíveis. Tenha cuidado ao utilizar estas opções.
-            </p>
-            <div className="flex flex-col gap-2">
-              <Button
-                variant="outline"
-                className="border-red-500/50 text-red-500 hover:bg-red-500/10 w-full"
-                onClick={() => {
-                  toast({
-                    title: 'Funcionalidade em desenvolvimento',
-                    description: 'A exportação de dados estará disponível em breve',
-                  });
-                }}
-              >
-                <i className='bx bx-download'></i>
-                Exportar Dados
-              </Button>
-              <Button
-                variant="outline"
-                className="border-red-500/50 text-red-500 hover:bg-red-500/10 w-full"
-                onClick={() => setShowDeleteDialog(true)}
-              >
-                <i className='bx bx-trash'></i>
-                Excluir Conta
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Delete Account Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -822,7 +1023,7 @@ export default function SettingsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-            <AlertDialogCancel 
+            <AlertDialogCancel
               onClick={() => {
                 setDeleteConfirmation('');
                 setShowDeleteDialog(false);
@@ -881,46 +1082,88 @@ export default function SettingsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Cancel Subscription Dialog */}
+      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-500 flex items-center gap-2">
+              <i className='bx bx-error-circle text-xl'></i>
+              Cancelar Assinatura
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-left space-y-4">
+              <div>
+                Tem certeza que deseja cancelar sua assinatura?
+              </div>
+              <div className="text-sm">
+                Sua assinatura será cancelada ao final do período atual ({plan?.current_period_end ? new Date(plan.current_period_end).toLocaleDateString('pt-BR') : ''}). 
+                Você continuará tendo acesso a todas as funcionalidades até essa data.
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Após o cancelamento, você poderá reativar sua assinatura a qualquer momento.
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel onClick={() => setShowCancelDialog(false)}>
+              Manter Assinatura
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancelSubscription}
+              disabled={cancelling}
+              className="bg-red-500 hover:bg-red-600 text-white focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {cancelling ? (
+                <>
+                  <i className='bx bx-loader-alt bx-spin mr-2'></i>
+                  Cancelando...
+                </>
+              ) : (
+                <>
+                  <i className='bx bx-x-circle mr-2'></i>
+                  Sim, Cancelar Assinatura
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Upgrade Modal */}
       <Dialog open={showUpgradeModal} onOpenChange={setShowUpgradeModal}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <i className='bx bx-rocket text-2xl text-primary'></i>
-              Upgrade para Plano Pro
+            <DialogTitle className="flex items-center gap-2 text-2xl font-display font-bold">
+              <i className='bx bx-rocket text-primary'></i>
+              Escolha seu novo Plano
             </DialogTitle>
             <DialogDescription>
-              Desbloqueie todas as funcionalidades avançadas do c2Finance
+              Desbloqueie o poder da IA e tenha controle total das suas finanças
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-4">
-            <div className="mb-6">
-              <div className="flex items-baseline gap-2 mb-2">
-                <span className="text-3xl font-bold">R$29</span>
-                <span className="text-muted-foreground">/mês</span>
+          <div className="grid md:grid-cols-2 gap-6 py-4">
+            {/* Pro Plan Card */}
+            <div className={`p-6 rounded-2xl border-2 transition-all ${plan?.plan === 'pro' ? 'border-primary/20 bg-primary/5 opacity-60 cursor-default' : 'border-border hover:border-primary/50'}`}>
+              <div className="mb-6">
+                <h3 className="text-xl font-bold flex items-center gap-2">
+                  Plano Pro
+                  {plan?.plan === 'pro' && <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full uppercase">Atual</span>}
+                </h3>
+                <div className="flex items-baseline gap-1 mt-2">
+                  <span className="text-3xl font-bold">R$29</span>
+                  <span className="text-muted-foreground">/mês</span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-2">O poder da IA para suas finanças</p>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Cancele a qualquer momento. Sem compromisso.
-              </p>
-            </div>
 
-            <div className="space-y-3">
-              <h4 className="font-semibold text-sm mb-3">O que está incluído:</h4>
-              <ul className="space-y-2">
+              <ul className="space-y-3 mb-8">
                 {[
                   'Transações ilimitadas',
-                  'Dashboard avançado',
-                  'Importação CSV + OFX',
-                  'Advisor ilimitado',
+                  'AI Advisor (10 consultas/mês)',
+                  'Importação OFX',
                   'Orçamentos e Projeções',
-                  'Dívidas',
-                  'Investimentos',
-                  'Patrimônio',
-                  'Objetivos',
-                  'Relatórios detalhados',
-                  'Categorias personalizadas',
-                  'Suporte prioritário',
+                  'Investimentos e Dívidas',
+                  'Patrimônio e Objetivos',
                 ].map((feature) => (
                   <li key={feature} className="flex items-start gap-2 text-sm">
                     <i className='bx bx-check text-primary text-lg flex-shrink-0 mt-0.5'></i>
@@ -928,35 +1171,67 @@ export default function SettingsPage() {
                   </li>
                 ))}
               </ul>
+
+              <Button
+                onClick={() => handleUpgrade('pro')}
+                disabled={upgrading || plan?.plan === 'pro' || plan?.plan === 'premium'}
+                className="w-full btn-primary"
+              >
+                {plan?.plan === 'pro' ? 'Seu Plano Atual' : upgrading ? 'Processando...' : 'Assinar Pro'}
+              </Button>
+            </div>
+
+            {/* Premium Plan Card */}
+            <div className={`p-6 rounded-2xl border-2 border-amber-500/30 bg-amber-500/5 transition-all hover:border-amber-500/60 relative ${plan?.plan === 'premium' ? 'opacity-60 cursor-default' : ''}`}>
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <span className="badge-pill text-[10px] bg-amber-500 text-white border-amber-500">
+                  RECOMENDADO
+                </span>
+              </div>
+              <div className="mb-6">
+                <h3 className="text-xl font-bold flex items-center gap-2">
+                  Plano Premium
+                  {plan?.plan === 'premium' && <span className="text-xs bg-amber-500/20 text-amber-500 px-2 py-0.5 rounded-full uppercase">Atual</span>}
+                </h3>
+                <div className="flex items-baseline gap-1 mt-2">
+                  <span className="text-3xl font-bold font-display">R$79</span>
+                  <span className="text-muted-foreground">/mês</span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-2">Análise avançada e IA ilimitada</p>
+              </div>
+
+              <ul className="space-y-3 mb-8">
+                {[
+                  'Tudo do Pro',
+                  'AI Advisor (100 consultas/mês)',
+                  'Relatórios Executivos',
+                  'Categorização inteligente via IA',
+                  'Análise preditiva de gastos',
+                  'Suporte prioritário via WhatsApp',
+                ].map((feature) => (
+                  <li key={feature} className="flex items-start gap-2 text-sm">
+                    <i className='bx bx-check text-amber-500 text-lg flex-shrink-0 mt-0.5'></i>
+                    <span className="text-foreground/80">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <Button
+                onClick={() => handleUpgrade('premium')}
+                disabled={upgrading || plan?.plan === 'premium'}
+                className="w-full bg-amber-500 hover:bg-amber-600 text-white"
+              >
+                {plan?.plan === 'premium' ? 'Seu Plano Atual' : upgrading ? 'Processando...' : 'Assinar Premium'}
+              </Button>
             </div>
           </div>
 
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowUpgradeModal(false)}
-              disabled={upgrading}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleUpgrade}
-              disabled={upgrading}
-              className="btn-primary"
-            >
-              {upgrading ? (
-                <>
-                  <i className='bx bx-loader-alt bx-spin mr-2'></i>
-                  Processando...
-                </>
-              ) : (
-                <>
-                  <i className='bx bx-credit-card mr-2'></i>
-                  Fazer Upgrade Agora
-                </>
-              )}
-            </Button>
-          </DialogFooter>
+          <div className="text-center mt-4">
+            <p className="text-xs text-muted-foreground">
+              Cancele a qualquer momento direto pelo portal de cobrança.
+              Ao clicar em assinar, você será redirecionado para o Checkout seguro da Stripe.
+            </p>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

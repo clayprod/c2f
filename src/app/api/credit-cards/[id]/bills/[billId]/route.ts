@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientFromRequest } from '@/lib/supabase/server';
 import { getUserId } from '@/lib/auth';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 import { creditCardBillPaymentSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
 
@@ -9,13 +10,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string; billId: string }> }
 ) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id, billId } = await params;
-    const supabase = await createClient();
+    const ownerId = await getEffectiveOwnerId(request, userId);
+    const { supabase } = createClientFromRequest(request);
 
     // Get bill first
     const { data: billData, error: billError } = await supabase
@@ -31,7 +33,7 @@ export async function GET(
       `)
       .eq('id', billId)
       .eq('account_id', id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .single();
 
     if (billError) throw billError;
@@ -53,7 +55,7 @@ export async function GET(
         notes
       `)
       .eq('credit_card_bill_id', billId)
-      .eq('user_id', userId);
+      .eq('user_id', ownerId);
 
     if (transactionsError) throw transactionsError;
 
@@ -105,14 +107,15 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string; billId: string }> }
 ) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id, billId } = await params;
     const body = await request.json();
-    const supabase = await createClient();
+    const ownerId = await getEffectiveOwnerId(request, userId);
+    const { supabase } = createClientFromRequest(request);
 
     // Check if this is a payment action
     if (body.action === 'pay') {
@@ -124,7 +127,7 @@ export async function PATCH(
         .select('*')
         .eq('id', billId)
         .eq('account_id', id)
-        .eq('user_id', userId)
+        .eq('user_id', ownerId)
         .single();
 
       if (billError || !bill) {
@@ -161,7 +164,7 @@ export async function PATCH(
         const { data: category } = await supabase
           .from('categories')
           .select('id')
-          .eq('user_id', userId)
+        .eq('user_id', ownerId)
           .ilike('name', '%FATURA%CART%')
           .single();
 
@@ -169,7 +172,7 @@ export async function PATCH(
         await supabase
           .from('transactions')
           .insert({
-            user_id: userId,
+            user_id: ownerId,
             account_id: validated.from_account_id,
             category_id: category?.id,
             posted_at: validated.payment_date,
@@ -231,7 +234,7 @@ export async function PATCH(
         .select('*')
         .eq('id', billId)
         .eq('account_id', id)
-        .eq('user_id', userId)
+        .eq('user_id', ownerId)
         .single();
 
       if (billError || !bill) {
@@ -293,7 +296,7 @@ export async function PATCH(
           await supabase
             .from('credit_card_bills')
             .insert({
-              user_id: userId,
+              user_id: ownerId,
               account_id: id,
               reference_month: nextMonthStr,
               closing_date: closingDate.toISOString().split('T')[0],
@@ -329,7 +332,7 @@ export async function PATCH(
       .update(updateData)
       .eq('id', billId)
       .eq('account_id', id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .select()
       .single();
 

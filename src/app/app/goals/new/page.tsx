@@ -44,10 +44,14 @@ export default function NewGoalPage() {
     image_url: '',
     image_position: 'center',
     notes: '',
-    include_in_budget: true,
+    include_in_plan: true,
     contribution_frequency: 'monthly',
     monthly_contribution_cents: '',
   });
+  const [useCustomPlan, setUseCustomPlan] = useState(false);
+  const [planEntries, setPlanEntries] = useState<Array<{ month: string; amount: string }>>([
+    { month: '', amount: '' },
+  ]);
 
   const processImageFile = async (file: File) => {
     // Validate file type
@@ -220,18 +224,42 @@ export default function NewGoalPage() {
     setLoading(true);
 
     try {
+      const cleanedPlanEntries = planEntries
+        .map((entry) => ({
+          month: entry.month,
+          amount: parseFloat(entry.amount),
+        }))
+        .filter((entry) => entry.month && !Number.isNaN(entry.amount) && entry.amount > 0);
+
+      if (useCustomPlan && cleanedPlanEntries.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "Plano personalizado incompleto",
+          description: "Adicione ao menos um mês com valor válido.",
+        });
+        setLoading(false);
+        return;
+      }
+
       const response = await fetch('/api/goals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
+          include_in_plan: formData.include_in_plan || useCustomPlan,
           target_amount_cents: Math.round(parseFloat(formData.target_amount_cents) * 100),
           current_amount_cents: Math.round(parseFloat(formData.current_amount_cents || '0') * 100),
           monthly_contribution_cents: formData.monthly_contribution_cents
             ? Math.round(parseFloat(formData.monthly_contribution_cents) * 100)
             : undefined,
-          contribution_frequency: formData.include_in_budget && formData.contribution_frequency
+          contribution_frequency: !useCustomPlan && formData.include_in_plan && formData.contribution_frequency
             ? formData.contribution_frequency
+            : undefined,
+          plan_entries: useCustomPlan
+            ? cleanedPlanEntries.map((entry) => ({
+                month: entry.month,
+                amount_cents: Math.round(entry.amount * 100),
+              }))
             : undefined,
           image_url: formData.image_url || undefined,
           image_position: formData.image_position || 'center',
@@ -498,53 +526,133 @@ export default function NewGoalPage() {
         <div className="border-t pt-6 space-y-4">
           <div className="flex items-center gap-3">
             <Checkbox
-              id="include_in_budget"
-              checked={formData.include_in_budget}
-              onCheckedChange={(checked) => setFormData({ ...formData, include_in_budget: checked === true })}
+              id="include_in_plan"
+              checked={formData.include_in_plan}
+              onCheckedChange={(checked) => setFormData({ ...formData, include_in_plan: checked === true })}
+              disabled={useCustomPlan}
             />
-            <label htmlFor="include_in_budget" className="text-sm font-medium cursor-pointer">
-              Incluir no orçamento
+            <label htmlFor="include_in_plan" className="text-sm font-medium cursor-pointer">
+              Incluir no orçamento e projeções
             </label>
           </div>
 
-          {formData.include_in_budget && (
+          {formData.include_in_plan && (
             <div className="grid md:grid-cols-2 gap-4 pl-6 border-l-2 border-primary/30">
-              <div>
-                <label className="block text-sm font-medium mb-2">Frequência de Aporte *</label>
-                <Select
-                  value={formData.contribution_frequency}
-                  onValueChange={(value) => setFormData({ ...formData, contribution_frequency: value })}
-                  required={formData.include_in_budget}
-                >
-                  <SelectTrigger className="w-full bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
-                    <SelectValue placeholder="Selecione a frequência" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="daily">Diário</SelectItem>
-                    <SelectItem value="weekly">Semanal</SelectItem>
-                    <SelectItem value="biweekly">Quinzenal</SelectItem>
-                    <SelectItem value="monthly">Mensal</SelectItem>
-                    <SelectItem value="quarterly">Trimestral</SelectItem>
-                    <SelectItem value="yearly">Anual</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="md:col-span-2 flex items-center gap-3">
+                <Checkbox
+                  id="use_custom_plan"
+                  checked={useCustomPlan}
+                  onCheckedChange={(checked) => {
+                    const enabled = checked === true;
+                    setUseCustomPlan(enabled);
+                    if (enabled) {
+                      setFormData((prev) => ({ ...prev, include_in_plan: true }));
+                    }
+                  }}
+                />
+                <label htmlFor="use_custom_plan" className="text-sm font-medium cursor-pointer">
+                  Usar plano personalizado de aportes
+                </label>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-2">Valor Mensal do Aporte (R$)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.monthly_contribution_cents}
-                  onChange={(e) => setFormData({ ...formData, monthly_contribution_cents: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  placeholder="0.00"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Valor mensal calculado automaticamente baseado na frequência, ou defina manualmente
-                </p>
-              </div>
+              {useCustomPlan && (
+                <div className="md:col-span-2 space-y-3">
+                  {planEntries.map((entry, index) => (
+                    <div key={index} className="grid md:grid-cols-3 gap-3 items-end">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Mês</label>
+                        <input
+                          type="month"
+                          value={entry.month}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setPlanEntries((prev) =>
+                              prev.map((item, idx) => idx === index ? { ...item, month: value } : item)
+                            );
+                          }}
+                          className="w-full px-4 py-2 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Valor (R$)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={entry.amount}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setPlanEntries((prev) =>
+                              prev.map((item, idx) => idx === index ? { ...item, amount: value } : item)
+                            );
+                          }}
+                          className="w-full px-4 py-2 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={() => setPlanEntries((prev) => [...prev, { month: '', amount: '' }])}
+                        >
+                          + Adicionar
+                        </button>
+                        {planEntries.length > 1 && (
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={() => setPlanEntries((prev) => prev.filter((_, idx) => idx !== index))}
+                          >
+                            Remover
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!useCustomPlan && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Frequência de Aporte *</label>
+                    <Select
+                      value={formData.contribution_frequency}
+                      onValueChange={(value) => setFormData({ ...formData, contribution_frequency: value })}
+                      required={formData.include_in_plan}
+                    >
+                      <SelectTrigger className="w-full bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                        <SelectValue placeholder="Selecione a frequência" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">Diário</SelectItem>
+                        <SelectItem value="weekly">Semanal</SelectItem>
+                        <SelectItem value="biweekly">Quinzenal</SelectItem>
+                        <SelectItem value="monthly">Mensal</SelectItem>
+                        <SelectItem value="quarterly">Trimestral</SelectItem>
+                        <SelectItem value="yearly">Anual</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Valor Mensal do Aporte (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.monthly_contribution_cents}
+                      onChange={(e) => setFormData({ ...formData, monthly_contribution_cents: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                      placeholder="0.00"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Valor mensal calculado automaticamente baseado na frequência, ou defina manualmente
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>

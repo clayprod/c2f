@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientFromRequest } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getUserId } from '@/lib/auth';
 import { transactionSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
 import { isCreditCardExpired } from '@/lib/utils';
+import { getUserPlan } from '@/services/stripe/subscription';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,6 +14,7 @@ export async function GET(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { searchParams } = new URL(request.url);
     const accountId = searchParams.get('account_id');
@@ -19,8 +23,8 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type'); // 'income' or 'expense'
     const fromDate = searchParams.get('from_date');
     const toDate = searchParams.get('to_date');
-    const isRecurring = searchParams.get('is_recurring'); // 'true' or 'false'
     const isInstallment = searchParams.get('is_installment'); // 'true' or 'false'
+    const assignedTo = searchParams.get('assigned_to');
     const limit = parseInt(searchParams.get('limit') || '10');
     const offset = parseInt(searchParams.get('offset') || '0');
     const sortBy = searchParams.get('sort_by') || 'posted_at';
@@ -30,7 +34,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('transactions')
       .select('*, accounts(*), categories(*)', { count: 'exact' })
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .range(offset, offset + limit - 1);
 
     // Apply sorting
@@ -66,9 +70,6 @@ export async function GET(request: NextRequest) {
       // Ensure we're comparing dates correctly (end of day)
       query = query.lte('posted_at', toDate);
     }
-    if (isRecurring !== null) {
-      query = query.eq('is_recurring', isRecurring === 'true');
-    }
     if (isInstallment !== null) {
       if (isInstallment === 'true') {
         // Filter for transactions that are part of an installment
@@ -80,22 +81,58 @@ export async function GET(request: NextRequest) {
         query = query.is('installment_parent_id', null).or('installment_total.is.null,installment_total.eq.1');
       }
     }
+    if (assignedTo) {
+      query = query.eq('assigned_to', assignedTo);
+    }
 
     const { data, error, count } = await query;
 
     if (error) throw error;
 
-    // Convert amount (NUMERIC) to amount_cents (BIGINT) for API response
-    const transformedData = (data || []).map((tx: any) => ({
-      ...tx,
-      amount_cents: Math.round((tx.amount || 0) * 100),
-    }));
+    // Fetch assigned_to profiles separately using admin client (bypasses RLS)
+    // This is needed because RLS on profiles only allows viewing own profile
+    const assignedToIds = [...new Set((data || [])
+      .map((tx: any) => tx.assigned_to)
+      .filter((id: string | null) => id !== null))] as string[];
 
-    return NextResponse.json({ 
+    let profilesMap: Record<string, any> = {};
+    if (assignedToIds.length > 0) {
+      const admin = createAdminClient();
+      const { data: profiles, error: profilesError } = await admin
+        .from('profiles')
+        .select('id, full_name, email, avatar_url')
+        .in('id', assignedToIds);
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+      } else if (profiles) {
+        profilesMap = profiles.reduce((acc: Record<string, any>, profile: any) => {
+          acc[profile.id] = profile;
+          return acc;
+        }, {});
+      }
+    }
+
+    // Convert amount (NUMERIC) to amount_cents (BIGINT) for API response
+    // and merge assigned_to_profile data
+    const transformedData = (data || []).map((tx: any) => {
+      // Use the profile from the map if available, otherwise try the joined data
+      const assignedProfile = tx.assigned_to 
+        ? (profilesMap[tx.assigned_to] || tx.assigned_to_profile || null)
+        : null;
+
+      return {
+        ...tx,
+        amount_cents: Math.round((tx.amount || 0) * 100),
+        assigned_to_profile: assignedProfile,
+      };
+    });
+
+    return NextResponse.json({
       data: transformedData,
       count: count || 0,
       limit,
-      offset 
+      offset
     });
   } catch (error) {
     console.error('Transactions GET error:', error);
@@ -113,11 +150,34 @@ export async function POST(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
+
+    const { supabase } = createClientFromRequest(request);
+
+    // Check plan limits for Free users
+    const userPlan = await getUserPlan(ownerId);
+    if (userPlan.plan === 'free') {
+      const now = new Date();
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
+
+      const { count } = await supabase
+        .from('transactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', ownerId)
+        .gte('created_at', firstDayOfMonth)
+        .lte('created_at', lastDayOfMonth);
+
+      if (count && count >= 100) {
+        return NextResponse.json(
+          { error: 'Limite de 100 transações mensais atingido no plano Free. Faça upgrade para o plano Pro ou Premium para transações ilimitadas.' },
+          { status: 403 }
+        );
+      }
+    }
 
     const body = await request.json();
     const validated = transactionSchema.parse(body);
-
-    const { supabase } = createClientFromRequest(request);
 
     // Determine amount sign based on type if provided
     let amount = validated.amount_cents / 100;
@@ -190,7 +250,7 @@ export async function POST(request: NextRequest) {
         if (closingDate.getDate() !== closingDay) {
           closingDate.setDate(0); // Last day of previous month
         }
-        
+
         // Calculate due date (ensure it's valid for the month)
         const dueDateObj = new Date(referenceMonth.getFullYear(), referenceMonth.getMonth(), dueDay);
         if (dueDateObj.getDate() !== dueDay) {
@@ -200,7 +260,7 @@ export async function POST(request: NextRequest) {
         const { data: newBill } = await supabase
           .from('credit_card_bills')
           .insert({
-            user_id: userId,
+            user_id: ownerId,
             account_id: validated.account_id,
             reference_month: referenceMonthStr,
             closing_date: closingDate.toISOString().split('T')[0],
@@ -260,7 +320,7 @@ export async function POST(request: NextRequest) {
             if (closingDate.getDate() !== closingDay) {
               closingDate.setDate(0); // Last day of previous month
             }
-            
+
             // Calculate due date (ensure it's valid for the month)
             const dueDateObj = new Date(referenceMonth.getFullYear(), referenceMonth.getMonth(), dueDay);
             if (dueDateObj.getDate() !== dueDay) {
@@ -285,7 +345,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Determine amount sign based on type
-        const installmentAmountValue = validated.type === 'income' 
+        const installmentAmountReais = validated.type === 'income'
           ? Math.abs(installmentAmount / 100) // Positive for income
           : -Math.abs(installmentAmount / 100); // Negative for expense
 
@@ -294,16 +354,16 @@ export async function POST(request: NextRequest) {
           category_id: validated.category_id || null,
           posted_at: installmentDate.toISOString().split('T')[0],
           description: `${validated.description} (${i}/${validated.installment_total})`,
-          amount: installmentAmountValue,
+          amount: installmentAmountReais,
           currency: validated.currency,
           notes: validated.notes || null,
-          user_id: userId,
+          user_id: ownerId,
           source: validated.source || 'manual',
-          is_recurring: false,
           installment_number: i,
           installment_total: validated.installment_total,
+          assigned_to: validated.assigned_to || null,
         };
-        
+
         // Only include credit_card_bill_id if it exists and is not null AND it's an expense
         if (installmentBillId && validated.type === 'expense') {
           txData.credit_card_bill_id = installmentBillId;
@@ -344,7 +404,7 @@ export async function POST(request: NextRequest) {
       // Create budgets for future installments
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       for (let i = 1; i <= installmentTotal; i++) {
         const installmentDate = new Date(validated.posted_at);
         installmentDate.setMonth(installmentDate.getMonth() + (i - 1));
@@ -354,15 +414,15 @@ export async function POST(request: NextRequest) {
         if (installmentDate > today && validated.category_id) {
           const year = installmentDate.getFullYear();
           const month = installmentDate.getMonth() + 1;
-          const installmentAmountValue = validated.type === 'income' 
-            ? Math.abs(installmentAmount / 100) // Positive for income
-            : -Math.abs(installmentAmount / 100); // Negative for expense
+          const installmentAmountCents = validated.type === 'income'
+            ? Math.abs(installmentAmount)
+            : -Math.abs(installmentAmount);
 
           // Check if budget exists
           const { data: existingBudget } = await supabase
             .from('budgets')
-            .select('id, amount_planned')
-            .eq('user_id', userId)
+            .select('id, amount_planned_cents')
+            .eq('user_id', ownerId)
             .eq('category_id', validated.category_id)
             .eq('year', year)
             .eq('month', month)
@@ -373,7 +433,7 @@ export async function POST(request: NextRequest) {
             await supabase
               .from('budgets')
               .update({
-                amount_planned: (existingBudget.amount_planned || 0) + installmentAmountValue,
+                amount_planned_cents: (existingBudget.amount_planned_cents || 0) + installmentAmountCents,
                 updated_at: new Date().toISOString(),
               })
               .eq('id', existingBudget.id);
@@ -382,11 +442,11 @@ export async function POST(request: NextRequest) {
             await supabase
               .from('budgets')
               .insert({
-                user_id: userId,
+                user_id: ownerId,
                 category_id: validated.category_id,
                 year,
                 month,
-                amount_planned: installmentAmountValue,
+                amount_planned_cents: installmentAmountCents,
                 amount_actual: 0,
               });
           }
@@ -414,20 +474,21 @@ export async function POST(request: NextRequest) {
       amount: amount, // Store as NUMERIC (reais) in database
       currency: validated.currency,
       notes: validated.notes || null,
-      user_id: userId,
+      user_id: ownerId,
       source: validated.source || 'manual',
       provider_tx_id: validated.provider_tx_id || null,
-      is_recurring: validated.is_recurring || false,
       recurrence_rule: validated.recurrence_rule || null,
+      include_in_plan: validated.include_in_plan ?? (!!validated.contribution_frequency || !!validated.recurrence_rule),
       installment_number: validated.installment_number || null,
       installment_total: validated.installment_total || null,
+      assigned_to: validated.assigned_to || null,
     };
-    
+
     // Only include credit_card_bill_id if it exists and is not null
     if (creditCardBillId) {
       insertData.credit_card_bill_id = creditCardBillId;
     }
-    
+
     const { data, error } = await supabase
       .from('transactions')
       .insert(insertData)
@@ -459,7 +520,7 @@ export async function POST(request: NextRequest) {
       const { data: creditCard } = await supabase
         .from('accounts')
         .select('id')
-        .eq('user_id', userId)
+        .eq('user_id', ownerId)
         .eq('type', 'credit_card')
         .eq('category_id', validated.category_id)
         .single();
@@ -469,7 +530,7 @@ export async function POST(request: NextRequest) {
         // This payment transaction will affect the account balance normally
         await processCreditCardBillPayment(
           supabase,
-          userId,
+          ownerId,
           validated.category_id,
           Math.abs(validated.amount_cents),
           validated.posted_at
@@ -478,7 +539,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Process investments, goals, and debts based on category
-    await processInvestmentGoalDebtTransactions(supabase, userId, validated.category_id, data.id, validated.amount_cents, validated.posted_at);
+    await processInvestmentGoalDebtTransactions(supabase, ownerId, validated.category_id, data.id, validated.amount_cents, validated.posted_at);
 
     // Create budget for future transactions
     const transactionDate = new Date(validated.posted_at);
@@ -489,13 +550,15 @@ export async function POST(request: NextRequest) {
     if (transactionDate > today && validated.category_id) {
       const year = transactionDate.getFullYear();
       const month = transactionDate.getMonth() + 1;
-      const transactionAmount = amount; // Already in NUMERIC (reais)
+      const transactionAmountCents = validated.type === 'income'
+        ? Math.abs(validated.amount_cents)
+        : -Math.abs(validated.amount_cents);
 
       // Check if budget exists
       const { data: existingBudget } = await supabase
         .from('budgets')
-        .select('id, amount_planned')
-        .eq('user_id', userId)
+        .select('id, amount_planned_cents')
+        .eq('user_id', ownerId)
         .eq('category_id', validated.category_id)
         .eq('year', year)
         .eq('month', month)
@@ -506,7 +569,7 @@ export async function POST(request: NextRequest) {
         await supabase
           .from('budgets')
           .update({
-            amount_planned: (existingBudget.amount_planned || 0) + transactionAmount,
+            amount_planned_cents: (existingBudget.amount_planned_cents || 0) + transactionAmountCents,
             updated_at: new Date().toISOString(),
           })
           .eq('id', existingBudget.id);
@@ -515,11 +578,11 @@ export async function POST(request: NextRequest) {
         await supabase
           .from('budgets')
           .insert({
-            user_id: userId,
+            user_id: ownerId,
             category_id: validated.category_id,
             year,
             month,
-            amount_planned: transactionAmount,
+            amount_planned_cents: transactionAmountCents,
             amount_actual: 0,
           });
       }

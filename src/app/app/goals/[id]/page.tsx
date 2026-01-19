@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { DatePicker } from '@/components/ui/date-picker';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -35,6 +37,10 @@ interface Goal {
   image_url?: string;
   image_position?: string;
   notes?: string;
+  include_in_plan?: boolean;
+  contribution_frequency?: string | null;
+  monthly_contribution_cents?: number | null;
+  plan_entries?: Array<{ entry_month: string; amount_cents: number; description?: string | null }>;
 }
 
 export default function EditGoalPage({ params }: { params: { id: string } }) {
@@ -58,7 +64,14 @@ export default function EditGoalPage({ params }: { params: { id: string } }) {
     image_url: '',
     image_position: 'center',
     notes: '',
+    include_in_plan: true,
+    contribution_frequency: 'monthly',
+    monthly_contribution_cents: '',
   });
+  const [useCustomPlan, setUseCustomPlan] = useState(false);
+  const [planEntries, setPlanEntries] = useState<Array<{ month: string; amount: string }>>([
+    { month: '', amount: '' },
+  ]);
   const [loadingGoal, setLoadingGoal] = useState(true);
 
   const processImageFile = async (file: File) => {
@@ -267,9 +280,23 @@ export default function EditGoalPage({ params }: { params: { id: string } }) {
           image_url: goal.image_url || '',
           image_position: imagePosition,
           notes: goal.notes || '',
+          include_in_plan: goal.include_in_plan ?? true,
+          contribution_frequency: goal.contribution_frequency || 'monthly',
+          monthly_contribution_cents: goal.monthly_contribution_cents
+            ? (goal.monthly_contribution_cents / 100).toString()
+            : '',
         });
         if (goal.image_url) {
           setImagePreview(goal.image_url);
+        }
+        if (goal.plan_entries && goal.plan_entries.length > 0) {
+          setUseCustomPlan(true);
+          setPlanEntries(
+            goal.plan_entries.map((entry) => ({
+              month: entry.entry_month?.slice(0, 7),
+              amount: ((entry.amount_cents || 0) / 100).toString(),
+            }))
+          );
         }
       }
     } catch (error) {
@@ -289,6 +316,23 @@ export default function EditGoalPage({ params }: { params: { id: string } }) {
     setLoading(true);
 
     try {
+      const cleanedPlanEntries = planEntries
+        .map((entry) => ({
+          month: entry.month,
+          amount: parseFloat(entry.amount),
+        }))
+        .filter((entry) => entry.month && !Number.isNaN(entry.amount) && entry.amount > 0);
+
+      if (useCustomPlan && cleanedPlanEntries.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "Plano personalizado incompleto",
+          description: "Adicione ao menos um mês com valor válido.",
+        });
+        setLoading(false);
+        return;
+      }
+
       const payload: any = {
         name: formData.name,
         target_amount_cents: Math.round(parseFloat(formData.target_amount_cents) * 100),
@@ -297,6 +341,19 @@ export default function EditGoalPage({ params }: { params: { id: string } }) {
         priority: formData.priority,
         icon: formData.icon,
         color: formData.color,
+        include_in_plan: formData.include_in_plan || useCustomPlan,
+        contribution_frequency: !useCustomPlan && formData.include_in_plan && formData.contribution_frequency
+          ? formData.contribution_frequency
+          : undefined,
+        monthly_contribution_cents: formData.monthly_contribution_cents
+          ? Math.round(parseFloat(formData.monthly_contribution_cents) * 100)
+          : undefined,
+        plan_entries: useCustomPlan
+          ? cleanedPlanEntries.map((entry) => ({
+              month: entry.month,
+              amount_cents: Math.round(entry.amount * 100),
+            }))
+          : undefined,
       };
 
       // Only include optional fields if they have values
@@ -599,6 +656,140 @@ export default function EditGoalPage({ params }: { params: { id: string } }) {
             rows={2}
             placeholder="Notas adicionais..."
           />
+        </div>
+
+        <div className="border-t pt-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <Checkbox
+              id="include_in_plan"
+              checked={formData.include_in_plan}
+              onCheckedChange={(checked) => setFormData({ ...formData, include_in_plan: checked === true })}
+              disabled={useCustomPlan}
+            />
+            <label htmlFor="include_in_plan" className="text-sm font-medium cursor-pointer">
+              Incluir no orçamento e projeções
+            </label>
+          </div>
+
+          {formData.include_in_plan && (
+            <div className="grid md:grid-cols-2 gap-4 pl-6 border-l-2 border-primary/30">
+              <div className="md:col-span-2 flex items-center gap-3">
+                <Checkbox
+                  id="use_custom_plan"
+                  checked={useCustomPlan}
+                  onCheckedChange={(checked) => {
+                    const enabled = checked === true;
+                    setUseCustomPlan(enabled);
+                    if (enabled) {
+                      setFormData((prev) => ({ ...prev, include_in_plan: true }));
+                    }
+                  }}
+                />
+                <label htmlFor="use_custom_plan" className="text-sm font-medium cursor-pointer">
+                  Usar plano personalizado de aportes
+                </label>
+              </div>
+
+              {useCustomPlan && (
+                <div className="md:col-span-2 space-y-3">
+                  {planEntries.map((entry, index) => (
+                    <div key={index} className="grid md:grid-cols-3 gap-3 items-end">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Mês</label>
+                        <input
+                          type="month"
+                          value={entry.month}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setPlanEntries((prev) =>
+                              prev.map((item, idx) => idx === index ? { ...item, month: value } : item)
+                            );
+                          }}
+                          className="w-full px-4 py-2 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Valor (R$)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={entry.amount}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setPlanEntries((prev) =>
+                              prev.map((item, idx) => idx === index ? { ...item, amount: value } : item)
+                            );
+                          }}
+                          className="w-full px-4 py-2 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={() => setPlanEntries((prev) => [...prev, { month: '', amount: '' }])}
+                        >
+                          + Adicionar
+                        </button>
+                        {planEntries.length > 1 && (
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={() => setPlanEntries((prev) => prev.filter((_, idx) => idx !== index))}
+                          >
+                            Remover
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!useCustomPlan && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Frequência de Aporte *</label>
+                    <Select
+                      value={formData.contribution_frequency}
+                      onValueChange={(value) => setFormData({ ...formData, contribution_frequency: value })}
+                      required={formData.include_in_plan}
+                    >
+                      <SelectTrigger className="w-full bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                        <SelectValue placeholder="Selecione a frequência" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">Diário</SelectItem>
+                        <SelectItem value="weekly">Semanal</SelectItem>
+                        <SelectItem value="biweekly">Quinzenal</SelectItem>
+                        <SelectItem value="monthly">Mensal</SelectItem>
+                        <SelectItem value="quarterly">Trimestral</SelectItem>
+                        <SelectItem value="yearly">Anual</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Valor Mensal do Aporte (R$)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.monthly_contribution_cents}
+                      onChange={(e) => setFormData({ ...formData, monthly_contribution_cents: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                      placeholder="0.00"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Valor mensal calculado automaticamente baseado na frequência, ou defina manualmente
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex gap-4">

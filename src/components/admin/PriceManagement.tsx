@@ -47,7 +47,7 @@ export default function PriceManagement() {
     }
   };
 
-  const handleUpdatePrice = async (productId: string, currentPriceId: string, planType: 'pro' | 'business') => {
+  const handleUpdatePrice = async (productId: string, currentPriceId: string, planType: 'pro' | 'premium') => {
     const inputId = `price-${productId}`;
     const input = document.getElementById(inputId) as HTMLInputElement;
     if (!input) return;
@@ -114,16 +114,18 @@ export default function PriceManagement() {
     return <div className="text-center py-8">Carregando preços...</div>;
   }
 
-  const planProducts = products.filter((p) => 
-    p.name.toLowerCase().includes('pro') || p.name.toLowerCase().includes('business')
+  const planProducts = products.filter((p) =>
+    p.name.toLowerCase().includes('pro') ||
+    p.name.toLowerCase().includes('business') ||
+    p.name.toLowerCase().includes('premium')
   );
 
   return (
     <div className="space-y-6">
       {planProducts.map((product) => {
         const activePrice = product.prices.find((p) => p.active);
-        const planType = product.name.toLowerCase().includes('pro') ? 'pro' : 'business';
-        
+        const planType = product.name.toLowerCase().includes('pro') ? 'pro' : 'premium';
+
         if (!activePrice) return null;
 
         return (
@@ -144,7 +146,7 @@ export default function PriceManagement() {
                   Price ID: {activePrice.id}
                 </div>
               </div>
-              
+
               <div>
                 <Label htmlFor={`price-${product.id}`}>Novo Preço (em R$)</Label>
                 <div className="flex gap-2 mt-2">
@@ -174,4 +176,5 @@ export default function PriceManagement() {
     </div>
   );
 }
+
 

@@ -32,6 +32,8 @@ import {
 import DateRangeFilter from '@/components/ui/DateRangeFilter';
 import { formatMonthYear } from '@/lib/utils';
 import { InfoIcon } from '@/components/ui/InfoIcon';
+import { PlanGuard } from '@/components/app/PlanGuard';
+import { useMembers } from '@/hooks/useMembers';
 
 interface PeriodData {
   period: string;
@@ -153,6 +155,8 @@ export default function ReportsPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [selectedAssignedTo, setSelectedAssignedTo] = useState<string>('');
+  const { members } = useMembers();
 
   // Report data
   const [overviewData, setOverviewData] = useState<{
@@ -230,7 +234,7 @@ export default function ReportsPage() {
 
   useEffect(() => {
     fetchReportData();
-  }, [activeTab, startDate, endDate, groupBy, selectedAccountIds, selectedCategoryIds]);
+  }, [activeTab, startDate, endDate, groupBy, selectedAccountIds, selectedCategoryIds, selectedAssignedTo]);
 
   const fetchFilterOptions = async () => {
     try {
@@ -263,6 +267,9 @@ export default function ReportsPage() {
       }
       if (selectedCategoryIds.length) {
         params.set('categoryIds', selectedCategoryIds.join(','));
+      }
+      if (selectedAssignedTo) {
+        params.set('assignedTo', selectedAssignedTo);
       }
 
       const res = await fetch(`/api/reports?${params}`);
@@ -386,7 +393,7 @@ export default function ReportsPage() {
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1;
-    
+
     return data.findIndex((item) => {
       if (item.period.length === 7) {
         const [year, month] = item.period.split('-');
@@ -395,40 +402,40 @@ export default function ReportsPage() {
       return false;
     });
   };
-  
+
   // Função para reorganizar dados e centralizar mês corrente (mesma lógica do dashboard)
   const reorganizeDataForChart = (data: PeriodData[], periodMonths: number = 12): { data: PeriodData[]; currentMonthIndex: number } => {
     if (!data || data.length === 0) {
       return { data: [], currentMonthIndex: -1 };
     }
-    
+
     const currentMonthIdx = findCurrentMonthIndex(data);
-    
+
     if (currentMonthIdx < 0) {
       return { data, currentMonthIndex: -1 };
     }
-    
+
     // Dividir em histórico, mês corrente e projeção
     const historicalData = data.slice(0, currentMonthIdx);
     const currentMonthData = [data[currentMonthIdx]];
     const projectedData = data.slice(currentMonthIdx + 1);
-    
+
     // Calcular quantos períodos mostrar antes e depois
     const halfPeriod = Math.floor(periodMonths / 2);
     const periodsBefore = Math.min(halfPeriod, historicalData.length);
     const periodsAfter = Math.min(halfPeriod, projectedData.length);
-    
+
     // Pegar últimos N períodos históricos e primeiros N períodos projetados
     const selectedHistorical = historicalData.slice(-periodsBefore);
     const selectedProjected = projectedData.slice(0, periodsAfter);
-    
+
     // Combinar: histórico + mês corrente + projeção
     const reorganizedData = [
       ...selectedHistorical,
       ...currentMonthData,
       ...selectedProjected,
     ];
-    
+
     return {
       data: reorganizedData,
       currentMonthIndex: selectedHistorical.length,
@@ -448,178 +455,998 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div>
-          <h1 className="font-display text-2xl md:text-3xl font-bold">Relatórios</h1>
-          <p className="text-muted-foreground">Analise seus dados financeiros</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            onClick={() => handleExport('summary')}
-            disabled={exporting}
-          >
-            <i className='bx bx-download mr-2'></i>
-            {exporting ? 'Exportando...' : 'Exportar Resumo'}
-          </Button>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="glass-card p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="lg:col-span-2">
-            <label className="block text-sm font-medium mb-1">Periodo</label>
-            <DateRangeFilter
-              startDate={startDate}
-              endDate={endDate}
-              onDateChange={(start, end) => {
-                setStartDate(start);
-                setEndDate(end);
-              }}
-            />
-          </div>
+    <PlanGuard minPlan="premium">
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Agrupar por</label>
-            <Select value={groupBy} onValueChange={(v) => setGroupBy(v as typeof groupBy)}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="day">Dia</SelectItem>
-                <SelectItem value="week">Semana</SelectItem>
-                <SelectItem value="month">Mes</SelectItem>
-                <SelectItem value="year">Ano</SelectItem>
-              </SelectContent>
-            </Select>
+            <h1 className="font-display text-2xl md:text-3xl font-bold">Relatórios</h1>
+            <p className="text-muted-foreground">Analise seus dados financeiros</p>
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Conta</label>
-            <Select
-              value={selectedAccountIds[0] || 'all'}
-              onValueChange={(v) => setSelectedAccountIds(v === 'all' ? [] : [v])}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => handleExport('summary')}
+              disabled={exporting}
             >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Todas" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                {accounts.map((acc) => (
-                  <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Categoria</label>
-            <Select
-              value={selectedCategoryIds[0] || 'all'}
-              onValueChange={(v) => setSelectedCategoryIds(v === 'all' ? [] : [v])}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Todas" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                {categories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <i className='bx bx-download mr-2'></i>
+              {exporting ? 'Exportando...' : 'Exportar Resumo'}
+            </Button>
           </div>
         </div>
-      </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="flex flex-wrap gap-1 h-auto p-1 bg-muted/50">
-          <TabsTrigger value="overview" className="flex-1 min-w-[100px]">Visao Geral</TabsTrigger>
-          <TabsTrigger value="categories" className="flex-1 min-w-[100px]">Categorias</TabsTrigger>
-          <TabsTrigger value="budgets" className="flex-1 min-w-[100px]">Orçamentos</TabsTrigger>
-          <TabsTrigger value="goals" className="flex-1 min-w-[100px]">Objetivos</TabsTrigger>
-          <TabsTrigger value="debts" className="flex-1 min-w-[100px]">Dívidas</TabsTrigger>
-          <TabsTrigger value="investments" className="flex-1 min-w-[100px]">Investimentos</TabsTrigger>
-          <TabsTrigger value="cashflow" className="flex-1 min-w-[100px]">Fluxo de Caixa</TabsTrigger>
-        </TabsList>
+        {/* Filters */}
+        <div className="glass-card p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+            <div className="lg:col-span-2">
+              <label className="block text-sm font-medium mb-1">Periodo</label>
+              <DateRangeFilter
+                startDate={startDate}
+                endDate={endDate}
+                onDateChange={(start, end) => {
+                  setStartDate(start);
+                  setEndDate(end);
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Agrupar por</label>
+              <Select value={groupBy} onValueChange={(v) => setGroupBy(v as typeof groupBy)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day">Dia</SelectItem>
+                  <SelectItem value="week">Semana</SelectItem>
+                  <SelectItem value="month">Mes</SelectItem>
+                  <SelectItem value="year">Ano</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Conta</label>
+              <Select
+                value={selectedAccountIds[0] || 'all'}
+                onValueChange={(v) => setSelectedAccountIds(v === 'all' ? [] : [v])}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Todas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {accounts.map((acc) => (
+                    <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Categoria</label>
+              <Select
+                value={selectedCategoryIds[0] || 'all'}
+                onValueChange={(v) => setSelectedCategoryIds(v === 'all' ? [] : [v])}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Todas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {members.length > 1 && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Responsavel</label>
+                <Select
+                  value={selectedAssignedTo || 'all'}
+                  onValueChange={(v) => setSelectedAssignedTo(v === 'all' ? '' : v)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {members.map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        {member.fullName || member.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+        </div>
 
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-6">
-          {overviewData && (
-            <>
-              {/* Summary Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="glass-card p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
-                      <i className='bx bx-trending-up text-xl text-green-500'></i>
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="flex flex-wrap gap-1 h-auto p-1 bg-muted/50">
+            <TabsTrigger value="overview" className="flex-1 min-w-[100px]">Visao Geral</TabsTrigger>
+            <TabsTrigger value="categories" className="flex-1 min-w-[100px]">Categorias</TabsTrigger>
+            <TabsTrigger value="budgets" className="flex-1 min-w-[100px]">Orçamentos</TabsTrigger>
+            <TabsTrigger value="goals" className="flex-1 min-w-[100px]">Objetivos</TabsTrigger>
+            <TabsTrigger value="debts" className="flex-1 min-w-[100px]">Dívidas</TabsTrigger>
+            <TabsTrigger value="investments" className="flex-1 min-w-[100px]">Investimentos</TabsTrigger>
+            <TabsTrigger value="cashflow" className="flex-1 min-w-[100px]">Fluxo de Caixa</TabsTrigger>
+          </TabsList>
+
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-6">
+            {overviewData && (
+              <>
+                {/* Summary Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="glass-card p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
+                        <i className='bx bx-trending-up text-xl text-green-500'></i>
+                      </div>
+                      <span className="text-sm text-muted-foreground">Receitas</span>
                     </div>
-                    <span className="text-sm text-muted-foreground">Receitas</span>
+                    <p className="font-display text-2xl font-bold text-green-500">
+                      {formatCurrency(overviewData.summary.total_income_cents)}
+                    </p>
                   </div>
-                  <p className="font-display text-2xl font-bold text-green-500">
-                    {formatCurrency(overviewData.summary.total_income_cents)}
-                  </p>
+
+                  <div className="glass-card p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+                        <i className='bx bx-trending-down text-xl text-red-500'></i>
+                      </div>
+                      <span className="text-sm text-muted-foreground">Despesas</span>
+                    </div>
+                    <p className="font-display text-2xl font-bold text-red-500">
+                      {formatCurrency(overviewData.summary.total_expense_cents)}
+                    </p>
+                  </div>
+
+                  <div className="glass-card p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${overviewData.summary.balance_cents >= 0 ? 'bg-primary/10' : 'bg-red-500/10'
+                        }`}>
+                        <i className={`bx bx-wallet text-xl ${overviewData.summary.balance_cents >= 0 ? 'text-primary' : 'text-red-500'
+                          }`}></i>
+                      </div>
+                      <span className="text-sm text-muted-foreground">Saldo</span>
+                    </div>
+                    <p className={`font-display text-2xl font-bold ${overviewData.summary.balance_cents >= 0 ? 'text-primary' : 'text-red-500'
+                      }`}>
+                      {formatCurrency(overviewData.summary.balance_cents)}
+                    </p>
+                  </div>
+
+                  <div className="glass-card p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
+                        <i className='bx bx-pie-chart-alt text-xl text-cyan-500'></i>
+                      </div>
+                      <span className="text-sm text-muted-foreground">Taxa de Poupanca</span>
+                    </div>
+                    <p className="font-display text-2xl font-bold text-cyan-500">
+                      {overviewData.summary.savings_rate.toFixed(1)}%
+                    </p>
+                  </div>
                 </div>
 
-                <div className="glass-card p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
-                      <i className='bx bx-trending-down text-xl text-red-500'></i>
+                {/* Chart */}
+                <div className="glass-card p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-display font-semibold text-lg">Receitas vs Despesas</h3>
+                      <InfoIcon
+                        content={
+                          <div className="space-y-2">
+                            <p className="font-semibold">Sobre este gráfico:</p>
+                            <ul className="space-y-1.5 text-xs list-disc list-inside">
+                              <li><strong>Receitas:</strong> Valores recebidos no período selecionado.</li>
+                              <li><strong>Despesas:</strong> Valores gastos no período selecionado.</li>
+                              <li><strong>Barra azul:</strong> Destaca o mês/período corrente.</li>
+                              <li>O período corrente está sempre centralizado quando aplicável.</li>
+                              <li>Use os filtros acima para ajustar o período e visualizar diferentes intervalos de tempo.</li>
+                            </ul>
+                          </div>
+                        }
+                      />
                     </div>
-                    <span className="text-sm text-muted-foreground">Despesas</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleExport('transactions')}
+                      disabled={exporting}
+                    >
+                      <i className='bx bx-download mr-1'></i> CSV
+                    </Button>
                   </div>
-                  <p className="font-display text-2xl font-bold text-red-500">
-                    {formatCurrency(overviewData.summary.total_expense_cents)}
-                  </p>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      {(() => {
+                        const reorganized = reorganizeDataForChart(overviewData.periods);
+                        return (
+                          <BarChart data={reorganized.data}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                            <XAxis
+                              dataKey="period"
+                              tickFormatter={(value, index) => formatPeriodLabel(value, index, reorganized.data)}
+                              stroke="hsl(var(--muted-foreground))"
+                              fontSize={12}
+                            />
+                            {reorganized.currentMonthIndex >= 0 && reorganized.currentMonthIndex < reorganized.data.length && (
+                              <ReferenceArea
+                                x1={reorganized.data[reorganized.currentMonthIndex]?.period}
+                                x2={reorganized.data[reorganized.currentMonthIndex]?.period}
+                                y1="dataMin"
+                                y2="dataMax"
+                                fill="hsl(var(--primary))"
+                                fillOpacity={0.1}
+                                stroke="none"
+                                ifOverflow="extendDomain"
+                              />
+                            )}
+                            <YAxis
+                              tickFormatter={(v) => `R$${(v / 100).toFixed(0)}`}
+                              stroke="hsl(var(--muted-foreground))"
+                              fontSize={12}
+                            />
+                            <Tooltip
+                              formatter={(value: number) => formatChartValue(value)}
+                              labelFormatter={formatTooltipLabel}
+                              contentStyle={{
+                                backgroundColor: 'hsl(var(--card))',
+                                border: '1px solid hsl(var(--border))',
+                                borderRadius: '8px',
+                              }}
+                            />
+                            <Legend />
+                            <Bar dataKey="income_cents" name="Receitas" fill="#10b981" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="expense_cents" name="Despesas" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        );
+                      })()}
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </>
+            )}
+          </TabsContent>
+
+          {/* Categories Tab */}
+          <TabsContent value="categories" className="space-y-6">
+            {categoriesData && (
+              <div className="grid lg:grid-cols-2 gap-6">
+                {/* Income by Category */}
+                <div className="glass-card p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <h3 className="font-display font-semibold text-lg">Receitas por Categoria</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Total: {formatCurrency(categoriesData.income.total_cents)}
+                        </p>
+                      </div>
+                      <InfoIcon
+                        content={
+                          <div className="space-y-2">
+                            <p className="font-semibold">Sobre este gráfico:</p>
+                            <ul className="space-y-1.5 text-xs list-disc list-inside">
+                              <li>Mostra como suas receitas estão distribuídas entre diferentes categorias.</li>
+                              <li>Cada barra representa uma categoria de receita e seu valor total no período.</li>
+                              <li>As categorias são ordenadas do maior para o menor valor recebido.</li>
+                              <li>Use este gráfico para identificar suas principais fontes de renda.</li>
+                            </ul>
+                          </div>
+                        }
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleExport('categories')}
+                      disabled={exporting}
+                    >
+                      <i className='bx bx-download mr-1'></i> CSV
+                    </Button>
+                  </div>
+                  {categoriesData.income.categories.length > 0 ? (
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={categoriesData.income.categories}
+                            dataKey="total_cents"
+                            nameKey="category"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={80}
+                            label={({ category, percentage }) => `${category}: ${percentage.toFixed(1)}%`}
+                            labelLine={false}
+                          >
+                            {categoriesData.income.categories.map((_, index) => (
+                              <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <p className="text-center text-muted-foreground py-8">Nenhuma receita no periodo</p>
+                  )}
+                  <div className="space-y-2 mt-4">
+                    {categoriesData.income.categories.slice(0, 5).map((cat, i) => (
+                      <div key={cat.categoryId || i} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                          <span>{cat.category}</span>
+                        </div>
+                        <span className="font-medium">{formatCurrency(cat.total_cents)}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="glass-card p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                      overviewData.summary.balance_cents >= 0 ? 'bg-primary/10' : 'bg-red-500/10'
-                    }`}>
-                      <i className={`bx bx-wallet text-xl ${
-                        overviewData.summary.balance_cents >= 0 ? 'text-primary' : 'text-red-500'
-                      }`}></i>
+                {/* Expense by Category */}
+                <div className="glass-card p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <h3 className="font-display font-semibold text-lg">Despesas por Categoria</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Total: {formatCurrency(categoriesData.expense.total_cents)}
+                        </p>
+                      </div>
+                      <InfoIcon
+                        content={
+                          <div className="space-y-2">
+                            <p className="font-semibold">Sobre este gráfico:</p>
+                            <ul className="space-y-1.5 text-xs list-disc list-inside">
+                              <li>Mostra como suas despesas estão distribuídas entre diferentes categorias.</li>
+                              <li>Cada fatia do gráfico representa uma categoria de despesa e seu valor total no período.</li>
+                              <li>As categorias são ordenadas do maior para o menor valor gasto.</li>
+                              <li>Use este gráfico para identificar onde você está gastando mais dinheiro.</li>
+                            </ul>
+                          </div>
+                        }
+                      />
                     </div>
-                    <span className="text-sm text-muted-foreground">Saldo</span>
                   </div>
-                  <p className={`font-display text-2xl font-bold ${
-                    overviewData.summary.balance_cents >= 0 ? 'text-primary' : 'text-red-500'
-                  }`}>
-                    {formatCurrency(overviewData.summary.balance_cents)}
-                  </p>
-                </div>
-
-                <div className="glass-card p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
-                      <i className='bx bx-pie-chart-alt text-xl text-cyan-500'></i>
+                  {categoriesData.expense.categories.length > 0 ? (
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={categoriesData.expense.categories}
+                            dataKey="total_cents"
+                            nameKey="category"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={80}
+                            label={({ category, percentage }) => `${category}: ${percentage.toFixed(1)}%`}
+                            labelLine={false}
+                          >
+                            {categoriesData.expense.categories.map((_, index) => (
+                              <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                        </PieChart>
+                      </ResponsiveContainer>
                     </div>
-                    <span className="text-sm text-muted-foreground">Taxa de Poupanca</span>
+                  ) : (
+                    <p className="text-center text-muted-foreground py-8">Nenhuma despesa no periodo</p>
+                  )}
+                  <div className="space-y-2 mt-4">
+                    {categoriesData.expense.categories.slice(0, 5).map((cat, i) => (
+                      <div key={cat.categoryId || i} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                          <span>{cat.category}</span>
+                        </div>
+                        <span className="font-medium">{formatCurrency(cat.total_cents)}</span>
+                      </div>
+                    ))}
                   </div>
-                  <p className="font-display text-2xl font-bold text-cyan-500">
-                    {overviewData.summary.savings_rate.toFixed(1)}%
-                  </p>
                 </div>
               </div>
+            )}
+          </TabsContent>
 
-              {/* Chart */}
+          {/* Budgets Tab */}
+          <TabsContent value="budgets" className="space-y-6">
+            {budgetsData && (
+              <>
+                {/* Summary */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div className="glass-card p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <i className='bx bx-target-lock text-xl text-primary'></i>
+                      </div>
+                      <span className="text-sm text-muted-foreground">Total Orcado</span>
+                    </div>
+                    <p className="font-display text-2xl font-bold">
+                      {formatCurrency(budgetsData.summary.total_budgeted_cents)}
+                    </p>
+                  </div>
+
+                  <div className="glass-card p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center">
+                        <i className='bx bx-credit-card text-xl text-yellow-500'></i>
+                      </div>
+                      <span className="text-sm text-muted-foreground">Total Gasto</span>
+                    </div>
+                    <p className="font-display text-2xl font-bold">
+                      {formatCurrency(budgetsData.summary.total_spent_cents)}
+                    </p>
+                  </div>
+
+                  <div className="glass-card p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${budgetsData.summary.total_remaining_cents >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'
+                        }`}>
+                        <i className={`bx bx-check-circle text-xl ${budgetsData.summary.total_remaining_cents >= 0 ? 'text-green-500' : 'text-red-500'
+                          }`}></i>
+                      </div>
+                      <span className="text-sm text-muted-foreground">Disponivel</span>
+                    </div>
+                    <p className={`font-display text-2xl font-bold ${budgetsData.summary.total_remaining_cents >= 0 ? 'text-green-500' : 'text-red-500'
+                      }`}>
+                      {formatCurrency(budgetsData.summary.total_remaining_cents)}
+                    </p>
+                  </div>
+
+                  <div className="glass-card p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
+                        <i className='bx bx-pie-chart-alt text-xl text-cyan-500'></i>
+                      </div>
+                      <span className="text-sm text-muted-foreground">% Utilizado</span>
+                    </div>
+                    <p className="font-display text-2xl font-bold">
+                      {budgetsData.summary.overall_percentage.toFixed(1)}%
+                    </p>
+                  </div>
+                </div>
+
+                {/* Budget Chart */}
+                <div className="glass-card p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-display font-semibold text-lg">Orcamento vs Gasto por Categoria</h3>
+                      <InfoIcon
+                        content={
+                          <div className="space-y-2">
+                            <p className="font-semibold">Sobre este gráfico:</p>
+                            <ul className="space-y-1.5 text-xs list-disc list-inside">
+                              <li>Compara o valor orçado com o valor efetivamente gasto em cada categoria.</li>
+                              <li>Barras azuis representam o valor planejado para cada categoria.</li>
+                              <li>Barras laranjas representam o valor efetivamente gasto em cada categoria.</li>
+                              <li>Use este gráfico para identificar categorias onde você está gastando mais do que planejou.</li>
+                            </ul>
+                          </div>
+                        }
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleExport('budgets')}
+                      disabled={exporting}
+                    >
+                      <i className='bx bx-download mr-1'></i> CSV
+                    </Button>
+                  </div>
+                  {budgetsData.budgets.length > 0 ? (
+                    <div className="h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={budgetsData.budgets} layout="vertical">
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                          <XAxis
+                            type="number"
+                            tickFormatter={(v) => `R$${(v / 100).toFixed(0)}`}
+                            stroke="hsl(var(--muted-foreground))"
+                            fontSize={12}
+                          />
+                          <YAxis
+                            type="category"
+                            dataKey="category"
+                            stroke="hsl(var(--muted-foreground))"
+                            fontSize={12}
+                            width={100}
+                          />
+                          <Tooltip
+                            formatter={(value: number) => formatCurrency(value)}
+                            contentStyle={{
+                              backgroundColor: 'hsl(var(--card))',
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '8px',
+                            }}
+                          />
+                          <Legend />
+                          <Bar dataKey="budgeted_cents" name="Orcado" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
+                          <Bar dataKey="spent_cents" name="Gasto" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <p className="text-center text-muted-foreground py-8">Nenhum orcamento no periodo</p>
+                  )}
+                </div>
+
+                {/* Budget List */}
+                <div className="glass-card overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/30">
+                          <th className="text-left py-4 px-6 font-medium">Categoria</th>
+                          <th className="text-right py-4 px-6 font-medium">Orcado</th>
+                          <th className="text-right py-4 px-6 font-medium">Gasto</th>
+                          <th className="text-right py-4 px-6 font-medium">Restante</th>
+                          <th className="text-center py-4 px-6 font-medium">Progresso</th>
+                          <th className="text-center py-4 px-6 font-medium">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {budgetsData.budgets.map((budget) => (
+                          <tr key={budget.categoryId} className="border-b border-border/50 hover:bg-muted/20">
+                            <td className="py-4 px-6 font-medium">{budget.category}</td>
+                            <td className="py-4 px-6 text-right">{formatCurrency(budget.budgeted_cents)}</td>
+                            <td className="py-4 px-6 text-right">{formatCurrency(budget.spent_cents)}</td>
+                            <td className={`py-4 px-6 text-right ${budget.remaining_cents < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                              {formatCurrency(budget.remaining_cents)}
+                            </td>
+                            <td className="py-4 px-6">
+                              <div className="w-full bg-muted rounded-full h-2">
+                                <div
+                                  className={`h-2 rounded-full ${budget.status === 'over' ? 'bg-red-500' :
+                                    budget.status === 'near' ? 'bg-yellow-500' : 'bg-green-500'
+                                    }`}
+                                  style={{ width: `${Math.min(budget.percentage, 100)}%` }}
+                                />
+                              </div>
+                            </td>
+                            <td className="py-4 px-6 text-center">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${budget.status === 'over' ? 'bg-red-500/10 text-red-500' :
+                                budget.status === 'near' ? 'bg-yellow-500/10 text-yellow-500' :
+                                  'bg-green-500/10 text-green-500'
+                                }`}>
+                                {budget.percentage.toFixed(0)}%
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            )}
+          </TabsContent>
+
+          {/* Goals Tab */}
+          <TabsContent value="goals" className="space-y-6">
+            {goalsData && (
+              <>
+                {/* Summary */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div className="glass-card p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <i className='bx bx-flag text-xl text-primary'></i>
+                      </div>
+                      <span className="text-sm text-muted-foreground">Total Objetivos</span>
+                    </div>
+                    <p className="font-display text-2xl font-bold">{goalsData.summary.total_goals}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {goalsData.summary.active_goals} ativos, {goalsData.summary.completed_goals} concluidos
+                    </p>
+                  </div>
+
+                  <div className="glass-card p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
+                        <i className='bx bx-target-lock text-xl text-cyan-500'></i>
+                      </div>
+                      <span className="text-sm text-muted-foreground">Meta Total</span>
+                    </div>
+                    <p className="font-display text-2xl font-bold">
+                      {formatCurrency(goalsData.summary.total_target_cents)}
+                    </p>
+                  </div>
+
+                  <div className="glass-card p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
+                        <i className='bx bx-coin-stack text-xl text-green-500'></i>
+                      </div>
+                      <span className="text-sm text-muted-foreground">Acumulado</span>
+                    </div>
+                    <p className="font-display text-2xl font-bold text-green-500">
+                      {formatCurrency(goalsData.summary.total_current_cents)}
+                    </p>
+                  </div>
+
+                  <div className="glass-card p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
+                        <i className='bx bx-line-chart text-xl text-purple-500'></i>
+                      </div>
+                      <span className="text-sm text-muted-foreground">Progresso Geral</span>
+                    </div>
+                    <p className="font-display text-2xl font-bold">
+                      {goalsData.summary.overall_progress.toFixed(1)}%
+                    </p>
+                  </div>
+                </div>
+
+                {/* Goals List */}
+                <div className="glass-card p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="font-display font-semibold text-lg">Progresso dos Objetivos</h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleExport('goals')}
+                      disabled={exporting}
+                    >
+                      <i className='bx bx-download mr-1'></i> CSV
+                    </Button>
+                  </div>
+                  {goalsData.goals.length > 0 ? (
+                    <div className="space-y-4">
+                      {goalsData.goals.map((goal) => (
+                        <div key={goal.id} className="p-4 bg-muted/30 rounded-xl">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium">{goal.name}</h4>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${goal.status === 'completed' ? 'bg-green-500/10 text-green-500' :
+                              goal.status === 'active' ? 'bg-primary/10 text-primary' :
+                                'bg-muted text-muted-foreground'
+                              }`}>
+                              {goal.status === 'completed' ? 'Concluido' :
+                                goal.status === 'active' ? 'Ativo' :
+                                  goal.status === 'paused' ? 'Pausado' : 'Cancelado'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
+                            <span>{formatCurrency(goal.current_cents)} de {formatCurrency(goal.target_cents)}</span>
+                            {goal.days_remaining !== null && goal.days_remaining > 0 && (
+                              <span>| {goal.days_remaining} dias restantes</span>
+                            )}
+                            {goal.monthly_needed_cents !== null && goal.monthly_needed_cents > 0 && (
+                              <span>| {formatCurrency(goal.monthly_needed_cents)}/mes necessario</span>
+                            )}
+                          </div>
+                          <div className="w-full bg-muted rounded-full h-3">
+                            <div
+                              className="h-3 rounded-full bg-gradient-to-r from-primary to-cyan-500"
+                              style={{ width: `${Math.min(goal.progress, 100)}%` }}
+                            />
+                          </div>
+                          <p className="text-right text-sm font-medium mt-1">{goal.progress.toFixed(1)}%</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-center text-muted-foreground py-8">Nenhum objetivo cadastrado</p>
+                  )}
+                </div>
+              </>
+            )}
+          </TabsContent>
+
+          {/* Debts Tab */}
+          <TabsContent value="debts" className="space-y-6">
+            {debtsData && (
+              <>
+                {/* Summary */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div className="glass-card p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+                        <i className='bx bx-credit-card text-xl text-red-500'></i>
+                      </div>
+                      <span className="text-sm text-muted-foreground">Dívidas Ativas</span>
+                    </div>
+                    <p className="font-display text-2xl font-bold">{debtsData.summary.active_debts}</p>
+                    {debtsData.summary.overdue_debts > 0 && (
+                      <p className="text-xs text-red-500 mt-1">{debtsData.summary.overdue_debts} em atraso</p>
+                    )}
+                  </div>
+
+                  <div className="glass-card p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center">
+                        <i className='bx bx-money text-xl text-orange-500'></i>
+                      </div>
+                      <span className="text-sm text-muted-foreground">Total Dívidas</span>
+                    </div>
+                    <p className="font-display text-2xl font-bold">
+                      {formatCurrency(debtsData.summary.total_debt_cents)}
+                    </p>
+                  </div>
+
+                  <div className="glass-card p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
+                        <i className='bx bx-check text-xl text-green-500'></i>
+                      </div>
+                      <span className="text-sm text-muted-foreground">Total Pago</span>
+                    </div>
+                    <p className="font-display text-2xl font-bold text-green-500">
+                      {formatCurrency(debtsData.summary.total_paid_cents)}
+                    </p>
+                  </div>
+
+                  <div className="glass-card p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center">
+                        <i className='bx bx-time text-xl text-yellow-500'></i>
+                      </div>
+                      <span className="text-sm text-muted-foreground">Restante</span>
+                    </div>
+                    <p className="font-display text-2xl font-bold text-yellow-500">
+                      {formatCurrency(debtsData.summary.total_remaining_cents)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Debts Chart */}
+                <div className="glass-card p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="font-display font-semibold text-lg">Progresso de Pagamento</h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleExport('debts')}
+                      disabled={exporting}
+                    >
+                      <i className='bx bx-download mr-1'></i> CSV
+                    </Button>
+                  </div>
+                  {debtsData.debts.length > 0 ? (
+                    <div className="space-y-4">
+                      {debtsData.debts.map((debt) => (
+                        <div key={debt.id} className="p-4 bg-muted/30 rounded-xl">
+                          <div className="flex items-center justify-between mb-2">
+                            <div>
+                              <h4 className="font-medium">{debt.name}</h4>
+                              {debt.due_date && (
+                                <p className="text-xs text-muted-foreground">
+                                  Vencimento: {new Date(debt.due_date).toLocaleDateString('pt-BR')}
+                                  {debt.days_until_due !== null && (
+                                    <span className={debt.days_until_due < 0 ? ' text-red-500' : ''}>
+                                      {' '}({debt.days_until_due < 0 ? `${Math.abs(debt.days_until_due)} dias atrasado` : `${debt.days_until_due} dias`})
+                                    </span>
+                                  )}
+                                </p>
+                              )}
+                            </div>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${debt.status === 'paid' ? 'bg-green-500/10 text-green-500' :
+                              debt.status === 'overdue' ? 'bg-red-500/10 text-red-500' :
+                                debt.status === 'negotiating' ? 'bg-yellow-500/10 text-yellow-500' :
+                                  'bg-primary/10 text-primary'
+                              }`}>
+                              {debt.status === 'paid' ? 'Pago' :
+                                debt.status === 'overdue' ? 'Atrasado' :
+                                  debt.status === 'negotiating' ? 'Negociando' : 'Ativo'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
+                            <span>Pago: {formatCurrency(debt.paid_cents)} de {formatCurrency(debt.total_cents)}</span>
+                            {debt.interest_rate > 0 && <span>| Juros: {debt.interest_rate}%</span>}
+                          </div>
+                          <div className="w-full bg-muted rounded-full h-3">
+                            <div
+                              className={`h-3 rounded-full ${debt.status === 'paid' ? 'bg-green-500' :
+                                debt.status === 'overdue' ? 'bg-red-500' : 'bg-gradient-to-r from-orange-500 to-yellow-500'
+                                }`}
+                              style={{ width: `${Math.min(debt.progress, 100)}%` }}
+                            />
+                          </div>
+                          <p className="text-right text-sm font-medium mt-1">{debt.progress.toFixed(1)}%</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-center text-muted-foreground py-8">Nenhuma divida cadastrada</p>
+                  )}
+                </div>
+              </>
+            )}
+          </TabsContent>
+
+          {/* Investments Tab */}
+          <TabsContent value="investments" className="space-y-6">
+            {investmentsData && (
+              <>
+                {/* Summary */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div className="glass-card p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <i className='bx bx-bar-chart-alt text-xl text-primary'></i>
+                      </div>
+                      <span className="text-sm text-muted-foreground">Total Investido</span>
+                    </div>
+                    <p className="font-display text-2xl font-bold">
+                      {formatCurrency(investmentsData.summary.total_invested_cents)}
+                    </p>
+                  </div>
+
+                  <div className="glass-card p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
+                        <i className='bx bx-wallet text-xl text-cyan-500'></i>
+                      </div>
+                      <span className="text-sm text-muted-foreground">Valor Atual</span>
+                    </div>
+                    <p className="font-display text-2xl font-bold">
+                      {formatCurrency(investmentsData.summary.total_current_value_cents)}
+                    </p>
+                  </div>
+
+                  <div className="glass-card p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${investmentsData.summary.total_return_cents >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'
+                        }`}>
+                        <i className={`bx bx-trending-up text-xl ${investmentsData.summary.total_return_cents >= 0 ? 'text-green-500' : 'text-red-500'
+                          }`}></i>
+                      </div>
+                      <span className="text-sm text-muted-foreground">Retorno</span>
+                    </div>
+                    <p className={`font-display text-2xl font-bold ${investmentsData.summary.total_return_cents >= 0 ? 'text-green-500' : 'text-red-500'
+                      }`}>
+                      {formatCurrency(investmentsData.summary.total_return_cents)}
+                    </p>
+                  </div>
+
+                  <div className="glass-card p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${investmentsData.summary.total_return_percentage >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'
+                        }`}>
+                        <i className='bx bx-percent text-xl text-green-500'></i>
+                      </div>
+                      <span className="text-sm text-muted-foreground">% Retorno</span>
+                    </div>
+                    <p className={`font-display text-2xl font-bold ${investmentsData.summary.total_return_percentage >= 0 ? 'text-green-500' : 'text-red-500'
+                      }`}>
+                      {investmentsData.summary.total_return_percentage >= 0 ? '+' : ''}{investmentsData.summary.total_return_percentage.toFixed(2)}%
+                    </p>
+                  </div>
+                </div>
+
+                {/* Allocation Chart */}
+                <div className="grid lg:grid-cols-2 gap-6">
+                  <div className="glass-card p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="font-display font-semibold text-lg">Alocacao por Tipo</h3>
+                    </div>
+                    {investmentsData.by_type.length > 0 ? (
+                      <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={investmentsData.by_type.map(t => ({
+                                ...t,
+                                name: TYPE_LABELS[t.type] || t.type,
+                              }))}
+                              dataKey="current_value_cents"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={80}
+                              label={({ name, allocation_percentage }) => `${name}: ${allocation_percentage.toFixed(1)}%`}
+                              labelLine={false}
+                            >
+                              {investmentsData.by_type.map((_, index) => (
+                                <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <p className="text-center text-muted-foreground py-8">Nenhum investimento cadastrado</p>
+                    )}
+                  </div>
+
+                  <div className="glass-card p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="font-display font-semibold text-lg">Retorno por Tipo</h3>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleExport('investments')}
+                        disabled={exporting}
+                      >
+                        <i className='bx bx-download mr-1'></i> CSV
+                      </Button>
+                    </div>
+                    <div className="space-y-3">
+                      {investmentsData.by_type.map((type, i) => (
+                        <div key={type.type} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                            <span className="font-medium">{TYPE_LABELS[type.type] || type.type}</span>
+                            <span className="text-sm text-muted-foreground">({type.count})</span>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium">{formatCurrency(type.current_value_cents)}</p>
+                            <p className={`text-sm ${type.return_percentage >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                              {type.return_percentage >= 0 ? '+' : ''}{type.return_percentage.toFixed(2)}%
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Investments Table */}
+                <div className="glass-card overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/30">
+                          <th className="text-left py-4 px-6 font-medium">Nome</th>
+                          <th className="text-left py-4 px-6 font-medium">Tipo</th>
+                          <th className="text-right py-4 px-6 font-medium">Investido</th>
+                          <th className="text-right py-4 px-6 font-medium">Valor Atual</th>
+                          <th className="text-right py-4 px-6 font-medium">Retorno</th>
+                          <th className="text-center py-4 px-6 font-medium">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {investmentsData.investments.map((inv) => (
+                          <tr key={inv.id} className="border-b border-border/50 hover:bg-muted/20">
+                            <td className="py-4 px-6 font-medium">{inv.name}</td>
+                            <td className="py-4 px-6">{TYPE_LABELS[inv.type] || inv.type}</td>
+                            <td className="py-4 px-6 text-right">{formatCurrency(inv.invested_cents)}</td>
+                            <td className="py-4 px-6 text-right">{formatCurrency(inv.current_value_cents)}</td>
+                            <td className={`py-4 px-6 text-right ${inv.return_percentage >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                              {inv.return_percentage >= 0 ? '+' : ''}{inv.return_percentage.toFixed(2)}%
+                            </td>
+                            <td className="py-4 px-6 text-center">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${inv.status === 'active' ? 'bg-green-500/10 text-green-500' :
+                                inv.status === 'sold' ? 'bg-muted text-muted-foreground' :
+                                  'bg-yellow-500/10 text-yellow-500'
+                                }`}>
+                                {inv.status === 'active' ? 'Ativo' : inv.status === 'sold' ? 'Vendido' : 'Vencido'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            )}
+          </TabsContent>
+
+          {/* Cashflow Tab */}
+          <TabsContent value="cashflow" className="space-y-6">
+            {cashflowData && (
               <div className="glass-card p-6">
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-display font-semibold text-lg">Receitas vs Despesas</h3>
+                    <h3 className="font-display font-semibold text-lg">Fluxo de Caixa Acumulado</h3>
                     <InfoIcon
                       content={
                         <div className="space-y-2">
                           <p className="font-semibold">Sobre este gráfico:</p>
                           <ul className="space-y-1.5 text-xs list-disc list-inside">
-                            <li><strong>Receitas:</strong> Valores recebidos no período selecionado.</li>
-                            <li><strong>Despesas:</strong> Valores gastos no período selecionado.</li>
+                            <li><strong>Receitas:</strong> Área verde mostra valores recebidos ao longo do tempo.</li>
+                            <li><strong>Despesas:</strong> Área vermelha mostra valores gastos ao longo do tempo.</li>
+                            <li><strong>Saldo Acumulado:</strong> Linha roxa mostra a soma acumulada (receitas - despesas).</li>
                             <li><strong>Barra azul:</strong> Destaca o mês/período corrente.</li>
                             <li>O período corrente está sempre centralizado quando aplicável.</li>
-                            <li>Use os filtros acima para ajustar o período e visualizar diferentes intervalos de tempo.</li>
+                            <li>Valores positivos indicam saldo positivo, negativos indicam saldo negativo.</li>
                           </ul>
                         </div>
                       }
@@ -634,898 +1461,84 @@ export default function ReportsPage() {
                     <i className='bx bx-download mr-1'></i> CSV
                   </Button>
                 </div>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    {(() => {
-                      const reorganized = reorganizeDataForChart(overviewData.periods);
-                      return (
-                        <BarChart data={reorganized.data}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                          <XAxis
-                            dataKey="period"
-                            tickFormatter={(value, index) => formatPeriodLabel(value, index, reorganized.data)}
-                            stroke="hsl(var(--muted-foreground))"
-                            fontSize={12}
-                          />
-                          {reorganized.currentMonthIndex >= 0 && reorganized.currentMonthIndex < reorganized.data.length && (
-                            <ReferenceArea
-                              x1={reorganized.data[reorganized.currentMonthIndex]?.period}
-                              x2={reorganized.data[reorganized.currentMonthIndex]?.period}
-                              y1="dataMin"
-                              y2="dataMax"
-                              fill="hsl(var(--primary))"
-                              fillOpacity={0.1}
-                              stroke="none"
-                              ifOverflow="extendDomain"
+                {cashflowData.periods.length > 0 ? (
+                  <div className="h-96">
+                    <ResponsiveContainer width="100%" height="100%">
+                      {(() => {
+                        const reorganized = reorganizeDataForChart(cashflowData.periods);
+                        return (
+                          <AreaChart data={reorganized.data}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                            <XAxis
+                              dataKey="period"
+                              tickFormatter={(value, index) => formatPeriodLabel(value, index, reorganized.data)}
+                              stroke="hsl(var(--muted-foreground))"
+                              fontSize={12}
                             />
-                          )}
-                      <YAxis
-                        tickFormatter={(v) => `R$${(v / 100).toFixed(0)}`}
-                        stroke="hsl(var(--muted-foreground))"
-                        fontSize={12}
-                      />
-                      <Tooltip
-                        formatter={(value: number) => formatChartValue(value)}
-                        labelFormatter={formatTooltipLabel}
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--card))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px',
-                        }}
-                      />
-                          <Legend />
-                          <Bar dataKey="income_cents" name="Receitas" fill="#10b981" radius={[4, 4, 0, 0]} />
-                          <Bar dataKey="expense_cents" name="Despesas" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      );
-                    })()}
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </>
-          )}
-        </TabsContent>
-
-        {/* Categories Tab */}
-        <TabsContent value="categories" className="space-y-6">
-          {categoriesData && (
-            <div className="grid lg:grid-cols-2 gap-6">
-              {/* Income by Category */}
-              <div className="glass-card p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-2">
-                    <div>
-                      <h3 className="font-display font-semibold text-lg">Receitas por Categoria</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Total: {formatCurrency(categoriesData.income.total_cents)}
-                      </p>
-                    </div>
-                    <InfoIcon
-                      content={
-                        <div className="space-y-2">
-                          <p className="font-semibold">Sobre este gráfico:</p>
-                          <ul className="space-y-1.5 text-xs list-disc list-inside">
-                            <li>Mostra como suas receitas estão distribuídas entre diferentes categorias.</li>
-                            <li>Cada barra representa uma categoria de receita e seu valor total no período.</li>
-                            <li>As categorias são ordenadas do maior para o menor valor recebido.</li>
-                            <li>Use este gráfico para identificar suas principais fontes de renda.</li>
-                          </ul>
-                        </div>
-                      }
-                    />
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleExport('categories')}
-                    disabled={exporting}
-                  >
-                    <i className='bx bx-download mr-1'></i> CSV
-                  </Button>
-                </div>
-                {categoriesData.income.categories.length > 0 ? (
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={categoriesData.income.categories}
-                          dataKey="total_cents"
-                          nameKey="category"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          label={({ category, percentage }) => `${category}: ${percentage.toFixed(1)}%`}
-                          labelLine={false}
-                        >
-                          {categoriesData.income.categories.map((_, index) => (
-                            <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <p className="text-center text-muted-foreground py-8">Nenhuma receita no periodo</p>
-                )}
-                <div className="space-y-2 mt-4">
-                  {categoriesData.income.categories.slice(0, 5).map((cat, i) => (
-                    <div key={cat.categoryId || i} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                        <span>{cat.category}</span>
-                      </div>
-                      <span className="font-medium">{formatCurrency(cat.total_cents)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Expense by Category */}
-              <div className="glass-card p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-2">
-                    <div>
-                      <h3 className="font-display font-semibold text-lg">Despesas por Categoria</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Total: {formatCurrency(categoriesData.expense.total_cents)}
-                      </p>
-                    </div>
-                    <InfoIcon
-                      content={
-                        <div className="space-y-2">
-                          <p className="font-semibold">Sobre este gráfico:</p>
-                          <ul className="space-y-1.5 text-xs list-disc list-inside">
-                            <li>Mostra como suas despesas estão distribuídas entre diferentes categorias.</li>
-                            <li>Cada fatia do gráfico representa uma categoria de despesa e seu valor total no período.</li>
-                            <li>As categorias são ordenadas do maior para o menor valor gasto.</li>
-                            <li>Use este gráfico para identificar onde você está gastando mais dinheiro.</li>
-                          </ul>
-                        </div>
-                      }
-                    />
-                  </div>
-                </div>
-                {categoriesData.expense.categories.length > 0 ? (
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={categoriesData.expense.categories}
-                          dataKey="total_cents"
-                          nameKey="category"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          label={({ category, percentage }) => `${category}: ${percentage.toFixed(1)}%`}
-                          labelLine={false}
-                        >
-                          {categoriesData.expense.categories.map((_, index) => (
-                            <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <p className="text-center text-muted-foreground py-8">Nenhuma despesa no periodo</p>
-                )}
-                <div className="space-y-2 mt-4">
-                  {categoriesData.expense.categories.slice(0, 5).map((cat, i) => (
-                    <div key={cat.categoryId || i} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                        <span>{cat.category}</span>
-                      </div>
-                      <span className="font-medium">{formatCurrency(cat.total_cents)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </TabsContent>
-
-        {/* Budgets Tab */}
-        <TabsContent value="budgets" className="space-y-6">
-          {budgetsData && (
-            <>
-              {/* Summary */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                <div className="glass-card p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                      <i className='bx bx-target-lock text-xl text-primary'></i>
-                    </div>
-                    <span className="text-sm text-muted-foreground">Total Orcado</span>
-                  </div>
-                  <p className="font-display text-2xl font-bold">
-                    {formatCurrency(budgetsData.summary.total_budgeted_cents)}
-                  </p>
-                </div>
-
-                <div className="glass-card p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center">
-                      <i className='bx bx-credit-card text-xl text-yellow-500'></i>
-                    </div>
-                    <span className="text-sm text-muted-foreground">Total Gasto</span>
-                  </div>
-                  <p className="font-display text-2xl font-bold">
-                    {formatCurrency(budgetsData.summary.total_spent_cents)}
-                  </p>
-                </div>
-
-                <div className="glass-card p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                      budgetsData.summary.total_remaining_cents >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'
-                    }`}>
-                      <i className={`bx bx-check-circle text-xl ${
-                        budgetsData.summary.total_remaining_cents >= 0 ? 'text-green-500' : 'text-red-500'
-                      }`}></i>
-                    </div>
-                    <span className="text-sm text-muted-foreground">Disponivel</span>
-                  </div>
-                  <p className={`font-display text-2xl font-bold ${
-                    budgetsData.summary.total_remaining_cents >= 0 ? 'text-green-500' : 'text-red-500'
-                  }`}>
-                    {formatCurrency(budgetsData.summary.total_remaining_cents)}
-                  </p>
-                </div>
-
-                <div className="glass-card p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
-                      <i className='bx bx-pie-chart-alt text-xl text-cyan-500'></i>
-                    </div>
-                    <span className="text-sm text-muted-foreground">% Utilizado</span>
-                  </div>
-                  <p className="font-display text-2xl font-bold">
-                    {budgetsData.summary.overall_percentage.toFixed(1)}%
-                  </p>
-                </div>
-              </div>
-
-              {/* Budget Chart */}
-              <div className="glass-card p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-display font-semibold text-lg">Orcamento vs Gasto por Categoria</h3>
-                    <InfoIcon
-                      content={
-                        <div className="space-y-2">
-                          <p className="font-semibold">Sobre este gráfico:</p>
-                          <ul className="space-y-1.5 text-xs list-disc list-inside">
-                            <li>Compara o valor orçado com o valor efetivamente gasto em cada categoria.</li>
-                            <li>Barras azuis representam o valor planejado para cada categoria.</li>
-                            <li>Barras laranjas representam o valor efetivamente gasto em cada categoria.</li>
-                            <li>Use este gráfico para identificar categorias onde você está gastando mais do que planejou.</li>
-                          </ul>
-                        </div>
-                      }
-                    />
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleExport('budgets')}
-                    disabled={exporting}
-                  >
-                    <i className='bx bx-download mr-1'></i> CSV
-                  </Button>
-                </div>
-                {budgetsData.budgets.length > 0 ? (
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={budgetsData.budgets} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis
-                          type="number"
-                          tickFormatter={(v) => `R$${(v / 100).toFixed(0)}`}
-                          stroke="hsl(var(--muted-foreground))"
-                          fontSize={12}
-                        />
-                        <YAxis
-                          type="category"
-                          dataKey="category"
-                          stroke="hsl(var(--muted-foreground))"
-                          fontSize={12}
-                          width={100}
-                        />
-                        <Tooltip
-                          formatter={(value: number) => formatCurrency(value)}
-                          contentStyle={{
-                            backgroundColor: 'hsl(var(--card))',
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px',
-                          }}
-                        />
-                        <Legend />
-                        <Bar dataKey="budgeted_cents" name="Orcado" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
-                        <Bar dataKey="spent_cents" name="Gasto" fill="#f59e0b" radius={[0, 4, 4, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <p className="text-center text-muted-foreground py-8">Nenhum orcamento no periodo</p>
-                )}
-              </div>
-
-              {/* Budget List */}
-              <div className="glass-card overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-border bg-muted/30">
-                        <th className="text-left py-4 px-6 font-medium">Categoria</th>
-                        <th className="text-right py-4 px-6 font-medium">Orcado</th>
-                        <th className="text-right py-4 px-6 font-medium">Gasto</th>
-                        <th className="text-right py-4 px-6 font-medium">Restante</th>
-                        <th className="text-center py-4 px-6 font-medium">Progresso</th>
-                        <th className="text-center py-4 px-6 font-medium">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {budgetsData.budgets.map((budget) => (
-                        <tr key={budget.categoryId} className="border-b border-border/50 hover:bg-muted/20">
-                          <td className="py-4 px-6 font-medium">{budget.category}</td>
-                          <td className="py-4 px-6 text-right">{formatCurrency(budget.budgeted_cents)}</td>
-                          <td className="py-4 px-6 text-right">{formatCurrency(budget.spent_cents)}</td>
-                          <td className={`py-4 px-6 text-right ${budget.remaining_cents < 0 ? 'text-red-500' : 'text-green-500'}`}>
-                            {formatCurrency(budget.remaining_cents)}
-                          </td>
-                          <td className="py-4 px-6">
-                            <div className="w-full bg-muted rounded-full h-2">
-                              <div
-                                className={`h-2 rounded-full ${
-                                  budget.status === 'over' ? 'bg-red-500' :
-                                  budget.status === 'near' ? 'bg-yellow-500' : 'bg-green-500'
-                                }`}
-                                style={{ width: `${Math.min(budget.percentage, 100)}%` }}
+                            {reorganized.currentMonthIndex >= 0 && reorganized.currentMonthIndex < reorganized.data.length && (
+                              <ReferenceArea
+                                x1={reorganized.data[reorganized.currentMonthIndex]?.period}
+                                x2={reorganized.data[reorganized.currentMonthIndex]?.period}
+                                y1="dataMin"
+                                y2="dataMax"
+                                fill="hsl(var(--primary))"
+                                fillOpacity={0.1}
+                                stroke="none"
+                                ifOverflow="extendDomain"
                               />
-                            </div>
-                          </td>
-                          <td className="py-4 px-6 text-center">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              budget.status === 'over' ? 'bg-red-500/10 text-red-500' :
-                              budget.status === 'near' ? 'bg-yellow-500/10 text-yellow-500' :
-                              'bg-green-500/10 text-green-500'
-                            }`}>
-                              {budget.percentage.toFixed(0)}%
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </>
-          )}
-        </TabsContent>
-
-        {/* Goals Tab */}
-        <TabsContent value="goals" className="space-y-6">
-          {goalsData && (
-            <>
-              {/* Summary */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                <div className="glass-card p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                      <i className='bx bx-flag text-xl text-primary'></i>
-                    </div>
-                    <span className="text-sm text-muted-foreground">Total Objetivos</span>
-                  </div>
-                  <p className="font-display text-2xl font-bold">{goalsData.summary.total_goals}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {goalsData.summary.active_goals} ativos, {goalsData.summary.completed_goals} concluidos
-                  </p>
-                </div>
-
-                <div className="glass-card p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
-                      <i className='bx bx-target-lock text-xl text-cyan-500'></i>
-                    </div>
-                    <span className="text-sm text-muted-foreground">Meta Total</span>
-                  </div>
-                  <p className="font-display text-2xl font-bold">
-                    {formatCurrency(goalsData.summary.total_target_cents)}
-                  </p>
-                </div>
-
-                <div className="glass-card p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
-                      <i className='bx bx-coin-stack text-xl text-green-500'></i>
-                    </div>
-                    <span className="text-sm text-muted-foreground">Acumulado</span>
-                  </div>
-                  <p className="font-display text-2xl font-bold text-green-500">
-                    {formatCurrency(goalsData.summary.total_current_cents)}
-                  </p>
-                </div>
-
-                <div className="glass-card p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
-                      <i className='bx bx-line-chart text-xl text-purple-500'></i>
-                    </div>
-                    <span className="text-sm text-muted-foreground">Progresso Geral</span>
-                  </div>
-                  <p className="font-display text-2xl font-bold">
-                    {goalsData.summary.overall_progress.toFixed(1)}%
-                  </p>
-                </div>
-              </div>
-
-              {/* Goals List */}
-              <div className="glass-card p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="font-display font-semibold text-lg">Progresso dos Objetivos</h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleExport('goals')}
-                    disabled={exporting}
-                  >
-                    <i className='bx bx-download mr-1'></i> CSV
-                  </Button>
-                </div>
-                {goalsData.goals.length > 0 ? (
-                  <div className="space-y-4">
-                    {goalsData.goals.map((goal) => (
-                      <div key={goal.id} className="p-4 bg-muted/30 rounded-xl">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium">{goal.name}</h4>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            goal.status === 'completed' ? 'bg-green-500/10 text-green-500' :
-                            goal.status === 'active' ? 'bg-primary/10 text-primary' :
-                            'bg-muted text-muted-foreground'
-                          }`}>
-                            {goal.status === 'completed' ? 'Concluido' :
-                             goal.status === 'active' ? 'Ativo' :
-                             goal.status === 'paused' ? 'Pausado' : 'Cancelado'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-                          <span>{formatCurrency(goal.current_cents)} de {formatCurrency(goal.target_cents)}</span>
-                          {goal.days_remaining !== null && goal.days_remaining > 0 && (
-                            <span>| {goal.days_remaining} dias restantes</span>
-                          )}
-                          {goal.monthly_needed_cents !== null && goal.monthly_needed_cents > 0 && (
-                            <span>| {formatCurrency(goal.monthly_needed_cents)}/mes necessario</span>
-                          )}
-                        </div>
-                        <div className="w-full bg-muted rounded-full h-3">
-                          <div
-                            className="h-3 rounded-full bg-gradient-to-r from-primary to-cyan-500"
-                            style={{ width: `${Math.min(goal.progress, 100)}%` }}
-                          />
-                        </div>
-                        <p className="text-right text-sm font-medium mt-1">{goal.progress.toFixed(1)}%</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-center text-muted-foreground py-8">Nenhum objetivo cadastrado</p>
-                )}
-              </div>
-            </>
-          )}
-        </TabsContent>
-
-        {/* Debts Tab */}
-        <TabsContent value="debts" className="space-y-6">
-          {debtsData && (
-            <>
-              {/* Summary */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                <div className="glass-card p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
-                      <i className='bx bx-credit-card text-xl text-red-500'></i>
-                    </div>
-                    <span className="text-sm text-muted-foreground">Dívidas Ativas</span>
-                  </div>
-                  <p className="font-display text-2xl font-bold">{debtsData.summary.active_debts}</p>
-                  {debtsData.summary.overdue_debts > 0 && (
-                    <p className="text-xs text-red-500 mt-1">{debtsData.summary.overdue_debts} em atraso</p>
-                  )}
-                </div>
-
-                <div className="glass-card p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center">
-                      <i className='bx bx-money text-xl text-orange-500'></i>
-                    </div>
-                    <span className="text-sm text-muted-foreground">Total Dívidas</span>
-                  </div>
-                  <p className="font-display text-2xl font-bold">
-                    {formatCurrency(debtsData.summary.total_debt_cents)}
-                  </p>
-                </div>
-
-                <div className="glass-card p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
-                      <i className='bx bx-check text-xl text-green-500'></i>
-                    </div>
-                    <span className="text-sm text-muted-foreground">Total Pago</span>
-                  </div>
-                  <p className="font-display text-2xl font-bold text-green-500">
-                    {formatCurrency(debtsData.summary.total_paid_cents)}
-                  </p>
-                </div>
-
-                <div className="glass-card p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center">
-                      <i className='bx bx-time text-xl text-yellow-500'></i>
-                    </div>
-                    <span className="text-sm text-muted-foreground">Restante</span>
-                  </div>
-                  <p className="font-display text-2xl font-bold text-yellow-500">
-                    {formatCurrency(debtsData.summary.total_remaining_cents)}
-                  </p>
-                </div>
-              </div>
-
-              {/* Debts Chart */}
-              <div className="glass-card p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="font-display font-semibold text-lg">Progresso de Pagamento</h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleExport('debts')}
-                    disabled={exporting}
-                  >
-                    <i className='bx bx-download mr-1'></i> CSV
-                  </Button>
-                </div>
-                {debtsData.debts.length > 0 ? (
-                  <div className="space-y-4">
-                    {debtsData.debts.map((debt) => (
-                      <div key={debt.id} className="p-4 bg-muted/30 rounded-xl">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <h4 className="font-medium">{debt.name}</h4>
-                            {debt.due_date && (
-                              <p className="text-xs text-muted-foreground">
-                                Vencimento: {new Date(debt.due_date).toLocaleDateString('pt-BR')}
-                                {debt.days_until_due !== null && (
-                                  <span className={debt.days_until_due < 0 ? ' text-red-500' : ''}>
-                                    {' '}({debt.days_until_due < 0 ? `${Math.abs(debt.days_until_due)} dias atrasado` : `${debt.days_until_due} dias`})
-                                  </span>
-                                )}
-                              </p>
                             )}
-                          </div>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            debt.status === 'paid' ? 'bg-green-500/10 text-green-500' :
-                            debt.status === 'overdue' ? 'bg-red-500/10 text-red-500' :
-                            debt.status === 'negotiating' ? 'bg-yellow-500/10 text-yellow-500' :
-                            'bg-primary/10 text-primary'
-                          }`}>
-                            {debt.status === 'paid' ? 'Pago' :
-                             debt.status === 'overdue' ? 'Atrasado' :
-                             debt.status === 'negotiating' ? 'Negociando' : 'Ativo'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-                          <span>Pago: {formatCurrency(debt.paid_cents)} de {formatCurrency(debt.total_cents)}</span>
-                          {debt.interest_rate > 0 && <span>| Juros: {debt.interest_rate}%</span>}
-                        </div>
-                        <div className="w-full bg-muted rounded-full h-3">
-                          <div
-                            className={`h-3 rounded-full ${
-                              debt.status === 'paid' ? 'bg-green-500' :
-                              debt.status === 'overdue' ? 'bg-red-500' : 'bg-gradient-to-r from-orange-500 to-yellow-500'
-                            }`}
-                            style={{ width: `${Math.min(debt.progress, 100)}%` }}
-                          />
-                        </div>
-                        <p className="text-right text-sm font-medium mt-1">{debt.progress.toFixed(1)}%</p>
-                      </div>
-                    ))}
+                            <YAxis
+                              tickFormatter={(v) => `R$${(v / 100).toFixed(0)}`}
+                              stroke="hsl(var(--muted-foreground))"
+                              fontSize={12}
+                            />
+                            <Tooltip
+                              formatter={(value: number) => formatCurrency(value)}
+                              labelFormatter={formatTooltipLabel}
+                              contentStyle={{
+                                backgroundColor: 'hsl(var(--card))',
+                                border: '1px solid hsl(var(--border))',
+                                borderRadius: '8px',
+                              }}
+                            />
+                            <Legend />
+                            <Area
+                              type="monotone"
+                              dataKey="income_cents"
+                              name="Receitas"
+                              stroke="#10b981"
+                              fill="#10b981"
+                              fillOpacity={0.3}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="expense_cents"
+                              name="Despesas"
+                              stroke="#ef4444"
+                              fill="#ef4444"
+                              fillOpacity={0.3}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="cumulative_balance_cents"
+                              name="Saldo Acumulado"
+                              stroke="#8b5cf6"
+                              strokeWidth={3}
+                              dot={false}
+                            />
+                          </AreaChart>
+                        );
+                      })()}
+                    </ResponsiveContainer>
                   </div>
                 ) : (
-                  <p className="text-center text-muted-foreground py-8">Nenhuma divida cadastrada</p>
+                  <p className="text-center text-muted-foreground py-8">Nenhuma transacao no periodo</p>
                 )}
               </div>
-            </>
-          )}
-        </TabsContent>
-
-        {/* Investments Tab */}
-        <TabsContent value="investments" className="space-y-6">
-          {investmentsData && (
-            <>
-              {/* Summary */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                <div className="glass-card p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                      <i className='bx bx-bar-chart-alt text-xl text-primary'></i>
-                    </div>
-                    <span className="text-sm text-muted-foreground">Total Investido</span>
-                  </div>
-                  <p className="font-display text-2xl font-bold">
-                    {formatCurrency(investmentsData.summary.total_invested_cents)}
-                  </p>
-                </div>
-
-                <div className="glass-card p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
-                      <i className='bx bx-wallet text-xl text-cyan-500'></i>
-                    </div>
-                    <span className="text-sm text-muted-foreground">Valor Atual</span>
-                  </div>
-                  <p className="font-display text-2xl font-bold">
-                    {formatCurrency(investmentsData.summary.total_current_value_cents)}
-                  </p>
-                </div>
-
-                <div className="glass-card p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                      investmentsData.summary.total_return_cents >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'
-                    }`}>
-                      <i className={`bx bx-trending-up text-xl ${
-                        investmentsData.summary.total_return_cents >= 0 ? 'text-green-500' : 'text-red-500'
-                      }`}></i>
-                    </div>
-                    <span className="text-sm text-muted-foreground">Retorno</span>
-                  </div>
-                  <p className={`font-display text-2xl font-bold ${
-                    investmentsData.summary.total_return_cents >= 0 ? 'text-green-500' : 'text-red-500'
-                  }`}>
-                    {formatCurrency(investmentsData.summary.total_return_cents)}
-                  </p>
-                </div>
-
-                <div className="glass-card p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                      investmentsData.summary.total_return_percentage >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'
-                    }`}>
-                      <i className='bx bx-percent text-xl text-green-500'></i>
-                    </div>
-                    <span className="text-sm text-muted-foreground">% Retorno</span>
-                  </div>
-                  <p className={`font-display text-2xl font-bold ${
-                    investmentsData.summary.total_return_percentage >= 0 ? 'text-green-500' : 'text-red-500'
-                  }`}>
-                    {investmentsData.summary.total_return_percentage >= 0 ? '+' : ''}{investmentsData.summary.total_return_percentage.toFixed(2)}%
-                  </p>
-                </div>
-              </div>
-
-              {/* Allocation Chart */}
-              <div className="grid lg:grid-cols-2 gap-6">
-                <div className="glass-card p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="font-display font-semibold text-lg">Alocacao por Tipo</h3>
-                  </div>
-                  {investmentsData.by_type.length > 0 ? (
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={investmentsData.by_type.map(t => ({
-                              ...t,
-                              name: TYPE_LABELS[t.type] || t.type,
-                            }))}
-                            dataKey="current_value_cents"
-                            nameKey="name"
-                            cx="50%"
-                            cy="50%"
-                            outerRadius={80}
-                            label={({ name, allocation_percentage }) => `${name}: ${allocation_percentage.toFixed(1)}%`}
-                            labelLine={false}
-                          >
-                            {investmentsData.by_type.map((_, index) => (
-                              <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                  ) : (
-                    <p className="text-center text-muted-foreground py-8">Nenhum investimento cadastrado</p>
-                  )}
-                </div>
-
-                <div className="glass-card p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="font-display font-semibold text-lg">Retorno por Tipo</h3>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleExport('investments')}
-                      disabled={exporting}
-                    >
-                      <i className='bx bx-download mr-1'></i> CSV
-                    </Button>
-                  </div>
-                  <div className="space-y-3">
-                    {investmentsData.by_type.map((type, i) => (
-                      <div key={type.type} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                          <span className="font-medium">{TYPE_LABELS[type.type] || type.type}</span>
-                          <span className="text-sm text-muted-foreground">({type.count})</span>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-medium">{formatCurrency(type.current_value_cents)}</p>
-                          <p className={`text-sm ${type.return_percentage >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                            {type.return_percentage >= 0 ? '+' : ''}{type.return_percentage.toFixed(2)}%
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Investments Table */}
-              <div className="glass-card overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-border bg-muted/30">
-                        <th className="text-left py-4 px-6 font-medium">Nome</th>
-                        <th className="text-left py-4 px-6 font-medium">Tipo</th>
-                        <th className="text-right py-4 px-6 font-medium">Investido</th>
-                        <th className="text-right py-4 px-6 font-medium">Valor Atual</th>
-                        <th className="text-right py-4 px-6 font-medium">Retorno</th>
-                        <th className="text-center py-4 px-6 font-medium">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {investmentsData.investments.map((inv) => (
-                        <tr key={inv.id} className="border-b border-border/50 hover:bg-muted/20">
-                          <td className="py-4 px-6 font-medium">{inv.name}</td>
-                          <td className="py-4 px-6">{TYPE_LABELS[inv.type] || inv.type}</td>
-                          <td className="py-4 px-6 text-right">{formatCurrency(inv.invested_cents)}</td>
-                          <td className="py-4 px-6 text-right">{formatCurrency(inv.current_value_cents)}</td>
-                          <td className={`py-4 px-6 text-right ${inv.return_percentage >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                            {inv.return_percentage >= 0 ? '+' : ''}{inv.return_percentage.toFixed(2)}%
-                          </td>
-                          <td className="py-4 px-6 text-center">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              inv.status === 'active' ? 'bg-green-500/10 text-green-500' :
-                              inv.status === 'sold' ? 'bg-muted text-muted-foreground' :
-                              'bg-yellow-500/10 text-yellow-500'
-                            }`}>
-                              {inv.status === 'active' ? 'Ativo' : inv.status === 'sold' ? 'Vendido' : 'Vencido'}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </>
-          )}
-        </TabsContent>
-
-        {/* Cashflow Tab */}
-        <TabsContent value="cashflow" className="space-y-6">
-          {cashflowData && (
-            <div className="glass-card p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-display font-semibold text-lg">Fluxo de Caixa Acumulado</h3>
-                  <InfoIcon
-                    content={
-                      <div className="space-y-2">
-                        <p className="font-semibold">Sobre este gráfico:</p>
-                        <ul className="space-y-1.5 text-xs list-disc list-inside">
-                          <li><strong>Receitas:</strong> Área verde mostra valores recebidos ao longo do tempo.</li>
-                          <li><strong>Despesas:</strong> Área vermelha mostra valores gastos ao longo do tempo.</li>
-                          <li><strong>Saldo Acumulado:</strong> Linha roxa mostra a soma acumulada (receitas - despesas).</li>
-                          <li><strong>Barra azul:</strong> Destaca o mês/período corrente.</li>
-                          <li>O período corrente está sempre centralizado quando aplicável.</li>
-                          <li>Valores positivos indicam saldo positivo, negativos indicam saldo negativo.</li>
-                        </ul>
-                      </div>
-                    }
-                  />
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleExport('transactions')}
-                  disabled={exporting}
-                >
-                  <i className='bx bx-download mr-1'></i> CSV
-                </Button>
-              </div>
-              {cashflowData.periods.length > 0 ? (
-                <div className="h-96">
-                  <ResponsiveContainer width="100%" height="100%">
-                    {(() => {
-                      const reorganized = reorganizeDataForChart(cashflowData.periods);
-                      return (
-                        <AreaChart data={reorganized.data}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                          <XAxis
-                            dataKey="period"
-                            tickFormatter={(value, index) => formatPeriodLabel(value, index, reorganized.data)}
-                            stroke="hsl(var(--muted-foreground))"
-                            fontSize={12}
-                          />
-                          {reorganized.currentMonthIndex >= 0 && reorganized.currentMonthIndex < reorganized.data.length && (
-                            <ReferenceArea
-                              x1={reorganized.data[reorganized.currentMonthIndex]?.period}
-                              x2={reorganized.data[reorganized.currentMonthIndex]?.period}
-                              y1="dataMin"
-                              y2="dataMax"
-                              fill="hsl(var(--primary))"
-                              fillOpacity={0.1}
-                              stroke="none"
-                              ifOverflow="extendDomain"
-                            />
-                          )}
-                      <YAxis
-                        tickFormatter={(v) => `R$${(v / 100).toFixed(0)}`}
-                        stroke="hsl(var(--muted-foreground))"
-                        fontSize={12}
-                      />
-                      <Tooltip
-                        formatter={(value: number) => formatCurrency(value)}
-                        labelFormatter={formatTooltipLabel}
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--card))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px',
-                        }}
-                      />
-                          <Legend />
-                          <Area
-                            type="monotone"
-                            dataKey="income_cents"
-                            name="Receitas"
-                            stroke="#10b981"
-                        fill="#10b981"
-                        fillOpacity={0.3}
-                      />
-                          <Area
-                            type="monotone"
-                            dataKey="expense_cents"
-                            name="Despesas"
-                            stroke="#ef4444"
-                            fill="#ef4444"
-                            fillOpacity={0.3}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="cumulative_balance_cents"
-                            name="Saldo Acumulado"
-                            stroke="#8b5cf6"
-                            strokeWidth={3}
-                            dot={false}
-                          />
-                        </AreaChart>
-                      );
-                    })()}
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <p className="text-center text-muted-foreground py-8">Nenhuma transacao no periodo</p>
-              )}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
-    </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
+    </PlanGuard>
   );
 }

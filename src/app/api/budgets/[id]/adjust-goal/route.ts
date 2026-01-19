@@ -5,9 +5,10 @@ import { createErrorResponse } from '@/lib/errors';
 import { recalculateGoalBudgets } from '@/services/budgets/autoGenerator';
 import { projectionCache } from '@/services/projections/cache';
 import { z } from 'zod';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
 const adjustGoalBudgetSchema = z.object({
-  amount_planned: z.number().positive('Valor deve ser positivo').optional(),
+  amount_planned_cents: z.number().int().positive('Valor deve ser positivo').optional(),
   limit_cents: z.number().int().positive('Valor deve ser positivo').optional(),
 });
 
@@ -20,6 +21,7 @@ export async function POST(
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const budgetId = params.id;
     const body = await request.json();
@@ -32,7 +34,7 @@ export async function POST(
       .from('budgets')
       .select('*, categories(source_type)')
       .eq('id', budgetId)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .single();
 
     if (budgetError || !budget) {
@@ -61,11 +63,11 @@ export async function POST(
     let newAmountCents: number;
     if (validated.limit_cents !== undefined) {
       newAmountCents = validated.limit_cents;
-    } else if (validated.amount_planned !== undefined) {
-      newAmountCents = Math.round(validated.amount_planned * 100);
+    } else if (validated.amount_planned_cents !== undefined) {
+      newAmountCents = validated.amount_planned_cents;
     } else {
       return NextResponse.json(
-        { error: 'amount_planned ou limit_cents é obrigatório' },
+        { error: 'amount_planned_cents ou limit_cents é obrigatório' },
         { status: 400 }
       );
     }
@@ -82,10 +84,10 @@ export async function POST(
     const { error: updateError } = await supabase
       .from('budgets')
       .update({
-        amount_planned: newAmountCents / 100, // Convert to reais
+        amount_planned_cents: newAmountCents,
       })
       .eq('id', budgetId)
-      .eq('user_id', userId);
+      .eq('user_id', ownerId);
 
     if (updateError) {
       console.error('Error updating budget:', updateError);
@@ -98,14 +100,14 @@ export async function POST(
     // Recalculate future budgets for this goal
     const { updated } = await recalculateGoalBudgets(
       supabase,
-      userId,
+      ownerId,
       budget.source_id,
       monthKey,
       newAmountCents
     );
 
     // Invalidate cache
-    projectionCache.invalidateUser(userId);
+    projectionCache.invalidateUser(ownerId);
 
     return NextResponse.json({
       message: 'Orçamento ajustado e meses subsequentes recalculados',
@@ -135,4 +137,5 @@ export async function POST(
     );
   }
 }
+
 

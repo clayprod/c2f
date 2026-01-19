@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
         if (priceId === process.env.STRIPE_PRICE_ID_PRO) {
           planId = 'pro';
         } else if (priceId === process.env.STRIPE_PRICE_ID_BUSINESS) {
-          planId = 'business';
+          planId = 'premium';
         }
 
         // Get or create customer
@@ -82,15 +82,41 @@ export async function POST(request: NextRequest) {
           customerId = customer.id;
         }
 
+        // Check if this is a manual subscription
+        const isManual = subscription.metadata?.is_manual === 'true' || 
+                        subscription.metadata?.granted_by_admin === 'true';
+
+        // Check if user already has a manual subscription
+        const { data: existingSubscription } = await supabase
+          .from('billing_subscriptions')
+          .select('is_manual, granted_by, granted_at')
+          .eq('user_id', userId)
+          .single();
+
+        // If existing subscription is manual and this checkout is not manual, don't overwrite
+        if (existingSubscription?.is_manual && !isManual) {
+          console.log(`Skipping checkout completion for manual subscription user: ${userId}`);
+          break;
+        }
+
         // Upsert subscription
-        await supabase.from('billing_subscriptions').upsert({
+        const upsertData: any = {
           user_id: userId,
           stripe_subscription_id: subscriptionId,
           stripe_customer_id: customerId,
           status: subscription.status,
           plan_id: planId,
           current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-        }, {
+        };
+
+        // Preserve manual fields if this is a manual subscription
+        if (isManual && existingSubscription) {
+          upsertData.is_manual = true;
+          upsertData.granted_by = existingSubscription.granted_by;
+          upsertData.granted_at = existingSubscription.granted_at;
+        }
+
+        await supabase.from('billing_subscriptions').upsert(upsertData, {
           onConflict: 'user_id',
         });
 
@@ -101,6 +127,10 @@ export async function POST(request: NextRequest) {
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription;
         const customerId = subscription.customer as string;
+
+        // Check if this is a manual subscription (via metadata)
+        const isManual = subscription.metadata?.is_manual === 'true' || 
+                        subscription.metadata?.granted_by_admin === 'true';
 
         // Find user by customer_id
         const { data: customer } = await supabase
@@ -114,29 +144,57 @@ export async function POST(request: NextRequest) {
           break;
         }
 
+        // Check if subscription exists and is manual
+        const { data: existingSubscription } = await supabase
+          .from('billing_subscriptions')
+          .select('is_manual')
+          .eq('user_id', customer.user_id)
+          .single();
+
+        // Don't overwrite manual plans unless they're being deleted from Stripe
+        if (existingSubscription?.is_manual && !isManual && event.type !== 'customer.subscription.deleted') {
+          console.log(`Skipping update for manual subscription: ${subscription.id}`);
+          break;
+        }
+
         const priceId = subscription.items.data[0]?.price.id;
         let planId = 'free';
         if (priceId === process.env.STRIPE_PRICE_ID_PRO) {
           planId = 'pro';
         } else if (priceId === process.env.STRIPE_PRICE_ID_BUSINESS) {
-          planId = 'business';
+          planId = 'premium';
         }
 
         if (event.type === 'customer.subscription.deleted') {
-          // Delete subscription
-          await supabase
-            .from('billing_subscriptions')
-            .delete()
-            .eq('user_id', customer.user_id);
+          // Only delete if it's not a manual plan, or if manual plan is being explicitly deleted
+          if (!existingSubscription?.is_manual || isManual) {
+            await supabase
+              .from('billing_subscriptions')
+              .delete()
+              .eq('user_id', customer.user_id);
+          } else {
+            console.log(`Skipping deletion for manual subscription: ${subscription.id}`);
+          }
         } else {
-          // Update subscription
+          // Update subscription - preserve manual fields if it was manual
+          const updateData: any = {
+            status: subscription.status,
+            plan_id: planId,
+            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+          };
+
+          // If updating a manual subscription, preserve manual fields
+          if (existingSubscription?.is_manual) {
+            // Don't update manual subscriptions unless metadata indicates it should be updated
+            if (!isManual) {
+              console.log(`Skipping update for manual subscription: ${subscription.id}`);
+              break;
+            }
+          }
+
           await supabase
             .from('billing_subscriptions')
-            .update({
-              status: subscription.status,
-              plan_id: planId,
-              current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-            })
+            .update(updateData)
             .eq('user_id', customer.user_id);
         }
 

@@ -3,6 +3,7 @@ import { createClientFromRequest } from '@/lib/supabase/server';
 import { getUserId } from '@/lib/auth';
 import { accountSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,12 +11,13 @@ export async function GET(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { supabase } = createClientFromRequest(request);
     const { data, error } = await supabase
       .from('accounts')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .neq('type', 'credit_card')
       .order('created_at', { ascending: false });
 
@@ -43,6 +45,7 @@ export async function POST(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const body = await request.json();
     const validated = accountSchema.parse(body);
@@ -56,7 +59,7 @@ export async function POST(request: NextRequest) {
         current_balance: validated.balance_cents / 100, // Convert cents to NUMERIC (reais)
         currency: validated.currency,
         institution: validated.institution,
-        user_id: userId,
+        user_id: ownerId,
       })
       .select()
       .single();

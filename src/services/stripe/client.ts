@@ -19,7 +19,7 @@ export function getStripeClient(): Stripe {
 export const PLAN_PRICE_IDS = {
   FREE: null, // Free plan has no price
   PRO: process.env.STRIPE_PRICE_ID_PRO || '',
-  BUSINESS: process.env.STRIPE_PRICE_ID_BUSINESS || '',
+  PREMIUM: process.env.STRIPE_PRICE_ID_BUSINESS || '',
 } as const;
 
 export type PlanId = keyof typeof PLAN_PRICE_IDS;

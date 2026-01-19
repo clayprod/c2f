@@ -6,6 +6,7 @@ import { createErrorResponse } from '@/lib/errors';
 import { calculateMonthlyContribution } from '@/services/goals/contributionCalculator';
 import { generateAutoBudgetsForGoal } from '@/services/budgets/autoGenerator';
 import { projectionCache } from '@/services/projections/cache';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,6 +14,7 @@ export async function GET(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
@@ -21,7 +23,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('goals')
       .select('*, accounts(*), categories(*)')
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .order('created_at', { ascending: false });
 
     if (status) {
@@ -40,7 +42,7 @@ export async function GET(request: NextRequest) {
           const { data: transactions } = await supabase
             .from('transactions')
             .select('amount')
-            .eq('user_id', userId)
+            .eq('user_id', ownerId)
             .eq('category_id', goal.category_id);
 
           if (transactions && transactions.length > 0) {
@@ -86,6 +88,7 @@ export async function POST(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const body = await request.json();
     const validated = goalSchema.parse(body);
@@ -97,7 +100,7 @@ export async function POST(request: NextRequest) {
     const { data: category, error: categoryError } = await supabase
       .from('categories')
       .insert({
-        user_id: userId,
+        user_id: ownerId,
         name: categoryName,
         type: 'expense', // Contributions are expenses, but can also be used for income (withdrawals)
         icon: validated.icon || '🎯',
@@ -111,9 +114,12 @@ export async function POST(request: NextRequest) {
       console.error('Error creating goal category:', categoryError);
     }
 
-    // Calculate monthly contribution if include_in_budget is true and target_date is provided
-    let monthlyContributionCents = validated.monthly_contribution_cents;
-    if (validated.include_in_budget && !monthlyContributionCents && validated.target_date) {
+    const hasCustomPlan = !!validated.plan_entries && validated.plan_entries.length > 0;
+    const includeInPlan = hasCustomPlan ? true : validated.include_in_plan;
+
+    // Calculate monthly contribution if include_in_plan is true and target_date is provided
+    let monthlyContributionCents = hasCustomPlan ? undefined : validated.monthly_contribution_cents;
+    if (includeInPlan && !monthlyContributionCents && validated.target_date) {
       const calculated = calculateMonthlyContribution({
         target_amount_cents: validated.target_amount_cents,
         current_amount_cents: validated.current_amount_cents || 0,
@@ -131,7 +137,7 @@ export async function POST(request: NextRequest) {
     const contributionFields: any = {};
     const imageFields: any = {};
     const baseData: any = {
-      user_id: userId,
+      user_id: ownerId,
       name: validated.name,
       description: validated.description,
       target_amount_cents: validated.target_amount_cents,
@@ -151,13 +157,10 @@ export async function POST(request: NextRequest) {
     if (monthlyContributionCents !== undefined) {
       contributionFields.monthly_contribution_cents = monthlyContributionCents;
     }
-    if (validated.include_in_budget !== undefined) {
-      contributionFields.include_in_budget = validated.include_in_budget;
+    if (includeInPlan !== undefined) {
+      contributionFields.include_in_plan = includeInPlan;
     }
-    if (validated.include_in_projection !== undefined) {
-      contributionFields.include_in_projection = validated.include_in_projection;
-    }
-    if (validated.contribution_frequency !== undefined) {
+    if (!hasCustomPlan && validated.contribution_frequency !== undefined) {
       contributionFields.contribution_frequency = validated.contribution_frequency;
     }
 
@@ -222,8 +225,30 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
-    // Generate automatic budgets if include_in_budget is true
-    if (data.include_in_budget && data.status === 'active' && data.category_id) {
+    // Insert custom plan entries if provided
+    if (data && validated.plan_entries && validated.plan_entries.length > 0) {
+      const planEntries = validated.plan_entries.map((entry) => ({
+        user_id: ownerId,
+        goal_id: data.id,
+        category_id: data.category_id || null,
+        entry_month: `${entry.month}-01`,
+        amount_cents: entry.amount_cents,
+        description: `Plano personalizado - ${data.name}`,
+      }));
+
+      const { error: planError } = await supabase
+        .from('goal_plan_entries')
+        .upsert(planEntries, {
+          onConflict: 'goal_id,entry_month',
+        });
+
+      if (planError) {
+        console.error('Error inserting goal plan entries:', planError);
+      }
+    }
+
+    // Generate automatic budgets if include_in_plan is true
+    if (data.include_in_plan && data.status === 'active' && data.category_id) {
       try {
         const today = new Date();
         const startMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -233,11 +258,11 @@ export async function POST(request: NextRequest) {
 
         await generateAutoBudgetsForGoal(
           supabase,
-          userId,
+          ownerId,
           {
             id: data.id,
             category_id: data.category_id,
-            include_in_budget: data.include_in_budget,
+          include_in_plan: data.include_in_plan,
             status: data.status,
             contribution_frequency: data.contribution_frequency,
             monthly_contribution_cents: data.monthly_contribution_cents,
@@ -253,7 +278,7 @@ export async function POST(request: NextRequest) {
           }
         );
 
-        projectionCache.invalidateUser(userId);
+        projectionCache.invalidateUser(ownerId);
       } catch (budgetError) {
         console.error('Error generating auto budgets for goal:', budgetError);
         // Don't fail the goal creation if budget generation fails

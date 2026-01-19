@@ -117,12 +117,19 @@ export default function AssetDetailPage() {
     }
 
     try {
+      console.log('Updating asset with data:', data);
+      console.log('Updating asset - data keys:', Object.keys(data));
+      console.log('Updating asset - current_value_cents:', data.current_value_cents);
+      console.log('Updating asset - has current_value_cents?', 'current_value_cents' in data);
+      const bodyToSend = JSON.stringify(data);
+      console.log('Updating asset - JSON body:', bodyToSend);
+      console.log('Updating asset - JSON parsed:', JSON.parse(bodyToSend));
       const response = await fetch(`/api/assets/${params.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: bodyToSend,
       });
 
       const result = await response.json();
@@ -139,6 +146,12 @@ export default function AssetDetailPage() {
       setShowEditForm(false);
       fetchAsset();
     } catch (error: any) {
+      console.error('Error updating asset:', error);
+      toast({
+        title: 'Erro',
+        description: error.message || 'Erro ao atualizar bem',
+        variant: 'destructive',
+      });
       throw error;
     }
   };
@@ -265,7 +278,16 @@ export default function AssetDetailPage() {
           <p className="text-muted-foreground">{typeLabels[asset.type] || asset.type}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowEditForm(true)}>
+          <Button 
+            variant="outline" 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('Edit button clicked');
+              setShowEditForm(true);
+            }}
+            type="button"
+          >
             <i className='bx bx-edit'></i>
             Editar
           </Button>
@@ -415,6 +437,7 @@ export default function AssetDetailPage() {
         valuations={asset.valuations || []}
         purchaseDate={asset.purchase_date}
         purchasePriceCents={asset.purchase_price_cents}
+        currentValueCents={asset.current_value_cents}
       />
 
       {/* Valuation History */}
@@ -497,5 +520,6 @@ export default function AssetDetailPage() {
     </div>
   );
 }
+
 
 

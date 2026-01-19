@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientFromRequest } from '@/lib/supabase/server';
 import { getUserId } from '@/lib/auth';
 import { calculateMinimumBudget } from '@/services/budgets/minimumCalculator';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { searchParams } = new URL(request.url);
     const categoryId = searchParams.get('category_id');
@@ -32,10 +34,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    const { supabase } = createClientFromRequest(request);
     const { minimum_cents, sources } = await calculateMinimumBudget(
       supabase,
-      userId,
+      ownerId,
       categoryId,
       year,
       monthNum
@@ -56,5 +58,6 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
 
 

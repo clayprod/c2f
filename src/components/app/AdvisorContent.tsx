@@ -31,6 +31,7 @@ interface AdvisorResponse {
   actions: AdvisorAction[];
   confidence: string;
   citations: any[];
+  sessionId?: string;
 }
 
 interface AdvisorContentProps {
@@ -46,6 +47,7 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -67,17 +69,13 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
     setLoading(true);
 
     try {
-      const conversationHistory = messages.map(m => ({
-        role: m.role,
-        content: m.content,
-      }));
-
       const res = await fetch('/api/advisor/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userMessage,
-          conversationHistory,
+          // Send sessionId to maintain conversation context on the server
+          ...(sessionId && { sessionId }),
         }),
       });
 
@@ -87,6 +85,11 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
       }
 
       const data: AdvisorResponse = await res.json();
+
+      // Store sessionId for subsequent messages
+      if (data.sessionId && !sessionId) {
+        setSessionId(data.sessionId);
+      }
 
       setMessages(prev => [...prev, {
         role: 'assistant',
@@ -119,6 +122,29 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
 
   const handleSuggestedQuestion = (question: string) => {
     setInput(question);
+  };
+
+  const handleNewConversation = async () => {
+    // Clear session on server if we have one
+    if (sessionId) {
+      try {
+        await fetch('/api/advisor/chat', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId }),
+        });
+      } catch (error) {
+        console.error('Error clearing session:', error);
+      }
+    }
+
+    // Reset local state
+    setSessionId(null);
+    setMessages([{
+      role: 'assistant',
+      content: 'Olá! Sou seu AI Advisor financeiro. Posso ajudar você a entender seus gastos, criar orçamentos e tomar decisões mais inteligentes com seu dinheiro. Como posso ajudar?',
+    }]);
+    setInput('');
   };
 
   const getConfidenceColor = (confidence: string) => {
@@ -155,9 +181,23 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
       <div className={`grid ${inDialog ? 'lg:grid-cols-3' : 'lg:grid-cols-3'} gap-6 flex-1 min-h-0 overflow-hidden`}>
         {/* Chat */}
         <div className={`${inDialog ? 'lg:col-span-2' : ''} glass-card p-6 flex flex-col min-h-0 overflow-hidden`}>
-          <div className="flex items-center gap-2 mb-4 flex-shrink-0">
-            <i className='bx bx-bot text-2xl text-purple-600'></i>
-            <h2 className="font-display font-semibold text-lg">Chat com Advisor</h2>
+          <div className="flex items-center justify-between mb-4 flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <i className='bx bx-sparkles-alt text-2xl text-purple-600'></i>
+              <h2 className="font-display font-semibold text-lg">Chat com Advisor</h2>
+            </div>
+            {messages.length > 1 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleNewConversation}
+                className="text-muted-foreground hover:text-foreground"
+                disabled={loading}
+              >
+                <i className='bx bx-repeat mr-1'></i>
+                Nova conversa
+              </Button>
+            )}
           </div>
 
           {/* Messages */}
@@ -168,16 +208,17 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
                 className={`${msg.role === 'user' ? 'ml-auto max-w-[80%]' : 'mr-auto max-w-[90%]'}`}
               >
                 <div
-                  className={`p-4 rounded-xl ${
-                    msg.role === 'user'
-                      ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-primary-foreground'
+                  className={`p-4 rounded-xl ${msg.role === 'user'
+                      ? 'bg-gradient-to-r from-purple-700 to-blue-700 text-white'
                       : 'bg-muted/30'
-                  }`}
+                    }`}
                 >
-                  <p className="text-sm text-muted-foreground mb-1">
+                  <p className={`text-sm mb-1 ${msg.role === 'user' ? 'text-white/80' : 'text-muted-foreground'}`}>
                     {msg.role === 'user' ? 'Você' : 'Advisor'}
                   </p>
-                  <p className="text-foreground">{msg.content}</p>
+                  <p className={msg.role === 'user' ? 'text-white' : 'text-foreground'}>
+                    {msg.content}
+                  </p>
 
                   {/* Insights */}
                   {msg.insights && msg.insights.length > 0 && (
@@ -186,7 +227,7 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
                       <ul className="space-y-1">
                         {msg.insights.map((insight, i) => (
                           <li key={i} className="flex items-start gap-2 text-sm">
-                            <i className={`bx ${insight.severity === 'high' ? 'bx-error-circle text-red-500' : insight.severity === 'medium' ? 'bx-error text-yellow-500' : 'bx-bulb text-purple-600'} mt-0.5`}></i>
+                            <i className={`bx ${insight.severity === 'high' ? 'bx-error-circle text-red-500' : insight.severity === 'medium' ? 'bx-error text-yellow-500' : 'bx-sparkles-alt text-purple-600'} mt-0.5`}></i>
                             <span>{typeof insight === 'string' ? insight : insight.message}</span>
                           </li>
                         ))}
@@ -249,11 +290,10 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
             <button
               type="submit"
               disabled={loading || !input.trim()}
-              className={`px-6 py-2 rounded-lg flex items-center justify-center ${
-                loading || !input.trim()
+              className={`px-6 py-2 rounded-lg flex items-center justify-center ${loading || !input.trim()
                   ? 'opacity-50 cursor-not-allowed'
                   : 'hover:shadow-[0_0_10px_2px_rgba(147,51,234,0.3)] transition-all duration-300'
-              }`}
+                }`}
               style={{
                 background: 'linear-gradient(to right, #9333ea, #3b82f6)',
               }}

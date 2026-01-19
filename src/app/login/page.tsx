@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useEffect, useMemo, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -17,6 +17,27 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const next = searchParams?.get('next') || '/app';
   const { toast } = useToast();
+  const inviteFromQuery = useMemo(
+    () => searchParams?.get('invite') || searchParams?.get('token') || '',
+    [searchParams]
+  );
+  const pendingInviteToken = useMemo(() => {
+    if (inviteFromQuery) return inviteFromQuery;
+    try {
+      return localStorage.getItem('c2f_pending_invite_token') || '';
+    } catch {
+      return '';
+    }
+  }, [inviteFromQuery]);
+
+  useEffect(() => {
+    if (!inviteFromQuery) return;
+    try {
+      localStorage.setItem('c2f_pending_invite_token', inviteFromQuery);
+    } catch {
+      // ignore
+    }
+  }, [inviteFromQuery]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +52,16 @@ function LoginForm() {
 
       if (error) throw error;
 
-      router.push(next);
+      if (pendingInviteToken) {
+        try {
+          localStorage.removeItem('c2f_pending_invite_token');
+        } catch {
+          // ignore
+        }
+        router.push(`/app/sharing/accept?token=${encodeURIComponent(pendingInviteToken)}`);
+      } else {
+        router.push(next);
+      }
       router.refresh();
     } catch (error: any) {
       toast({
@@ -101,7 +131,10 @@ function LoginForm() {
 
       <div className="mt-6 text-center text-sm text-muted-foreground">
         Não tem uma conta?{' '}
-        <Link href="/signup" className="text-primary hover:underline font-medium">
+        <Link
+          href={pendingInviteToken ? `/signup?invite=${encodeURIComponent(pendingInviteToken)}` : '/signup'}
+          className="text-primary hover:underline font-medium"
+        >
           Criar conta
         </Link>
       </div>

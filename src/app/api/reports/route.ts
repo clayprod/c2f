@@ -4,6 +4,7 @@ import { getUserId } from '@/lib/auth';
 import { reportFiltersSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
 import { ZodError } from 'zod';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
 interface TransactionRow {
   amount: number; // NUMERIC from DB
@@ -12,7 +13,7 @@ interface TransactionRow {
 }
 
 interface BudgetRow {
-  amount_planned: number; // NUMERIC from DB
+  amount_planned_cents: number;
   month: string;
   categories?: { name: string; type: string } | null;
 }
@@ -72,10 +73,11 @@ interface BudgetComparison {
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { searchParams } = new URL(request.url);
 
@@ -84,6 +86,7 @@ export async function GET(request: NextRequest) {
       endDate: searchParams.get('endDate') || getDefaultEndDate(),
       accountIds: searchParams.get('accountIds')?.split(',').filter(Boolean) || undefined,
       categoryIds: searchParams.get('categoryIds')?.split(',').filter(Boolean) || undefined,
+      assignedTo: searchParams.get('assignedTo') || undefined,
       reportType: searchParams.get('reportType') || 'overview',
       groupBy: searchParams.get('groupBy') || 'month',
     });
@@ -92,21 +95,21 @@ export async function GET(request: NextRequest) {
 
     switch (filters.reportType) {
       case 'overview':
-        return NextResponse.json(await getOverviewReport(supabase, userId, filters));
+        return NextResponse.json(await getOverviewReport(supabase, ownerId, filters));
       case 'categories':
-        return NextResponse.json(await getCategoriesReport(supabase, userId, filters));
+        return NextResponse.json(await getCategoriesReport(supabase, ownerId, filters));
       case 'budgets':
-        return NextResponse.json(await getBudgetsReport(supabase, userId, filters));
+        return NextResponse.json(await getBudgetsReport(supabase, ownerId, filters));
       case 'goals':
-        return NextResponse.json(await getGoalsReport(supabase, userId, filters));
+        return NextResponse.json(await getGoalsReport(supabase, ownerId, filters));
       case 'debts':
-        return NextResponse.json(await getDebtsReport(supabase, userId, filters));
+        return NextResponse.json(await getDebtsReport(supabase, ownerId, filters));
       case 'investments':
-        return NextResponse.json(await getInvestmentsReport(supabase, userId, filters));
+        return NextResponse.json(await getInvestmentsReport(supabase, ownerId, filters));
       case 'cashflow':
-        return NextResponse.json(await getCashflowReport(supabase, userId, filters));
+        return NextResponse.json(await getCashflowReport(supabase, ownerId, filters));
       default:
-        return NextResponse.json(await getOverviewReport(supabase, userId, filters));
+        return NextResponse.json(await getOverviewReport(supabase, ownerId, filters));
     }
   } catch (error) {
     if (error instanceof ZodError) {
@@ -139,6 +142,7 @@ type ReportFilters = {
   endDate: string;
   accountIds?: string[];
   categoryIds?: string[];
+  assignedTo?: string;
   groupBy: 'day' | 'week' | 'month' | 'year';
 };
 
@@ -161,6 +165,9 @@ async function getOverviewReport(
   }
   if (filters.categoryIds?.length) {
     query = query.in('category_id', filters.categoryIds);
+  }
+  if (filters.assignedTo) {
+    query = query.eq('assigned_to', filters.assignedTo);
   }
 
   const { data: transactions, error } = await query;
@@ -240,6 +247,9 @@ async function getCategoriesReport(
 
   if (filters.accountIds?.length) {
     query = query.in('account_id', filters.accountIds);
+  }
+  if (filters.assignedTo) {
+    query = query.eq('assigned_to', filters.assignedTo);
   }
 
   const { data: transactions, error } = await query;
@@ -325,7 +335,7 @@ async function getBudgetsReport(
   const [budgetsResult, transactionsResult] = await Promise.all([
     supabase
       .from('budgets')
-      .select('amount_planned, month, category_id, categories(name, type)')
+      .select('amount_planned_cents, month, category_id, categories(name, type)')
       .eq('user_id', userId)
       .gte('month', startMonth)
       .lte('month', endMonth),
@@ -341,7 +351,7 @@ async function getBudgetsReport(
   if (transactionsResult.error) throw transactionsResult.error;
 
   interface BudgetWithCategory {
-    amount_planned: number; // NUMERIC from DB
+    amount_planned_cents: number;
     month: string;
     category_id: string;
     categories?: { name: string; type: string } | null;
@@ -374,7 +384,7 @@ async function getBudgetsReport(
   for (const budget of budgets) {
     const spent = spentByCategory.get(budget.category_id) || 0;
     // Convert NUMERIC to cents
-    const budgetedCents = Math.round((budget.amount_planned || 0) * 100);
+    const budgetedCents = Math.round(budget.amount_planned_cents || 0);
     const remaining = budgetedCents - spent;
     const percentage = budgetedCents > 0 ? (spent / budgetedCents) * 100 : 0;
 
@@ -628,6 +638,9 @@ async function getCashflowReport(
 
   if (filters.accountIds?.length) {
     query = query.in('account_id', filters.accountIds);
+  }
+  if (filters.assignedTo) {
+    query = query.eq('assigned_to', filters.assignedTo);
   }
 
   const { data: transactions, error } = await query;

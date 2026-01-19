@@ -1,28 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClientFromRequest } from '@/lib/supabase/server';
 import { getUserId } from '@/lib/auth';
 import { transactionSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
 import { z } from 'zod';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { id } = params;
-    const supabase = await createClient();
+    const { supabase } = createClientFromRequest(request);
     
     const { data, error } = await supabase
       .from('transactions')
       .select('*, accounts(*), categories(*)')
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .single();
 
     if (error) throw error;
@@ -51,10 +53,11 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { id } = params;
     const body = await request.json();
@@ -71,7 +74,6 @@ export async function PATCH(
       type: z.enum(['income', 'expense']).optional(),
       source: z.enum(['manual', 'pluggy', 'import']).default('manual').optional(),
       provider_tx_id: z.string().optional(),
-      is_recurring: z.boolean().default(false).optional(),
       recurrence_rule: z.string().optional().or(z.literal('')).transform(val => val || undefined).optional(),
       contribution_frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).optional(),
       installment_number: z.number().int().positive().optional(),
@@ -80,14 +82,14 @@ export async function PATCH(
 
     const validated = partialTransactionSchema.parse(body);
 
-    const supabase = await createClient();
+    const { supabase } = createClientFromRequest(request);
     
     // Verify ownership
     const { data: existing } = await supabase
       .from('transactions')
       .select('id')
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .single();
 
     if (!existing) {
@@ -112,7 +114,6 @@ export async function PATCH(
     if (validated.currency !== undefined) updateData.currency = validated.currency;
     if (validated.notes !== undefined) updateData.notes = validated.notes;
     // Extended fields
-    if (validated.is_recurring !== undefined) updateData.is_recurring = validated.is_recurring;
     if (validated.recurrence_rule !== undefined) updateData.recurrence_rule = validated.recurrence_rule;
     if (validated.installment_number !== undefined) updateData.installment_number = validated.installment_number;
     if (validated.installment_total !== undefined) updateData.installment_total = validated.installment_total;
@@ -121,7 +122,7 @@ export async function PATCH(
       .from('transactions')
       .update(updateData)
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .select('*, accounts(*), categories(*)')
       .single();
 
@@ -154,20 +155,21 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { id } = params;
-    const supabase = await createClient();
+    const { supabase } = createClientFromRequest(request);
     
     // Verify ownership
     const { data: existing } = await supabase
       .from('transactions')
       .select('id')
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('user_id', ownerId)
       .single();
 
     if (!existing) {
@@ -178,7 +180,7 @@ export async function DELETE(
       .from('transactions')
       .delete()
       .eq('id', id)
-      .eq('user_id', userId);
+      .eq('user_id', ownerId);
 
     if (error) throw error;
 

@@ -4,6 +4,7 @@ import { getUserId } from '@/lib/auth';
 import { exportReportSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
 import { ZodError } from 'zod';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
 interface Transaction {
   id: string;
@@ -66,10 +67,11 @@ interface Investment {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const body = await request.json();
     const params = exportReportSchema.parse(body);
@@ -80,25 +82,25 @@ export async function POST(request: NextRequest) {
 
     switch (params.reportType) {
       case 'transactions':
-        ({ csvContent, filename } = await exportTransactions(supabase, userId, params));
+        ({ csvContent, filename } = await exportTransactions(supabase, ownerId, params));
         break;
       case 'categories':
-        ({ csvContent, filename } = await exportCategories(supabase, userId, params));
+        ({ csvContent, filename } = await exportCategories(supabase, ownerId, params));
         break;
       case 'budgets':
-        ({ csvContent, filename } = await exportBudgets(supabase, userId, params));
+        ({ csvContent, filename } = await exportBudgets(supabase, ownerId, params));
         break;
       case 'goals':
-        ({ csvContent, filename } = await exportGoals(supabase, userId));
+        ({ csvContent, filename } = await exportGoals(supabase, ownerId));
         break;
       case 'debts':
-        ({ csvContent, filename } = await exportDebts(supabase, userId));
+        ({ csvContent, filename } = await exportDebts(supabase, ownerId));
         break;
       case 'investments':
-        ({ csvContent, filename } = await exportInvestments(supabase, userId));
+        ({ csvContent, filename } = await exportInvestments(supabase, ownerId));
         break;
       case 'summary':
-        ({ csvContent, filename } = await exportSummary(supabase, userId, params));
+        ({ csvContent, filename } = await exportSummary(supabase, ownerId, params));
         break;
       default:
         return NextResponse.json({ error: 'Tipo de relatório inválido' }, { status: 400 });
@@ -294,7 +296,7 @@ async function exportBudgets(
   const [budgetsResult, transactionsResult] = await Promise.all([
     supabase
       .from('budgets')
-      .select('id, month, amount_planned, category_id, categories(name)')
+      .select('id, month, amount_planned_cents, category_id, categories(name)')
       .eq('user_id', userId)
       .gte('month', startMonth)
       .lte('month', endMonth),
@@ -312,7 +314,7 @@ async function exportBudgets(
   interface BudgetWithCategory {
     id: string;
     month: string;
-    amount_planned: number; // NUMERIC from DB
+    amount_planned_cents: number;
     category_id: string;
     categories?: { name: string } | null;
   }
@@ -340,8 +342,7 @@ async function exportBudgets(
   const headers = ['Mês', 'Categoria', 'Orçado (R$)', 'Gasto (R$)', 'Restante (R$)', '% Utilizado', 'Status'];
   const rows = budgets.map((b) => {
     const spent = spentByCategory.get(b.category_id) || 0;
-    // Convert NUMERIC to cents
-    const budgetedCents = Math.round((b.amount_planned || 0) * 100);
+    const budgetedCents = Math.round(b.amount_planned_cents || 0);
     const remaining = budgetedCents - spent;
     const percentage = budgetedCents > 0 ? (spent / budgetedCents) * 100 : 0;
     const status = percentage > 100 ? 'Acima' : percentage > 80 ? 'Próximo' : 'OK';

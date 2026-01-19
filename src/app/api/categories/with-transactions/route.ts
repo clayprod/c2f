@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClientFromRequest } from '@/lib/supabase/server';
 import { getUserId } from '@/lib/auth';
 import { createErrorResponse } from '@/lib/errors';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,6 +10,7 @@ export async function GET(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { supabase } = createClientFromRequest(request);
 
@@ -25,7 +27,7 @@ export async function GET(request: NextRequest) {
         created_at,
         updated_at
       `)
-      .eq('user_id', userId);
+      .eq('user_id', ownerId);
 
     if (categoriesError) throw categoriesError;
 
@@ -36,7 +38,7 @@ export async function GET(request: NextRequest) {
           .from('transactions')
           .select('*', { count: 'exact', head: true })
           .eq('category_id', category.id)
-          .eq('user_id', userId);
+          .eq('user_id', ownerId);
 
         return {
           ...category,
