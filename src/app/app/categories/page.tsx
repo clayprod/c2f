@@ -324,19 +324,20 @@ export default function CategoriesPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="font-display text-2xl md:text-3xl font-bold">Categorias</h1>
-          <p className="text-muted-foreground">Organize suas transações por categoria</p>
+        <div className="min-w-0 flex-1">
+          <h1 className="font-display text-2xl sm:text-2xl md:text-3xl font-bold">Categorias</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">Organize suas transações por categoria</p>
         </div>
-        <Button onClick={openNewDialog} className="btn-primary">
+        <Button onClick={openNewDialog} className="btn-primary w-full sm:w-auto flex-shrink-0">
           <i className='bx bx-plus mr-2'></i>
-          Nova Categoria
+          <span className="hidden sm:inline">Nova Categoria</span>
+          <span className="sm:hidden">Nova</span>
         </Button>
       </div>
 
       {/* Filters */}
       <div className="glass-card p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col gap-4">
           <div className="flex-1 relative">
             <i className='bx bx-search absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground'></i>
             <Input
@@ -346,106 +347,115 @@ export default function CategoriesPage() {
               className="pl-10"
             />
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setFilterType('all')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filterType === 'all'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted hover:bg-muted/80'
-              }`}
-            >
-              Todas
-            </button>
-            <button
-              onClick={() => setFilterType('income')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filterType === 'income'
-                  ? 'bg-green-500 text-white'
-                  : 'bg-muted hover:bg-muted/80'
-              }`}
-            >
-              Receitas
-            </button>
-            <button
-              onClick={() => setFilterType('expense')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filterType === 'expense'
-                  ? 'bg-red-500 text-white'
-                  : 'bg-muted hover:bg-muted/80'
-              }`}
-            >
-              Despesas
-            </button>
-            <div className="w-full sm:w-auto border-t sm:border-t-0 sm:border-l border-border pt-2 sm:pt-0 sm:pl-2"></div>
-            <button
-              onClick={() => setFilterSource('all')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filterSource === 'all'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted hover:bg-muted/80'
-              }`}
-            >
-              Todas Origens
-            </button>
-            <button
-              onClick={() => setFilterSource('general')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filterSource === 'general'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-muted hover:bg-muted/80'
-              }`}
-            >
-              Gerais
-            </button>
-            <button
-              onClick={() => setFilterSource('credit_card')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filterSource === 'credit_card'
-                  ? 'bg-pink-500 text-white'
-                  : 'bg-muted hover:bg-muted/80'
-              }`}
-            >
-              Cartões
-            </button>
-            <button
-              onClick={() => setFilterSource('investment')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filterSource === 'investment'
-                  ? 'bg-cyan-500 text-white'
-                  : 'bg-muted hover:bg-muted/80'
-              }`}
-            >
-              Investimentos
-            </button>
-            <button
-              onClick={() => setFilterSource('goal')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filterSource === 'goal'
-                  ? 'bg-green-600 text-white'
-                  : 'bg-muted hover:bg-muted/80'
-              }`}
-            >
-              Objetivos
-            </button>
-            <button
-              onClick={() => setFilterSource('debt')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filterSource === 'debt'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-muted hover:bg-muted/80'
-              }`}
-            >
-              Dívidas
-            </button>
-            <div className="w-full sm:w-auto border-t sm:border-t-0 sm:border-l border-border pt-2 sm:pt-0 sm:pl-2"></div>
-            <label className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer hover:bg-muted/80">
-              <Switch
-                checked={showInactive}
-                onCheckedChange={setShowInactive}
-              />
-              <span>Mostrar inativas</span>
-            </label>
+          <div className="flex flex-col gap-3">
+            {/* Type Filters */}
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setFilterType('all')}
+                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                  filterType === 'all'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted hover:bg-muted/80'
+                }`}
+              >
+                Todas
+              </button>
+              <button
+                onClick={() => setFilterType('income')}
+                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                  filterType === 'income'
+                    ? 'bg-green-500 text-white'
+                    : 'bg-muted hover:bg-muted/80'
+                }`}
+              >
+                Receitas
+              </button>
+              <button
+                onClick={() => setFilterType('expense')}
+                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                  filterType === 'expense'
+                    ? 'bg-red-500 text-white'
+                    : 'bg-muted hover:bg-muted/80'
+                }`}
+              >
+                Despesas
+              </button>
+            </div>
+            
+            {/* Source Filters */}
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setFilterSource('all')}
+                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                  filterSource === 'all'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted hover:bg-muted/80'
+                }`}
+              >
+                Todas Origens
+              </button>
+              <button
+                onClick={() => setFilterSource('general')}
+                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                  filterSource === 'general'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-muted hover:bg-muted/80'
+                }`}
+              >
+                Gerais
+              </button>
+              <button
+                onClick={() => setFilterSource('credit_card')}
+                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                  filterSource === 'credit_card'
+                    ? 'bg-pink-500 text-white'
+                    : 'bg-muted hover:bg-muted/80'
+                }`}
+              >
+                Cartões
+              </button>
+              <button
+                onClick={() => setFilterSource('investment')}
+                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                  filterSource === 'investment'
+                    ? 'bg-cyan-500 text-white'
+                    : 'bg-muted hover:bg-muted/80'
+                }`}
+              >
+                Investimentos
+              </button>
+              <button
+                onClick={() => setFilterSource('goal')}
+                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                  filterSource === 'goal'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-muted hover:bg-muted/80'
+                }`}
+              >
+                Objetivos
+              </button>
+              <button
+                onClick={() => setFilterSource('debt')}
+                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                  filterSource === 'debt'
+                    ? 'bg-red-600 text-white'
+                    : 'bg-muted hover:bg-muted/80'
+                }`}
+              >
+                Dívidas
+              </button>
+            </div>
+            
+            {/* Show Inactive Toggle */}
+            <div className="flex items-center gap-2 pt-2 border-t border-border">
+              <label className="flex items-center gap-2 px-2 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium cursor-pointer hover:bg-muted/80">
+                <Switch
+                  checked={showInactive}
+                  onCheckedChange={setShowInactive}
+                />
+                <span>Mostrar inativas</span>
+              </label>
+            </div>
           </div>
         </div>
       </div>
@@ -478,7 +488,7 @@ export default function CategoriesPage() {
                 <span className="w-3 h-3 rounded-full bg-green-500"></span>
                 Receitas ({generalIncome.length})
               </h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                 {generalIncome.map((category) => (
                   <CategoryCard
                     key={category.id}
@@ -504,7 +514,7 @@ export default function CategoriesPage() {
                 <span className="w-3 h-3 rounded-full bg-red-500"></span>
                 Despesas ({generalExpense.length})
               </h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                 {generalExpense.map((category) => (
                   <CategoryCard
                     key={category.id}
@@ -530,7 +540,7 @@ export default function CategoriesPage() {
                 <span className="w-3 h-3 rounded-full bg-pink-500"></span>
                 Cartões de Crédito ({creditCardCategories.length})
               </h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                 {creditCardCategories.map((category) => (
                   <CategoryCard
                     key={category.id}
@@ -556,7 +566,7 @@ export default function CategoriesPage() {
                 <span className="w-3 h-3 rounded-full bg-cyan-500"></span>
                 Investimentos ({investmentCategories.length})
               </h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                 {investmentCategories.map((category) => (
                   <CategoryCard
                     key={category.id}
@@ -582,7 +592,7 @@ export default function CategoriesPage() {
                 <span className="w-3 h-3 rounded-full bg-green-600"></span>
                 Objetivos ({goalCategories.length})
               </h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                 {goalCategories.map((category) => (
                   <CategoryCard
                     key={category.id}
@@ -608,7 +618,7 @@ export default function CategoriesPage() {
                 <span className="w-3 h-3 rounded-full bg-red-600"></span>
                 Dívidas ({debtCategories.length})
               </h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                 {debtCategories.map((category) => (
                   <CategoryCard
                     key={category.id}
@@ -823,29 +833,29 @@ function CategoryCard({
   const canDelete = transactionCount === 0;
   
   return (
-    <div className={`glass-card p-3 hover:shadow-lg transition-shadow group ${isInactive ? 'opacity-60' : ''}`}>
-      <div className="flex items-center gap-3">
+    <div className={`glass-card p-2.5 sm:p-3 hover:shadow-lg transition-shadow group ${isInactive ? 'opacity-60' : ''}`}>
+      <div className="flex items-center gap-2 sm:gap-3">
         <div
-          className="w-10 h-10 rounded-lg flex items-center justify-center text-xl flex-shrink-0"
+          className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center text-lg sm:text-xl flex-shrink-0"
           style={{ backgroundColor: (category.color || '#3b82f6') + '20' }}
         >
           {category.icon || '📁'}
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h3 className="font-medium truncate">{category.name}</h3>
+        <div className="flex-1 min-w-0 overflow-hidden">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+            <h3 className="font-medium truncate text-sm sm:text-base">{category.name}</h3>
             {isInactive && (
-              <span className="px-1.5 py-0.5 text-xs font-medium bg-muted text-muted-foreground rounded">
+              <span className="px-1.5 py-0.5 text-xs font-medium bg-muted text-muted-foreground rounded flex-shrink-0">
                 Inativa
               </span>
             )}
             {transactionCount > 0 && (
-              <span className="px-1.5 py-0.5 text-xs font-medium bg-blue-500/10 text-blue-500 rounded">
+              <span className="px-1.5 py-0.5 text-xs font-medium bg-blue-500/10 text-blue-500 rounded flex-shrink-0">
                 {transactionCount}
               </span>
             )}
           </div>
-          <span className={`text-xs ${
+          <span className={`text-xs block mt-0.5 ${
             category.type === 'income' 
               ? 'text-green-500' 
               : category.source_type === 'goal'
@@ -871,8 +881,8 @@ function CategoryCard({
               : 'Despesa'}
           </span>
         </div>
-        <div className="flex flex-col gap-1 relative z-10">
-          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex flex-col gap-1 relative z-10 flex-shrink-0">
+          <div className="flex gap-0.5 sm:gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             {isGeneralCategory && (
               <button
                 onClick={(e) => {
@@ -880,10 +890,10 @@ function CategoryCard({
                   e.stopPropagation();
                   onEdit();
                 }}
-                className="p-1.5 hover:bg-muted rounded-lg transition-colors"
+                className="p-1 sm:p-1.5 hover:bg-muted rounded-lg transition-colors"
                 title="Editar"
               >
-                <i className='bx bx-edit text-sm'></i>
+                <i className='bx bx-edit text-xs sm:text-sm'></i>
               </button>
             )}
             {isGeneralCategory && (
@@ -893,10 +903,10 @@ function CategoryCard({
                   e.stopPropagation();
                   onMigrate();
                 }}
-                className="p-1.5 hover:bg-blue-500/10 text-blue-500 rounded-lg transition-colors"
+                className="p-1 sm:p-1.5 hover:bg-blue-500/10 text-blue-500 rounded-lg transition-colors"
                 title={transactionCount > 0 ? "Migrar transações" : "Migrar categoria"}
               >
-                <i className='bx bx-arrow-right-left text-sm'></i>
+                <i className='bx bx-arrow-right-left text-xs sm:text-sm'></i>
               </button>
             )}
             {isGeneralCategory && (
@@ -907,14 +917,14 @@ function CategoryCard({
                   onDelete();
                 }}
                 disabled={!canDelete}
-                className={`p-1.5 rounded-lg transition-colors ${
+                className={`p-1 sm:p-1.5 rounded-lg transition-colors ${
                   canDelete 
                     ? 'hover:bg-red-500/10 text-red-500' 
                     : 'opacity-50 cursor-not-allowed text-muted-foreground'
                 }`}
                 title={canDelete ? 'Excluir' : 'Não é possível excluir categoria com transações'}
               >
-                <i className='bx bx-trash text-sm'></i>
+                <i className='bx bx-trash text-xs sm:text-sm'></i>
               </button>
             )}
           </div>
@@ -927,7 +937,7 @@ function CategoryCard({
                 }}
                 className="scale-75"
               />
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted-foreground hidden sm:inline">
                 {category.is_active === false ? 'Inativa' : 'Ativa'}
               </span>
             </div>

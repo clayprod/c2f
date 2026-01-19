@@ -172,30 +172,31 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
   return (
     <div className={`flex flex-col ${inDialog ? 'h-full overflow-hidden' : 'h-[calc(100vh-10rem)]'}`}>
       {!inDialog && (
-        <div className="mb-6">
-          <h1 className="font-display text-2xl md:text-3xl font-bold">AI Advisor</h1>
-          <p className="text-muted-foreground">Insights e recomendações personalizadas</p>
+        <div className="mb-4 sm:mb-6">
+          <h1 className="font-display text-xl sm:text-2xl md:text-3xl font-bold">AI Advisor</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">Insights e recomendações personalizadas</p>
         </div>
       )}
 
-      <div className={`grid ${inDialog ? 'lg:grid-cols-3' : 'lg:grid-cols-3'} gap-6 flex-1 min-h-0 overflow-hidden`}>
+      <div className={`grid grid-cols-1 ${inDialog ? 'md:grid-cols-3 lg:grid-cols-3' : 'md:grid-cols-3 lg:grid-cols-3'} gap-4 sm:gap-6 flex-1 min-h-0 overflow-hidden`}>
         {/* Chat */}
-        <div className={`${inDialog ? 'lg:col-span-2' : ''} glass-card p-6 flex flex-col min-h-0 overflow-hidden`}>
-          <div className="flex items-center justify-between mb-4 flex-shrink-0">
-            <div className="flex items-center gap-2">
-              <i className='bx bx-sparkles-alt text-2xl text-purple-600'></i>
-              <h2 className="font-display font-semibold text-lg">Chat com Advisor</h2>
+        <div className={`${inDialog ? 'md:col-span-2 lg:col-span-2' : 'md:col-span-2 lg:col-span-2'} glass-card p-4 sm:p-6 flex flex-col min-h-0 overflow-hidden`}>
+          <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <i className='bx bx-sparkles-alt text-xl sm:text-2xl text-purple-600 flex-shrink-0'></i>
+              <h2 className="font-display font-semibold text-base sm:text-lg truncate">Chat com Advisor</h2>
             </div>
             {messages.length > 1 && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleNewConversation}
-                className="text-muted-foreground hover:text-foreground"
+                className="text-muted-foreground hover:text-foreground flex-shrink-0 text-xs sm:text-sm"
                 disabled={loading}
               >
                 <i className='bx bx-repeat mr-1'></i>
-                Nova conversa
+                <span className="hidden sm:inline">Nova conversa</span>
+                <span className="sm:hidden">Nova</span>
               </Button>
             )}
           </div>
@@ -205,30 +206,30 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
             {messages.map((msg, index) => (
               <div
                 key={index}
-                className={`${msg.role === 'user' ? 'ml-auto max-w-[80%]' : 'mr-auto max-w-[90%]'}`}
+                className={`${msg.role === 'user' ? 'ml-auto max-w-[85%] sm:max-w-[80%]' : 'mr-auto max-w-[95%] sm:max-w-[90%]'}`}
               >
                 <div
-                  className={`p-4 rounded-xl ${msg.role === 'user'
+                  className={`p-3 sm:p-4 rounded-xl ${msg.role === 'user'
                       ? 'bg-gradient-to-r from-purple-700 to-blue-700 text-white'
                       : 'bg-muted/30'
                     }`}
                 >
-                  <p className={`text-sm mb-1 ${msg.role === 'user' ? 'text-white/80' : 'text-muted-foreground'}`}>
+                  <p className={`text-xs sm:text-sm mb-1 ${msg.role === 'user' ? 'text-white/80' : 'text-muted-foreground'}`}>
                     {msg.role === 'user' ? 'Você' : 'Advisor'}
                   </p>
-                  <p className={msg.role === 'user' ? 'text-white' : 'text-foreground'}>
+                  <p className={`text-sm sm:text-base break-words ${msg.role === 'user' ? 'text-white' : 'text-foreground'}`}>
                     {msg.content}
                   </p>
 
                   {/* Insights */}
                   {msg.insights && msg.insights.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-border/50">
+                    <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border/50">
                       <p className="text-xs font-medium text-muted-foreground mb-2">Insights:</p>
                       <ul className="space-y-1">
                         {msg.insights.map((insight, i) => (
-                          <li key={i} className="flex items-start gap-2 text-sm">
-                            <i className={`bx ${insight.severity === 'high' ? 'bx-error-circle text-red-500' : insight.severity === 'medium' ? 'bx-error text-yellow-500' : 'bx-sparkles-alt text-purple-600'} mt-0.5`}></i>
-                            <span>{typeof insight === 'string' ? insight : insight.message}</span>
+                          <li key={i} className="flex items-start gap-2 text-xs sm:text-sm">
+                            <i className={`bx ${insight.severity === 'high' ? 'bx-error-circle text-red-500' : insight.severity === 'medium' ? 'bx-error text-yellow-500' : 'bx-sparkles-alt text-purple-600'} mt-0.5 flex-shrink-0`}></i>
+                            <span className="break-words">{typeof insight === 'string' ? insight : insight.message}</span>
                           </li>
                         ))}
                       </ul>
@@ -237,13 +238,13 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
 
                   {/* Actions */}
                   {msg.actions && msg.actions.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-border/50">
+                    <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border/50">
                       <p className="text-xs font-medium text-muted-foreground mb-2">Ações sugeridas:</p>
                       <div className="space-y-2">
                         {msg.actions.map((action, i) => (
                           <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-primary/5">
-                            <i className='bx bx-right-arrow-alt text-purple-600 mt-0.5'></i>
-                            <span className="text-sm">{action.description || action.type}</span>
+                            <i className='bx bx-right-arrow-alt text-purple-600 mt-0.5 flex-shrink-0'></i>
+                            <span className="text-xs sm:text-sm break-words">{action.description || action.type}</span>
                           </div>
                         ))}
                       </div>
@@ -285,12 +286,12 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
               onChange={(e) => setInput(e.target.value)}
               placeholder="Digite sua pergunta..."
               disabled={loading}
-              className="flex-1 px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors disabled:opacity-50"
+              className="flex-1 px-3 sm:px-4 py-2 sm:py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors disabled:opacity-50 text-sm sm:text-base"
             />
             <button
               type="submit"
               disabled={loading || !input.trim()}
-              className={`px-6 py-2 rounded-lg flex items-center justify-center ${loading || !input.trim()
+              className={`px-4 sm:px-6 py-2 rounded-lg flex items-center justify-center flex-shrink-0 ${loading || !input.trim()
                   ? 'opacity-50 cursor-not-allowed'
                   : 'hover:shadow-[0_0_10px_2px_rgba(147,51,234,0.3)] transition-all duration-300'
                 }`}
@@ -298,22 +299,22 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
                 background: 'linear-gradient(to right, #9333ea, #3b82f6)',
               }}
             >
-              <i className='bx bx-send text-white'></i>
+              <i className='bx bx-send text-white text-base sm:text-lg'></i>
             </button>
           </form>
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {/* Suggested Questions */}
-          <div className="glass-card p-6">
-            <h3 className="font-display font-semibold mb-4">Perguntas Sugeridas</h3>
+          <div className="glass-card p-4 sm:p-6">
+            <h3 className="font-display font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Perguntas Sugeridas</h3>
             <div className="space-y-2">
               {suggestedQuestions.map((question, i) => (
                 <button
                   key={i}
                   onClick={() => handleSuggestedQuestion(question)}
-                  className="w-full text-left p-3 rounded-xl bg-muted/30 hover:bg-gradient-to-r hover:from-purple-600/20 hover:to-blue-600/20 transition-all text-sm"
+                  className="w-full text-left p-2.5 sm:p-3 rounded-xl bg-muted/30 hover:bg-gradient-to-r hover:from-purple-600/20 hover:to-blue-600/20 transition-all text-xs sm:text-sm break-words"
                 >
                   {question}
                 </button>
@@ -322,20 +323,20 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
           </div>
 
           {/* Tips */}
-          <div className="glass-card p-6">
-            <h3 className="font-display font-semibold mb-4">Dicas</h3>
-            <ul className="space-y-3 text-sm text-muted-foreground">
+          <div className="glass-card p-4 sm:p-6">
+            <h3 className="font-display font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Dicas</h3>
+            <ul className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-muted-foreground">
               <li className="flex items-start gap-2">
-                <i className='bx bx-info-circle text-purple-600 mt-0.5'></i>
-                <span>O Advisor analisa suas transações para dar insights personalizados</span>
+                <i className='bx bx-info-circle text-purple-600 mt-0.5 flex-shrink-0'></i>
+                <span className="break-words">O Advisor analisa suas transações para dar insights personalizados</span>
               </li>
               <li className="flex items-start gap-2">
-                <i className='bx bx-info-circle text-purple-600 mt-0.5'></i>
-                <span>Quanto mais dados você tiver, melhores serão as recomendações</span>
+                <i className='bx bx-info-circle text-purple-600 mt-0.5 flex-shrink-0'></i>
+                <span className="break-words">Quanto mais dados você tiver, melhores serão as recomendações</span>
               </li>
               <li className="flex items-start gap-2">
-                <i className='bx bx-info-circle text-purple-600 mt-0.5'></i>
-                <span>Pergunte sobre orçamentos, economia e planejamento financeiro</span>
+                <i className='bx bx-info-circle text-purple-600 mt-0.5 flex-shrink-0'></i>
+                <span className="break-words">Pergunte sobre orçamentos, economia e planejamento financeiro</span>
               </li>
             </ul>
           </div>

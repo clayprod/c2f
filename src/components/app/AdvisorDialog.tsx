@@ -41,26 +41,28 @@ export default function AdvisorDialog({ open, onOpenChange }: AdvisorDialogProps
             "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
             // Mobile positioning
-            "inset-3 md:inset-auto",
+            "inset-3 sm:inset-4",
+            // Tablet positioning
+            "md:inset-auto md:left-[50%] md:top-[50%] md:w-[95vw] md:max-w-5xl md:translate-x-[-50%] md:-translate-y-1/2",
             // Desktop positioning
-            "md:left-[50%] md:top-[40%] md:w-[90vw] md:max-w-6xl md:translate-x-[-50%] md:-translate-y-1/4",
-            "rounded-xl md:rounded-xl"
+            "lg:w-[90vw] lg:max-w-6xl lg:top-[40%] lg:-translate-y-1/4",
+            "rounded-xl"
           )}
           style={isMobile ? {
             maxHeight: 'calc(100vh - 24px)'
           } : {
-            aspectRatio: '16/9',
-            maxHeight: '80vh'
+            maxHeight: '90vh',
+            minHeight: '500px'
           }}
         >
           <div className={cn(
             "flex-1 overflow-hidden",
-            "p-4 pt-12 md:p-6 md:pr-14 md:pt-10"
+            "p-3 pt-10 sm:p-4 sm:pt-12 md:p-6 md:pr-12 md:pt-10 lg:pr-14"
           )}>
             <AdvisorContent inDialog={true} />
           </div>
-          <DialogPrimitive.Close className="absolute right-3 top-3 md:right-4 md:top-4 rounded-full w-8 h-8 bg-muted/80 md:bg-transparent opacity-100 md:opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground flex items-center justify-center z-10">
-            <i className='bx bx-x text-lg'></i>
+          <DialogPrimitive.Close className="absolute right-2 top-2 sm:right-3 sm:top-3 md:right-4 md:top-4 rounded-full w-7 h-7 sm:w-8 sm:h-8 bg-muted/80 md:bg-transparent opacity-100 md:opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground flex items-center justify-center z-10">
+            <i className='bx bx-x text-base sm:text-lg'></i>
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
         </DialogPrimitive.Content>

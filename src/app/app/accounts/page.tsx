@@ -215,20 +215,21 @@ export default function AccountsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="font-display text-2xl md:text-3xl font-bold">Contas</h1>
-          <p className="text-muted-foreground">Gerencie suas contas bancárias e cartões</p>
+        <div className="min-w-0 flex-1">
+          <h1 className="font-display text-2xl sm:text-2xl md:text-3xl font-bold">Contas</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">Gerencie suas contas bancárias e cartões</p>
         </div>
-        <Button onClick={openNewDialog} className="btn-primary">
+        <Button onClick={openNewDialog} className="btn-primary w-full sm:w-auto flex-shrink-0">
           <i className='bx bx-plus mr-2'></i>
-          Nova Conta
+          <span className="hidden sm:inline">Nova Conta</span>
+          <span className="sm:hidden">Nova</span>
         </Button>
       </div>
 
       {/* Filters */}
       <div className="glass-card p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1 relative">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+          <div className="flex-1 relative min-w-0">
             <i className='bx bx-search absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground'></i>
             <Input
               placeholder="Buscar contas..."
@@ -240,7 +241,7 @@ export default function AccountsPage() {
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
-            className="px-3 py-2 rounded-md border border-input bg-background"
+            className="px-3 py-2 rounded-md border border-input bg-background text-sm sm:text-base flex-shrink-0 w-full sm:w-auto"
           >
             <option value="all">Todos os tipos</option>
             {accountTypes.map((type) => (
@@ -272,7 +273,7 @@ export default function AccountsPage() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredAccounts.map((account) => (
             <div key={account.id} className="glass-card p-4 hover:shadow-lg transition-shadow">
               <div className="flex items-start justify-between mb-4">

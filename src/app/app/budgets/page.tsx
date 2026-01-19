@@ -722,9 +722,9 @@ export default function BudgetsPage() {
 
         {/* Compact Filters + Summary Row */}
         <div className="glass-card p-2.5 md:p-3">
-          <div className="flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-4">
+          <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4">
             {/* Search */}
-            <div className="relative flex-1 max-w-xs">
+            <div className="relative flex-1 min-w-0 md:max-w-xs">
               <i className='bx bx-search absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-sm'></i>
               <input
                 type="text"
@@ -736,7 +736,7 @@ export default function BudgetsPage() {
             </div>
             
             {/* Filter pills - compact */}
-            <div className="flex gap-1 overflow-x-auto scrollbar-hide">
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-hide flex-shrink-0">
               {[
                 { key: 'all', label: 'Todas' },
                 { key: 'general', label: 'Gerais' },
@@ -748,7 +748,7 @@ export default function BudgetsPage() {
                 <button
                   key={key}
                   onClick={() => setFilterSource(key as typeof filterSource)}
-                  className={`px-2 py-1 rounded text-xs font-medium transition-colors flex-shrink-0 ${
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors flex-shrink-0 whitespace-nowrap ${
                     filterSource === key
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted/50 hover:bg-muted'
@@ -760,10 +760,10 @@ export default function BudgetsPage() {
             </div>
 
             {/* Divider */}
-            <div className="hidden lg:block w-px h-6 bg-border flex-shrink-0" />
+            <div className="hidden md:block w-px h-6 bg-border flex-shrink-0" />
 
             {/* Summary inline - compact */}
-            <div className="flex items-center gap-2 md:gap-4 text-[10px] md:text-sm overflow-x-auto scrollbar-hide flex-shrink-0">
+            <div className="flex items-center gap-2 md:gap-3 lg:gap-4 text-[10px] sm:text-xs md:text-sm overflow-x-auto scrollbar-hide flex-shrink-0">
               <div className="flex items-center gap-1 flex-shrink-0">
                 <i className='bx bx-trending-up text-green-500 text-xs md:text-sm'></i>
                 <span className="text-muted-foreground hidden sm:inline">Receitas:</span>
