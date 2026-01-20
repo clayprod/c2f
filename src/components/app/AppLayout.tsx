@@ -265,7 +265,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   };
 
   return (
-    <div className="min-h-screen bg-background flex overflow-x-hidden max-w-full">
+    <div className="h-screen bg-background flex overflow-hidden max-w-full">
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden"
@@ -410,7 +410,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-h-screen lg:ml-64 overflow-x-hidden max-w-full min-w-0">
+      <div className="flex-1 flex flex-col h-full lg:ml-64 overflow-hidden max-w-full min-w-0">
         <header className="h-14 md:h-16 border-b border-border flex items-center px-3 md:px-4 lg:px-6 bg-card/50 backdrop-blur-xl sticky top-0 z-40 min-w-0 max-w-full overflow-x-hidden">
           <button
             onClick={() => setSidebarOpen(true)}
@@ -595,7 +595,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </div>
         </header>
 
-        <main className="flex-1 p-3 md:p-4 lg:p-6 overflow-auto overflow-x-hidden max-w-full min-w-0">{children}</main>
+        <main className="flex-1 p-3 md:p-4 lg:p-6 overflow-y-auto overflow-x-hidden max-w-full min-w-0">{children}</main>
       </div>
 
       <AdvisorDialog open={advisorOpen} onOpenChange={setAdvisorOpen} />

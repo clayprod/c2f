@@ -170,7 +170,7 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
   };
 
   return (
-    <div className={`flex flex-col max-w-full overflow-x-hidden ${inDialog ? 'h-full overflow-hidden' : 'h-[calc(100vh-10rem)]'}`}>
+    <div className={`flex flex-col max-w-full overflow-x-hidden ${inDialog ? 'h-full overflow-hidden' : 'min-h-[600px] h-[calc(100vh-10rem)]'}`}>
       {!inDialog && (
         <div className="mb-4 sm:mb-6 max-w-full">
           <h1 className="font-display text-xl sm:text-2xl md:text-3xl font-bold">AI Advisor</h1>
@@ -178,9 +178,9 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
         </div>
       )}
 
-      <div className={`grid grid-cols-1 ${inDialog ? 'md:grid-cols-3 lg:grid-cols-3' : 'md:grid-cols-3 lg:grid-cols-3'} gap-4 sm:gap-6 flex-1 min-h-0 overflow-hidden max-w-full`}>
+      <div className={`grid grid-cols-1 ${inDialog ? 'lg:grid-cols-3' : 'md:grid-cols-3 lg:grid-cols-3'} gap-3 sm:gap-4 md:gap-6 flex-1 min-h-0 overflow-hidden max-w-full`}>
         {/* Chat */}
-        <div className={`${inDialog ? 'md:col-span-2 lg:col-span-2' : 'md:col-span-2 lg:col-span-2'} glass-card p-4 sm:p-6 flex flex-col min-h-0 overflow-hidden max-w-full min-w-0`}>
+        <div className={`${inDialog ? 'lg:col-span-2' : 'md:col-span-2 lg:col-span-2'} glass-card p-3 sm:p-4 md:p-6 flex flex-col min-h-0 overflow-hidden max-w-full min-w-0`}>
           <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <i className='bx bx-sparkles-alt text-xl sm:text-2xl text-purple-600 flex-shrink-0'></i>
@@ -210,8 +210,8 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
               >
                 <div
                   className={`p-3 sm:p-4 rounded-xl ${msg.role === 'user'
-                      ? 'bg-gradient-to-r from-purple-700 to-blue-700 text-white'
-                      : 'bg-muted/30'
+                    ? 'bg-gradient-to-r from-purple-700 to-blue-700 text-white'
+                    : 'bg-muted/30'
                     }`}
                 >
                   <p className={`text-xs sm:text-sm mb-1 ${msg.role === 'user' ? 'text-white/80' : 'text-muted-foreground'}`}>
@@ -292,8 +292,8 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
               type="submit"
               disabled={loading || !input.trim()}
               className={`px-4 sm:px-6 py-2 rounded-lg flex items-center justify-center flex-shrink-0 ${loading || !input.trim()
-                  ? 'opacity-50 cursor-not-allowed'
-                  : 'hover:shadow-[0_0_10px_2px_rgba(147,51,234,0.3)] transition-all duration-300'
+                ? 'opacity-50 cursor-not-allowed'
+                : 'hover:shadow-[0_0_10px_2px_rgba(147,51,234,0.3)] transition-all duration-300'
                 }`}
               style={{
                 background: 'linear-gradient(to right, #9333ea, #3b82f6)',
@@ -305,9 +305,9 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-4 sm:space-y-6 max-w-full min-w-0 overflow-x-hidden">
+        <div className="space-y-3 sm:space-y-4 md:space-y-6 max-w-full min-w-0 overflow-x-hidden">
           {/* Suggested Questions */}
-          <div className="glass-card p-4 sm:p-6 max-w-full overflow-x-hidden">
+          <div className="glass-card p-3 sm:p-4 md:p-6 max-w-full overflow-x-hidden">
             <h3 className="font-display font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Perguntas Sugeridas</h3>
             <div className="space-y-2 max-w-full">
               {suggestedQuestions.map((question, i) => (
@@ -323,7 +323,7 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
           </div>
 
           {/* Tips */}
-          <div className="glass-card p-4 sm:p-6 max-w-full overflow-x-hidden">
+          <div className="glass-card p-3 sm:p-4 md:p-6 max-w-full overflow-x-hidden">
             <h3 className="font-display font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Dicas</h3>
             <ul className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-muted-foreground">
               <li className="flex items-start gap-2">

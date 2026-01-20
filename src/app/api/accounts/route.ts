@@ -67,8 +67,15 @@ export async function POST(request: NextRequest) {
     if (validated.overdraft_interest_rate_monthly !== undefined) {
       insertData.overdraft_interest_rate_monthly = validated.overdraft_interest_rate_monthly;
     }
+    // Add yield fields if provided
+    if (validated.yield_type !== undefined) {
+      insertData.yield_type = validated.yield_type;
+    }
     if (validated.yield_rate_monthly !== undefined) {
       insertData.yield_rate_monthly = validated.yield_rate_monthly;
+    }
+    if (validated.cdi_percentage !== undefined) {
+      insertData.cdi_percentage = validated.cdi_percentage;
     }
 
     const { data, error } = await supabase

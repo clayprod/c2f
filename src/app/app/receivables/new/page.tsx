@@ -9,11 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 
 export default function NewReceivablePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -84,11 +86,14 @@ export default function NewReceivablePage() {
         const totalFromInstallments = paymentAmount * installmentCount;
 
         if (totalFromInstallments > totalAmount) {
-          const confirmAdjust = confirm(
-            `O valor total das parcelas (${(totalFromInstallments / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}) é maior que o valor do recebível (${(totalAmount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}). Deseja ajustar o valor total do recebível para ${(totalFromInstallments / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}?`
-          );
+          const confirmed = await confirm({
+            title: 'Ajustar Valor do Recebível',
+            description: `O valor total das parcelas (${(totalFromInstallments / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}) é maior que o valor do recebível (${(totalAmount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}). Deseja ajustar o valor total do recebível para ${(totalFromInstallments / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}?`,
+            confirmText: 'Ajustar',
+            cancelText: 'Cancelar',
+          });
 
-          if (confirmAdjust) {
+          if (confirmed) {
             formData.total_amount_cents = (totalFromInstallments / 100).toFixed(2);
           }
         }
@@ -522,6 +527,9 @@ export default function NewReceivablePage() {
           </Link>
         </div>
       </form>
+
+      {/* Adjust Value Confirmation Dialog */}
+      {ConfirmDialog}
     </div>
   );
 }

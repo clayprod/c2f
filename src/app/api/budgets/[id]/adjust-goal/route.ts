@@ -14,7 +14,7 @@ const adjustGoalBudgetSchema = z.object({
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const userId = await getUserId(request);
@@ -23,7 +23,7 @@ export async function POST(
     }
     const ownerId = await getEffectiveOwnerId(request, userId);
 
-    const budgetId = params.id;
+    const { id: budgetId } = await params;
     const body = await request.json();
     const validated = adjustGoalBudgetSchema.parse(body);
 

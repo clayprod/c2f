@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useMembers } from '@/hooks/useMembers';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 
 interface Account {
   id: string;
@@ -70,6 +71,7 @@ export default function TransactionsPage() {
   const [importOpen, setImportOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<TransactionFormType | undefined>();
   const { toast } = useToast();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   useEffect(() => {
     fetchAccounts();
@@ -217,7 +219,15 @@ export default function TransactionsPage() {
   };
 
   const handleDeleteTransaction = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta transação?')) {
+    const confirmed = await confirm({
+      title: 'Excluir Transação',
+      description: 'Tem certeza que deseja excluir esta transação?',
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -382,6 +392,9 @@ export default function TransactionsPage() {
         }}
         accounts={accounts}
       />
+
+      {/* Delete Confirmation Dialog */}
+      {ConfirmDialog}
     </div>
   );
 }

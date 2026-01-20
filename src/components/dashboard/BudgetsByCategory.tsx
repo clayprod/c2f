@@ -111,7 +111,7 @@ export function BudgetsByCategory() {
   }, [budgets, statusFilter]);
 
   return (
-    <div className="glass-card p-3 md:p-4 lg:p-6 h-full flex flex-col">
+    <div className="glass-card p-3 md:p-4 lg:p-6">
       <div className="flex flex-col gap-2 md:gap-3 mb-3 md:mb-4 lg:mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -194,7 +194,7 @@ export function BudgetsByCategory() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-3 lg:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-3 md:gap-3 lg:gap-4">
           {filteredBudgets.map((budget) => {
             const spent = Math.abs(budget.amount_actual || 0);
             const limit = Math.abs((budget.limit_cents || budget.amount_planned_cents || 0) / 100);
@@ -260,7 +260,7 @@ export function BudgetsByCategory() {
 
                 <div className="space-y-2 lg:space-y-3">
                   <div className="space-y-1">
-                    <div className="flex items-center justify-between text-[9px] md:text-[10px] lg:text-xs">
+                    <div className="flex flex-wrap items-center justify-between text-[9px] md:text-[10px] lg:text-xs gap-1">
                       <span className="text-muted-foreground font-medium">Consumido</span>
                       <span className="font-bold hidden md:inline">{formatCurrency(spent)}</span>
                       <span className="font-bold md:hidden text-xs">{formatCurrency(spent).replace('R$', 'R$').substring(0, 8)}</span>

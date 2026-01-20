@@ -34,32 +34,36 @@ export default function AdvisorDialog({ open, onOpenChange }: AdvisorDialogProps
         />
         <DialogPrimitive.Content
           className={cn(
-            // Mobile: nearly full screen with small margins
+            // Base styles
             "fixed z-50 bg-background border border-border shadow-lg duration-200",
             "flex flex-col overflow-hidden overflow-x-hidden relative",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-            // Mobile positioning
-            "inset-3 sm:inset-4",
-            // Tablet positioning
-            "md:inset-auto md:left-[50%] md:top-[50%] md:w-[95vw] md:max-w-5xl md:translate-x-[-50%] md:-translate-y-1/2",
-            // Desktop positioning
-            "lg:w-[90vw] lg:max-w-6xl lg:top-[40%] lg:-translate-y-1/4",
             "rounded-xl",
-            "max-w-full"
+            // Mobile positioning - safe margins with vertical centering
+            "left-4 right-4 top-[5vh] bottom-[5vh]",
+            "sm:left-[50%] sm:right-auto sm:top-[50%] sm:bottom-auto",
+            "sm:w-[calc(100vw-2rem)] sm:max-w-[calc(100vw-2rem)] sm:translate-x-[-50%] sm:translate-y-[-50%]",
+            // Tablet positioning - centered with safe margins (min 32px each side = 4rem total)
+            "md:w-[calc(100vw-4rem)] md:max-w-[min(90vw,1200px)]",
+            // Desktop positioning - centered with comfortable margins (min 48px each side = 6rem total)
+            "lg:w-[calc(100vw-6rem)] lg:max-w-[min(85vw,1400px)]"
           )}
           style={isMobile ? {
-            maxHeight: 'calc(100vh - 24px)',
-            maxWidth: 'calc(100vw - 24px)'
+            maxHeight: 'calc(90vh)',
+            height: 'auto'
           } : {
-            maxHeight: '90vh',
-            minHeight: '500px'
+            maxHeight: 'min(80vh, calc(100vh - 4rem))',
+            minHeight: 'min(500px, calc(100vh - 4rem))',
+            height: 'auto'
           }}
         >
           <div className={cn(
-            "flex-1 overflow-hidden overflow-x-hidden max-w-full",
-            "p-3 pt-10 sm:p-4 sm:pt-12 md:p-6 md:pr-12 md:pt-10 lg:pr-14"
+            "flex-1 overflow-hidden overflow-x-hidden max-w-full min-w-0",
+            "p-3 pt-10 sm:p-4 sm:pt-12 md:p-5 md:pt-12 lg:p-6",
+            // Ensure padding doesn't cause overflow
+            "box-border"
           )}>
             <AdvisorContent inDialog={true} />
           </div>

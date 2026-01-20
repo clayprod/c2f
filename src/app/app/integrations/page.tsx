@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import WhatsAppIntegration from '@/components/integrations/WhatsAppIntegration';
 
 interface PluggyItem {
@@ -32,6 +33,7 @@ export default function IntegrationsPage() {
   const [userPlan, setUserPlan] = useState<UserPlan | null>(null);
   const [syncing, setSyncing] = useState<string | null>(null);
   const { toast } = useToast();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   useEffect(() => {
     fetchItems();
@@ -127,7 +129,15 @@ export default function IntegrationsPage() {
   };
 
   const handleDisconnect = async (itemId: string) => {
-    if (!confirm('Tem certeza que deseja desconectar esta conta?')) {
+    const confirmed = await confirm({
+      title: 'Desconectar Conta',
+      description: 'Tem certeza que deseja desconectar esta conta?',
+      confirmText: 'Desconectar',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -373,6 +383,9 @@ export default function IntegrationsPage() {
             </div>
           </div>
         </div>
+
+        {/* Disconnect Confirmation Dialog */}
+        {ConfirmDialog}
       </div>
     </div>
   );

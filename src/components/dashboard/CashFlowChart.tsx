@@ -26,7 +26,7 @@ function useIsMobile(breakpoint: number = 768) {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < breakpoint);
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
@@ -56,7 +56,7 @@ interface CashFlowChartProps {
 
 export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
   const isMobile = useIsMobile();
-  
+
   const { chartData, currentMonthIndex } = useMemo(() => {
     // Primeiro, processar e formatar os dados
     let runningBalance = 0;
@@ -281,7 +281,7 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
       <ResponsiveContainer width="100%" height={isMobile ? 280 : 400}>
         <ComposedChart
           data={chartData}
-          margin={isMobile 
+          margin={isMobile
             ? { top: 10, right: 10, left: 0, bottom: 50 }
             : { top: 20, right: 30, left: 20, bottom: 60 }
           }
@@ -296,7 +296,18 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
             height={isMobile ? 70 : 100}
             stroke="hsl(var(--muted-foreground))"
             fontSize={isMobile ? 10 : 12}
-            interval={isMobile ? 1 : 0}
+            interval={(() => {
+              if (isMobile) {
+                if (periodMonths <= 6) return 0;
+                if (periodMonths <= 12) return 1;
+                return 2;
+              }
+              // Desktop
+              if (periodMonths <= 12) return 0; // Show all
+              if (periodMonths <= 24) return 1; // Every 2nd
+              if (periodMonths <= 60) return 5; // Every 6th
+              return 11; // Every 12th
+            })()}
           />
           <YAxis
             stroke="hsl(var(--muted-foreground))"

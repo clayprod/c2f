@@ -1,22 +1,37 @@
 /**
  * Calculate and generate account yield budgets
  * Generates budgets for the month following a period where accounts had positive balances with yield rate
+ *
+ * Supports two yield types:
+ * - 'fixed': Fixed monthly rate (e.g., 0.5% per month)
+ * - 'cdi_percentage': Percentage of CDI rate (e.g., 100% CDI, 120% CDI)
+ *   The CDI rate is fetched daily from BACEN API
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
 import { DailyBalance } from './overdraftInterest';
+import { getCdiRatesForPeriod, calculateEffectiveDailyRate } from '@/services/bacen/cdi';
 
 export interface AccountYield {
   account_id: string;
   account_name: string;
   yield_cents: number;
+  yield_type: 'fixed' | 'cdi_percentage';
+}
+
+interface AccountWithYield {
+  id: string;
+  name: string;
+  yield_type: 'fixed' | 'cdi_percentage' | null;
+  yield_rate_monthly: number | null;
+  cdi_percentage: number | null;
 }
 
 /**
  * Calculate daily yield rate from monthly rate (compound)
  * Formula: (1 + monthly_rate)^(1/30) - 1
  */
-function calculateDailyRate(monthlyRate: number): number {
+function calculateDailyRateFromMonthly(monthlyRate: number): number {
   if (monthlyRate <= 0) return 0;
   // Convert percentage to decimal (e.g., 0.5% -> 0.005)
   const monthlyDecimal = monthlyRate / 100;
@@ -48,7 +63,7 @@ async function reconstructDailyBalances(
   endDate: Date
 ): Promise<DailyBalance[]> {
   const balances: DailyBalance[] = [];
-  
+
   // Get account current balance
   const { data: account } = await supabase
     .from('accounts')
@@ -87,12 +102,12 @@ async function reconstructDailyBalances(
   // Start from end date and work backwards
   // We'll use the current balance as the balance at endDate
   let runningBalanceCents = currentBalanceCents;
-  
+
   // Reverse iterate through dates
   const date = new Date(endDate);
   while (date >= startDate) {
     const dateStr = date.toISOString().split('T')[0];
-    
+
     // Subtract transactions that happened on this date (working backwards)
     const dayTransactions = transactionsByDate.get(dateStr) || 0;
     runningBalanceCents -= dayTransactions;
@@ -110,9 +125,9 @@ async function reconstructDailyBalances(
 }
 
 /**
- * Calculate account yield for an account in a given period
+ * Calculate account yield for an account with FIXED rate in a given period
  */
-async function calculateAccountYield(
+async function calculateAccountYieldFixed(
   supabase: SupabaseClient,
   accountId: string,
   accountName: string,
@@ -131,7 +146,7 @@ async function calculateAccountYield(
 
   if (dailyBalances.length === 0) return null;
 
-  const dailyRate = calculateDailyRate(yieldRateMonthly);
+  const dailyRate = calculateDailyRateFromMonthly(yieldRateMonthly);
   let totalYieldCents = 0;
 
   for (const dayBalance of dailyBalances) {
@@ -148,7 +163,104 @@ async function calculateAccountYield(
     account_id: accountId,
     account_name: accountName,
     yield_cents: totalYieldCents,
+    yield_type: 'fixed',
   };
+}
+
+/**
+ * Calculate account yield for an account with CDI PERCENTAGE in a given period
+ * Uses actual daily CDI rates from BACEN
+ */
+async function calculateAccountYieldCdi(
+  supabase: SupabaseClient,
+  accountId: string,
+  accountName: string,
+  userId: string,
+  cdiPercentage: number,
+  startDate: Date,
+  endDate: Date
+): Promise<AccountYield | null> {
+  const dailyBalances = await reconstructDailyBalances(
+    supabase,
+    accountId,
+    userId,
+    startDate,
+    endDate
+  );
+
+  if (dailyBalances.length === 0) return null;
+
+  // Fetch CDI rates for the period from BACEN
+  const cdiRates = await getCdiRatesForPeriod(startDate, endDate);
+
+  let totalYieldCents = 0;
+
+  for (const dayBalance of dailyBalances) {
+    // Only calculate yield if balance is positive
+    if (dayBalance.balance_cents > 0) {
+      // Get CDI rate for this date
+      const cdiDailyRate = cdiRates.get(dayBalance.date);
+
+      if (cdiDailyRate !== undefined) {
+        // Calculate effective daily rate based on CDI percentage
+        // CDI rate from BACEN is already in percentage (e.g., 0.055131 means 0.055131%)
+        // Convert to decimal for calculation
+        const effectiveDailyRate = calculateEffectiveDailyRate(cdiPercentage, cdiDailyRate) / 100;
+        const dailyYield = calculateDailyYield(dayBalance.balance_cents, effectiveDailyRate);
+        totalYieldCents += dailyYield;
+      } else {
+        // If CDI rate not available for this date (weekend/holiday), skip
+        // The CDI is only published on business days
+        continue;
+      }
+    }
+  }
+
+  if (totalYieldCents <= 0) return null;
+
+  return {
+    account_id: accountId,
+    account_name: accountName,
+    yield_cents: totalYieldCents,
+    yield_type: 'cdi_percentage',
+  };
+}
+
+/**
+ * Calculate account yield for any account (fixed or CDI)
+ */
+async function calculateAccountYield(
+  supabase: SupabaseClient,
+  account: AccountWithYield,
+  userId: string,
+  startDate: Date,
+  endDate: Date
+): Promise<AccountYield | null> {
+  const yieldType = account.yield_type || 'fixed';
+
+  if (yieldType === 'cdi_percentage' && account.cdi_percentage && account.cdi_percentage > 0) {
+    return calculateAccountYieldCdi(
+      supabase,
+      account.id,
+      account.name,
+      userId,
+      account.cdi_percentage,
+      startDate,
+      endDate
+    );
+  } else if (yieldType === 'fixed' && account.yield_rate_monthly && account.yield_rate_monthly > 0) {
+    return calculateAccountYieldFixed(
+      supabase,
+      account.id,
+      account.name,
+      userId,
+      account.yield_rate_monthly,
+      startDate,
+      endDate
+    );
+  }
+
+  return null;
 }
 
 /**
@@ -208,22 +320,48 @@ export async function generateAccountYieldBudget(
   const targetDate = new Date(targetYear, targetMonth - 1, 1);
   const previousMonth = new Date(targetDate);
   previousMonth.setMonth(previousMonth.getMonth() - 1);
-  
+
   const previousYear = previousMonth.getFullYear();
   const previousMonthNum = previousMonth.getMonth() + 1;
 
   const startDate = new Date(previousYear, previousMonthNum - 1, 1);
   const endDate = new Date(previousYear, previousMonthNum, 0); // Last day of previous month
 
-  // Get eligible accounts (have yield rate, exclude credit_card)
-  const { data: accounts } = await supabase
-    .from('accounts')
-    .select('id, name, yield_rate_monthly')
-    .eq('user_id', userId)
-    .neq('type', 'credit_card')
-    .gt('yield_rate_monthly', 0);
+  // Get eligible accounts (have yield rate OR cdi_percentage, exclude credit_card)
+  // First try with new columns
+  let accounts: AccountWithYield[] = [];
 
-  if (!accounts || accounts.length === 0) {
+  const { data: accountsData, error: accountsError } = await supabase
+    .from('accounts')
+    .select('id, name, yield_type, yield_rate_monthly, cdi_percentage')
+    .eq('user_id', userId)
+    .neq('type', 'credit_card');
+
+  if (accountsError) {
+    // Fallback to old schema if new columns don't exist
+    const { data: fallbackAccounts } = await supabase
+      .from('accounts')
+      .select('id, name, yield_rate_monthly')
+      .eq('user_id', userId)
+      .neq('type', 'credit_card')
+      .gt('yield_rate_monthly', 0);
+
+    if (fallbackAccounts) {
+      accounts = fallbackAccounts.map(acc => ({
+        ...acc,
+        yield_type: 'fixed' as const,
+        cdi_percentage: null,
+      }));
+    }
+  } else {
+    // Filter accounts that have either yield_rate_monthly > 0 OR cdi_percentage > 0
+    accounts = (accountsData || []).filter(acc =>
+      (acc.yield_type === 'fixed' && acc.yield_rate_monthly && acc.yield_rate_monthly > 0) ||
+      (acc.yield_type === 'cdi_percentage' && acc.cdi_percentage && acc.cdi_percentage > 0)
+    );
+  }
+
+  if (accounts.length === 0) {
     return { created: false };
   }
 
@@ -232,10 +370,8 @@ export async function generateAccountYieldBudget(
   for (const account of accounts) {
     const accountYieldResult = await calculateAccountYield(
       supabase,
-      account.id,
-      account.name,
+      account,
       userId,
-      account.yield_rate_monthly || 0,
       startDate,
       endDate
     );
@@ -272,9 +408,9 @@ export async function generateAccountYieldBudget(
     0
   );
 
-  // Prepare breakdown items
+  // Prepare breakdown items with yield type info
   const breakdownItems = accountYields.map((acc) => ({
-    label: acc.account_name,
+    label: `${acc.account_name} (${acc.yield_type === 'cdi_percentage' ? '% CDI' : 'Taxa Fixa'})`,
     amount_cents: acc.yield_cents,
   }));
 
@@ -328,4 +464,3 @@ export async function generateAccountYieldBudget(
 
   return { created: true, budgetId: newBudget.id };
 }
-

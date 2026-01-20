@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 
 interface Receivable {
   id: string;
@@ -41,6 +42,7 @@ export default function ReceivableDetailPage() {
   const params = useParams();
   const receivableId = params?.id as string;
   const { toast } = useToast();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -177,11 +179,14 @@ export default function ReceivableDetailPage() {
         const totalFromInstallments = paymentAmount * installmentCount;
 
         if (totalFromInstallments > totalAmount) {
-          const confirmAdjust = confirm(
-            `O valor total das parcelas (${(totalFromInstallments / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}) é maior que o valor do recebível (${(totalAmount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}). Deseja ajustar o valor total do recebível para ${(totalFromInstallments / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}?`
-          );
+          const confirmed = await confirm({
+            title: 'Ajustar Valor do Recebível',
+            description: `O valor total das parcelas (${(totalFromInstallments / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}) é maior que o valor do recebível (${(totalAmount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}). Deseja ajustar o valor total do recebível para ${(totalFromInstallments / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}?`,
+            confirmText: 'Ajustar',
+            cancelText: 'Cancelar',
+          });
 
-          if (confirmAdjust) {
+          if (confirmed) {
             setFormData({
               ...formData,
               total_amount_cents: (totalFromInstallments / 100).toFixed(2),
@@ -774,6 +779,9 @@ export default function ReceivableDetailPage() {
           )}
         </>
       )}
+
+      {/* Adjust Value Confirmation Dialog */}
+      {ConfirmDialog}
     </div>
   );
 }

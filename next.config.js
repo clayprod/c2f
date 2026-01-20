@@ -1,7 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
-  outputFileTracing: true,
+  // Standalone apenas em produção (não funciona bem com hot reload)
+  ...(process.env.NODE_ENV === 'production' && {
+    output: 'standalone',
+    outputFileTracing: true,
+  }),
   
   images: {
     domains: ['localhost'],

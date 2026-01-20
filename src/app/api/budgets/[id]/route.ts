@@ -37,7 +37,7 @@ function sumBreakdownItemsCents(items: BudgetBreakdownItemInput[]) {
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const userId = await getUserId(request);
@@ -47,7 +47,7 @@ export async function PATCH(
     const ownerId = await getEffectiveOwnerId(request, userId);
 
     const body = await request.json();
-    const budgetId = params.id;
+    const { id: budgetId } = await params;
 
     // Validate input - allow updating planned amount OR breakdown_items
     if (body.limit_cents === undefined && body.amount_planned_cents === undefined && !Object.prototype.hasOwnProperty.call(body, 'breakdown_items')) {
@@ -275,27 +275,79 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    console.log('[DELETE Budget] Starting...');
+    
     const userId = await getUserId(request);
+    console.log('[DELETE Budget] userId:', userId);
+    
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    
+    let budgetId: string;
+    try {
+      const resolvedParams = await params;
+      budgetId = resolvedParams.id;
+      console.log('[DELETE Budget] budgetId:', budgetId);
+    } catch (paramsError: any) {
+      console.error('[DELETE Budget] Error resolving params:', paramsError);
+      return NextResponse.json(
+        { error: 'ID do orçamento inválido' },
+        { status: 400 }
+      );
+    }
+
+    if (!budgetId || typeof budgetId !== 'string') {
+      return NextResponse.json(
+        { error: 'ID do orçamento é obrigatório' },
+        { status: 400 }
+      );
+    }
+
+    console.log('[DELETE Budget] Getting ownerId...');
     const ownerId = await getEffectiveOwnerId(request, userId);
-
-    const budgetId = params.id;
+    console.log('[DELETE Budget] ownerId:', ownerId);
+    
+    console.log('[DELETE Budget] Creating supabase client...');
     const { supabase } = createClientFromRequest(request);
+    console.log('[DELETE Budget] Supabase client created');
 
-    // Verify the budget belongs to the user
+    // First, verify the budget exists and belongs to the user
+    // Note: We fetch without user_id filter first to let RLS handle access control
+    // Then we verify the user_id matches ownerId
     const { data: existingBudget, error: fetchError } = await supabase
       .from('budgets')
-      .select('id, is_auto_generated, source_type, categories(source_type)')
+      .select('id, is_auto_generated, source_type, category_id, user_id')
       .eq('id', budgetId)
-      .eq('user_id', ownerId)
       .single();
 
-    if (fetchError || !existingBudget) {
+    if (fetchError) {
+      // PGRST116 means no rows returned
+      if (fetchError.code === 'PGRST116' || fetchError.message?.includes('No rows')) {
+        return NextResponse.json(
+          { error: 'Orçamento não encontrado ou não pertence ao usuário' },
+          { status: 404 }
+        );
+      }
+      console.error('[DELETE Budget] Unexpected fetch error:', fetchError);
+      return NextResponse.json(
+        { error: 'Erro ao verificar orçamento', details: fetchError.message },
+        { status: 500 }
+      );
+    }
+
+    if (!existingBudget) {
+      return NextResponse.json(
+        { error: 'Orçamento não encontrado ou não pertence ao usuário' },
+        { status: 404 }
+      );
+    }
+
+    // Verify the budget belongs to the expected owner
+    if (existingBudget.user_id !== ownerId) {
       return NextResponse.json(
         { error: 'Orçamento não encontrado ou não pertence ao usuário' },
         { status: 404 }
@@ -304,7 +356,17 @@ export async function DELETE(
 
     // Block deleting auto-generated budgets
     if (existingBudget.is_auto_generated) {
-      const category = existingBudget.categories as any;
+      // Fetch category source_type separately if needed
+      let categorySourceType = null;
+      if (existingBudget.category_id) {
+        const { data: category } = await supabase
+          .from('categories')
+          .select('source_type')
+          .eq('id', existingBudget.category_id)
+          .single();
+        categorySourceType = category?.source_type;
+      }
+
       const sourceTypeLabels: Record<string, string> = {
         credit_card: 'cartão de crédito',
         goal: 'objetivo',
@@ -324,29 +386,59 @@ export async function DELETE(
     }
 
     // Delete the budget
+    // IMPORTANT: RLS policy for DELETE only allows when user_id = auth.uid()
+    // So we must use userId (auth.uid()) for the delete, not ownerId
+    // But we've already verified that existingBudget.user_id === ownerId
+    // So if ownerId === userId, we can delete. Otherwise, RLS will block it.
+    
+    // RLS policy requires user_id = auth.uid(), so we must use userId
+    // But we've verified the budget belongs to ownerId, so if they differ, 
+    // the user can't delete budgets from shared accounts
+    if (ownerId !== userId) {
+      return NextResponse.json(
+        { error: 'Não é possível excluir orçamentos de contas compartilhadas' },
+        { status: 403 }
+      );
+    }
+
+    // Use userId (which equals ownerId at this point) for the delete
     const { error: deleteError } = await supabase
       .from('budgets')
       .delete()
       .eq('id', budgetId)
-      .eq('user_id', ownerId);
+      .eq('user_id', userId);
 
     if (deleteError) {
-      console.error('Database error deleting budget:', deleteError);
+      // If RLS blocked it (no rows affected), return 404
+      if (deleteError.code === 'PGRST116' || deleteError.message?.includes('No rows')) {
+        return NextResponse.json(
+          { error: 'Orçamento não encontrado ou não pertence ao usuário' },
+          { status: 404 }
+        );
+      }
+      
       return NextResponse.json(
         { error: deleteError.message || 'Erro ao excluir orçamento' },
         { status: 500 }
       );
     }
 
-    // Clear cache for this user
-    projectionCache.invalidateUser(ownerId);
+    // Clear cache for this user (safely)
+    try {
+      projectionCache.invalidateUser(ownerId);
+    } catch (cacheError) {
+      // Cache error shouldn't block the delete operation
+      console.error('[DELETE Budget] Cache invalidation error:', cacheError);
+    }
 
     return NextResponse.json({ message: 'Orçamento excluído com sucesso' }, { status: 200 });
   } catch (error: any) {
-    console.error('Budget delete error:', error);
+    console.error('[DELETE Budget] Unexpected error:', error);
     const errorResponse = createErrorResponse(error);
     return NextResponse.json(
-      { error: errorResponse.error || 'Erro ao excluir orçamento' },
+      { 
+        error: errorResponse.error || 'Erro ao excluir orçamento',
+      },
       { status: errorResponse.statusCode || 500 }
     );
   }

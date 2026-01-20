@@ -25,7 +25,16 @@ interface Account {
   is_default?: boolean;
   overdraft_limit_cents?: number;
   overdraft_interest_rate_monthly?: number;
+  yield_type?: 'fixed' | 'cdi_percentage';
   yield_rate_monthly?: number;
+  cdi_percentage?: number;
+}
+
+interface CdiRateInfo {
+  daily_rate: number;
+  monthly_rate: number;
+  annual_rate: number;
+  date: string;
 }
 
 const accountTypes = [
@@ -66,13 +75,41 @@ export default function AccountsPage() {
     overdraft_limit: '',
     overdraft_interest_rate: '',
     has_yield: false,
+    yield_type: 'fixed' as 'fixed' | 'cdi_percentage',
     yield_rate: '',
+    cdi_percentage: '',
   });
+  const [cdiRate, setCdiRate] = useState<CdiRateInfo | null>(null);
+  const [loadingCdi, setLoadingCdi] = useState(false);
   const { toast } = useToast();
+
+  // Fetch CDI rate when dialog opens with yield enabled
+  const fetchCdiRate = async () => {
+    if (loadingCdi) return;
+    setLoadingCdi(true);
+    try {
+      const res = await fetch('/api/cdi');
+      if (res.ok) {
+        const data = await res.json();
+        setCdiRate(data);
+      }
+    } catch (error) {
+      console.error('Error fetching CDI rate:', error);
+    } finally {
+      setLoadingCdi(false);
+    }
+  };
 
   useEffect(() => {
     fetchAccounts();
   }, []);
+
+  // Fetch CDI rate when dialog opens
+  useEffect(() => {
+    if (dialogOpen && formData.has_yield && !cdiRate) {
+      fetchCdiRate();
+    }
+  }, [dialogOpen, formData.has_yield]);
 
   const fetchAccounts = async () => {
     try {
@@ -121,17 +158,31 @@ export default function AccountsPage() {
       // Add overdraft fields if enabled
       if (formData.has_overdraft) {
         body.overdraft_limit_cents = Math.round(parseFloat(formData.overdraft_limit || '0') * 100);
-        body.overdraft_interest_rate_monthly = parseFloat(formData.overdraft_interest_rate || '0');
+        // Parse with comma support for Brazilian format
+        const interestValue = formData.overdraft_interest_rate.replace(',', '.');
+        body.overdraft_interest_rate_monthly = parseFloat(interestValue || '0');
       } else {
         body.overdraft_limit_cents = 0;
         body.overdraft_interest_rate_monthly = 0;
       }
 
-      // Add yield field if enabled
+      // Add yield fields if enabled
       if (formData.has_yield) {
-        body.yield_rate_monthly = parseFloat(formData.yield_rate || '0');
+        body.yield_type = formData.yield_type;
+        if (formData.yield_type === 'fixed') {
+          // Parse with comma support for Brazilian format
+          const yieldValue = formData.yield_rate.replace(',', '.');
+          body.yield_rate_monthly = parseFloat(yieldValue || '0');
+          body.cdi_percentage = null;
+        } else {
+          // CDI percentage
+          body.yield_rate_monthly = 0;
+          body.cdi_percentage = parseFloat(formData.cdi_percentage || '0');
+        }
       } else {
+        body.yield_type = 'fixed';
         body.yield_rate_monthly = 0;
+        body.cdi_percentage = null;
       }
 
       const res = await fetch(url, {
@@ -193,6 +244,9 @@ export default function AccountsPage() {
 
   const openEditDialog = (account: Account) => {
     setEditingAccount(account);
+    const hasYield = account.yield_type === 'cdi_percentage'
+      ? (account.cdi_percentage || 0) > 0
+      : (account.yield_rate_monthly || 0) > 0;
     setFormData({
       name: account.name,
       type: account.type,
@@ -204,8 +258,10 @@ export default function AccountsPage() {
       has_overdraft: (account.overdraft_limit_cents || 0) > 0,
       overdraft_limit: account.overdraft_limit_cents ? (account.overdraft_limit_cents / 100).toFixed(2) : '',
       overdraft_interest_rate: account.overdraft_interest_rate_monthly ? account.overdraft_interest_rate_monthly.toString() : '',
-      has_yield: (account.yield_rate_monthly || 0) > 0,
-      yield_rate: account.yield_rate_monthly ? account.yield_rate_monthly.toString() : '',
+      has_yield: hasYield,
+      yield_type: account.yield_type || 'fixed',
+      yield_rate: account.yield_rate_monthly ? account.yield_rate_monthly.toString().replace('.', ',') : '',
+      cdi_percentage: account.cdi_percentage ? account.cdi_percentage.toString() : '',
     });
     setDialogOpen(true);
   };
@@ -224,7 +280,9 @@ export default function AccountsPage() {
       overdraft_limit: '',
       overdraft_interest_rate: '',
       has_yield: false,
+      yield_type: 'fixed',
       yield_rate: '',
+      cdi_percentage: '',
     });
     setDialogOpen(true);
   };
@@ -449,16 +507,19 @@ export default function AccountsPage() {
                   <div>
                     <label className="text-sm font-medium">Taxa de Juros Mensal (%)</label>
                     <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="100"
+                      type="text"
+                      inputMode="decimal"
                       value={formData.overdraft_interest_rate}
-                      onChange={(e) => setFormData({ ...formData, overdraft_interest_rate: e.target.value })}
-                      placeholder="0,00"
+                      onChange={(e) => {
+                        // Allow comma or dot as decimal separator
+                        const value = e.target.value.replace(/[^0-9.,]/g, '');
+                        setFormData({ ...formData, overdraft_interest_rate: value });
+                      }}
+                      placeholder="5,50"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Taxa de juros aplicada sobre o saldo negativo (ex: 5.5 para 5,5% ao mês)
+                      <i className='bx bx-info-circle mr-1'></i>
+                      Taxa de juros aplicada sobre o saldo negativo. Use <strong>vírgula</strong> como separador decimal (ex: 5,5 para 5,5% ao mês).
                     </p>
                   </div>
                 </div>
@@ -476,24 +537,110 @@ export default function AccountsPage() {
                   className="w-4 h-4 rounded border-gray-300"
                 />
                 <label htmlFor="has_yield" className="text-sm font-medium">
-                  Rendimento da conta (a.m)
+                  Conta possui rendimento
                 </label>
               </div>
               {formData.has_yield && (
-                <div className="pl-6">
-                  <label className="text-sm font-medium">Taxa de Rendimento Mensal (%)</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="100"
-                    value={formData.yield_rate}
-                    onChange={(e) => setFormData({ ...formData, yield_rate: e.target.value })}
-                    placeholder="0,00"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Taxa de rendimento aplicada sobre o saldo positivo (ex: 0.5 para 0,5% ao mês)
-                  </p>
+                <div className="pl-6 space-y-4">
+                  {/* Tipo de Rendimento */}
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Tipo de Rendimento</label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="yield_type"
+                          value="fixed"
+                          checked={formData.yield_type === 'fixed'}
+                          onChange={() => setFormData({ ...formData, yield_type: 'fixed' })}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-sm">Taxa Fixa Mensal</span>
+                      </label>
+                      <label className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="yield_type"
+                          value="cdi_percentage"
+                          checked={formData.yield_type === 'cdi_percentage'}
+                          onChange={() => setFormData({ ...formData, yield_type: 'cdi_percentage' })}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-sm">% do CDI</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Taxa Fixa */}
+                  {formData.yield_type === 'fixed' && (
+                    <div>
+                      <label className="text-sm font-medium">Taxa de Rendimento Mensal (%)</label>
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        value={formData.yield_rate}
+                        onChange={(e) => {
+                          // Allow comma or dot as decimal separator
+                          const value = e.target.value.replace(/[^0-9.,]/g, '');
+                          setFormData({ ...formData, yield_rate: value });
+                        }}
+                        placeholder="0,50"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        <i className='bx bx-info-circle mr-1'></i>
+                        Taxa de rendimento aplicada sobre o saldo positivo. Use <strong>vírgula</strong> como separador decimal (ex: 0,5 para 0,5% ao mês).
+                      </p>
+                    </div>
+                  )}
+
+                  {/* % do CDI */}
+                  {formData.yield_type === 'cdi_percentage' && (
+                    <div>
+                      <label className="text-sm font-medium">Percentual do CDI (%)</label>
+                      <Input
+                        type="number"
+                        step="1"
+                        min="0"
+                        max="500"
+                        value={formData.cdi_percentage}
+                        onChange={(e) => setFormData({ ...formData, cdi_percentage: e.target.value })}
+                        placeholder="100"
+                      />
+                      <div className="mt-2 p-3 bg-muted/50 rounded-lg text-xs">
+                        <div className="flex items-start gap-2">
+                          <i className='bx bx-info-circle text-primary mt-0.5'></i>
+                          <div className="space-y-1">
+                            <p>
+                              Os bancos divulgam o rendimento como percentual do CDI. Exemplos:
+                            </p>
+                            <ul className="list-disc list-inside pl-2 space-y-0.5 text-muted-foreground">
+                              <li><strong>100%</strong> do CDI = rende igual ao CDI</li>
+                              <li><strong>102%</strong> do CDI = rende 2% a mais que o CDI</li>
+                              <li><strong>120%</strong> do CDI = rende 20% a mais que o CDI</li>
+                            </ul>
+                            {loadingCdi ? (
+                              <p className="text-muted-foreground mt-2">
+                                <i className='bx bx-loader-alt bx-spin mr-1'></i>
+                                Buscando taxa CDI atual...
+                              </p>
+                            ) : cdiRate ? (
+                              <div className="mt-2 pt-2 border-t border-border">
+                                <p className="font-medium text-foreground">Taxa CDI atual ({cdiRate.date}):</p>
+                                <p className="text-muted-foreground">
+                                  {cdiRate.daily_rate.toFixed(6)}% ao dia ≈ {cdiRate.monthly_rate.toFixed(2)}% ao mês ≈ {cdiRate.annual_rate.toFixed(2)}% ao ano
+                                </p>
+                                {formData.cdi_percentage && parseFloat(formData.cdi_percentage) > 0 && (
+                                  <p className="text-primary font-medium mt-1">
+                                    Com {formData.cdi_percentage}% do CDI: ≈ {(cdiRate.monthly_rate * parseFloat(formData.cdi_percentage) / 100).toFixed(2)}% ao mês
+                                  </p>
+                                )}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

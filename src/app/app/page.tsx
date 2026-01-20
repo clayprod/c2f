@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { CashFlowChart } from '@/components/dashboard/CashFlowChart';
 import { ExpensesByCategoryChart } from '@/components/dashboard/ExpensesByCategoryChart';
@@ -65,7 +65,30 @@ export default function DashboardPage() {
   const [cashFlowLoading, setCashFlowLoading] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState(12); // Default: 1 year
   const { isFree, loading: profileLoading } = useProfile();
-  
+  const [maxVisibleItems, setMaxVisibleItems] = useState(9);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (window.innerWidth >= 1024) { // Only on desktop (lg)
+        const height = entry.contentRect.height;
+        // Approx item height (row + border) is ~53px. 
+        // Using 50px to be slightly aggressive/fill more, 55px to be safe.
+        // Let's use 55px to avoid partial rows.
+        const count = Math.floor(height / 55);
+        setMaxVisibleItems(Math.max(5, count));
+      } else {
+        setMaxVisibleItems(9);
+      }
+    });
+
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [loading]); // Re-attach if loading state changes layout, though mostly static ref.
+
   // Memoizar o nome do mês atual para evitar recálculos
   const currentMonthName = useMemo(() => {
     try {
@@ -73,20 +96,24 @@ export default function DashboardPage() {
       if (!monthName || monthName === 'Invalid Date') {
         // Fallback caso haja problema com timezone
         const now = new Date();
-        return now.toLocaleDateString('pt-BR', { month: 'long' }).charAt(0).toUpperCase() + 
-               now.toLocaleDateString('pt-BR', { month: 'long' }).slice(1);
+        return now.toLocaleDateString('pt-BR', { month: 'long' }).charAt(0).toUpperCase() +
+          now.toLocaleDateString('pt-BR', { month: 'long' }).slice(1);
       }
       return monthName.charAt(0).toUpperCase() + monthName.slice(1);
     } catch (error) {
       // Fallback em caso de erro
       const now = new Date();
-      return now.toLocaleDateString('pt-BR', { month: 'long' }).charAt(0).toUpperCase() + 
-             now.toLocaleDateString('pt-BR', { month: 'long' }).slice(1);
+      return now.toLocaleDateString('pt-BR', { month: 'long' }).charAt(0).toUpperCase() +
+        now.toLocaleDateString('pt-BR', { month: 'long' }).slice(1);
     }
   }, []);
 
   useEffect(() => {
     fetchDashboardData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     fetchCashFlowData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPeriod]);
@@ -158,7 +185,7 @@ export default function DashboardPage() {
         savings,
       });
 
-      setRecentTransactions(transactions.slice(0, 5));
+      setRecentTransactions(transactions.slice(0, 50));
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       setData({
@@ -182,35 +209,22 @@ export default function DashboardPage() {
       const currentYear = brazilDate.getFullYear();
       const currentMonth = brazilDate.getMonth();
 
-      // Start: 5 months back from current month
-      const startDate = new Date(currentYear, currentMonth - 5, 1);
+      // Calculate ranges prioritizing future
+      // We want to show current month, so available slots for others is selectedPeriod - 1
+      const monthsBack = Math.floor((selectedPeriod - 1) / 2);
+      const monthsForward = selectedPeriod - 1 - monthsBack;
 
-      // End: selectedPeriod months forward from current month
-      // Limit to max 10 years (120 months total from start)
-      // We have 5 months back, so max 115 months forward
-      const maxMonthsForward = Math.min(selectedPeriod, 115);
+      // Start: monthsBack months back from current
+      const startDate = new Date(currentYear, currentMonth - monthsBack, 1);
 
-      // Calculate end date: add months to current date
-      const endDate = new Date(today);
-      endDate.setMonth(endDate.getMonth() + maxMonthsForward);
+      // End: monthsForward months forward from current
+      const endDate = new Date(currentYear, currentMonth + monthsForward, 1);
       // Set to last day of that month
       endDate.setMonth(endDate.getMonth() + 1, 0);
 
-      // Double-check period doesn't exceed 120 months total
-      const monthsDiff = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
-        (endDate.getMonth() - startDate.getMonth() + 1);
-      if (monthsDiff > 120) {
-        console.warn('Período excede 10 anos, limitando a 10 anos');
-        const limitedEndDate = new Date(startDate);
-        limitedEndDate.setMonth(limitedEndDate.getMonth() + 120);
-        endDate.setTime(limitedEndDate.getTime());
-      }
-
-      // Ensure end date is not before start date
-      if (endDate < startDate) {
-        console.error('Data final anterior à data inicial');
-        setCashFlowLoading(false);
-        return;
+      // Limit check (max 10 years total)
+      if (selectedPeriod > 120) {
+        console.warn('Período excede 10 anos');
       }
 
       const startMonth = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`;
@@ -240,9 +254,19 @@ export default function DashboardPage() {
     const today = new Date();
     const brazilDate = new Date(today.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
     const currentYear = brazilDate.getFullYear();
-    const currentMonth = brazilDate.getMonth() + 1;
-    const startDate = new Date(currentYear, currentMonth - 6, 1); // 5 months back
-    const endDate = new Date(currentYear, currentMonth + selectedPeriod, 0); // selectedPeriod months forward
+    const currentMonth = brazilDate.getMonth() + 1; // 1-12
+
+    // Logic matching fetchCashFlowData
+    const monthsBack = Math.floor((selectedPeriod - 1) / 2);
+    const monthsForward = selectedPeriod - 1 - monthsBack;
+
+    // currentMonth in calculation is 1-based (from brazildate.getMonth() + 1)
+    // Date constructor expects 0-based month.
+    // So currentMonth - 1 is the 0-based index of current month.
+    const startDate = new Date(currentYear, currentMonth - 1 - monthsBack, 1);
+
+    const endDate = new Date(currentYear, currentMonth - 1 + monthsForward, 1);
+    endDate.setMonth(endDate.getMonth() + 1, 0);
 
     const months: Array<{
       month: string;
@@ -259,7 +283,11 @@ export default function DashboardPage() {
     }> = [];
 
     let current = new Date(startDate);
-    while (current <= endDate) {
+    // Safety break to prevent infinite loops if dates are messed up
+    let safetyCounter = 0;
+
+    while (current <= endDate && safetyCounter < 150) {
+      safetyCounter++;
       const year = current.getFullYear();
       const month = current.getMonth() + 1;
       const monthKey = `${year}-${String(month).padStart(2, '0')}`;
@@ -523,8 +551,8 @@ export default function DashboardPage() {
         <PlanGuard minPlan="pro" showFallback={false}>
           <BudgetsByCategory />
         </PlanGuard>
-        <div className="glass-card p-4 md:p-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="glass-card p-4 md:p-6 h-full flex flex-col">
+          <div className="flex items-center justify-between mb-4 flex-shrink-0">
             <div className="flex items-center gap-2">
               <h2 className="font-display font-semibold text-sm md:text-base">Transações Recentes</h2>
               <InfoIcon
@@ -553,10 +581,10 @@ export default function DashboardPage() {
               </Link>
             </div>
           ) : (
-            <>
+            <div ref={containerRef} className="flex-1 min-h-0 overflow-hidden">
               {/* Mobile: Card view */}
               <div className="md:hidden space-y-2">
-                {recentTransactions.map((tx) => {
+                {recentTransactions.slice(0, 9).map((tx) => {
                   const amount = typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount;
                   const isIncome = amount > 0;
                   return (
@@ -585,7 +613,7 @@ export default function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {recentTransactions.map((tx) => (
+                    {recentTransactions.slice(0, 9).map((tx) => (
                       <tr key={tx.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
                         <td className="py-2 px-3 text-xs min-w-0">
                           <div className="truncate max-w-[200px]" title={tx.description}>{tx.description}</div>
@@ -598,9 +626,9 @@ export default function DashboardPage() {
                         </td>
                         <td
                           className={`py-2 px-3 text-xs text-right font-medium whitespace-nowrap ${(() => {
-                              const amount = typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount;
-                              return amount > 0 ? 'text-green-500' : 'text-red-500';
-                            })()
+                            const amount = typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount;
+                            return amount > 0 ? 'text-green-500' : 'text-red-500';
+                          })()
                             }`}
                         >
                           {(() => {
@@ -626,9 +654,9 @@ export default function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {recentTransactions.map((tx) => (
+                    {recentTransactions.slice(0, maxVisibleItems).map((tx) => (
                       <tr key={tx.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                        <td className="py-3 px-4 text-sm min-w-0 max-w-[300px]">
+                        <td className="py-3 px-4 text-sm min-w-0 max-w-[150px] xl:max-w-[300px]">
                           <div className="truncate" title={tx.description}>{tx.description}</div>
                         </td>
                         <td className="py-3 px-4">
@@ -641,9 +669,9 @@ export default function DashboardPage() {
                         </td>
                         <td
                           className={`py-3 px-4 text-sm text-right font-medium whitespace-nowrap ${(() => {
-                              const amount = typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount;
-                              return amount > 0 ? 'text-green-500' : 'text-red-500';
-                            })()
+                            const amount = typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount;
+                            return amount > 0 ? 'text-green-500' : 'text-red-500';
+                          })()
                             }`}
                         >
                           {(() => {
@@ -657,7 +685,7 @@ export default function DashboardPage() {
                   </tbody>
                 </table>
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>

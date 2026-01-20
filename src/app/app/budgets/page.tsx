@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PlanGuard } from '@/components/app/PlanGuard';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 
 interface Category {
   id: string;
@@ -79,6 +80,7 @@ export default function BudgetsPage() {
   const [showMissingBudgetAlert, setShowMissingBudgetAlert] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const { toast } = useToast();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const missingAlertSessionKey = 'budgets_missing_alert_shown_session';
 
   // Scroll to top immediately when component mounts
@@ -307,7 +309,15 @@ export default function BudgetsPage() {
   };
 
   const handleDeleteBudget = async (budgetId: string) => {
-    if (!confirm('Tem certeza que deseja excluir este orçamento?')) {
+    const confirmed = await confirm({
+      title: 'Excluir Orçamento',
+      description: 'Tem certeza que deseja excluir este orçamento?',
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -1111,6 +1121,9 @@ export default function BudgetsPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Delete Confirmation Dialog */}
+        {ConfirmDialog}
       </div>
     </PlanGuard>
   );

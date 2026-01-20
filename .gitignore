@@ -57,3 +57,7 @@ n8n/c2f-whatsapp-agent.json
 
 #desktop.ini
 desktop.ini
+
+.mcp.json
+.mcp.json.backup
+.mcp_original_cursor_gemini.json

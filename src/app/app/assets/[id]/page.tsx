@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 
 interface Asset {
   id: string;
@@ -56,6 +57,7 @@ export default function AssetDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { toast } = useToast();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const [asset, setAsset] = useState<Asset | null>(null);
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -188,7 +190,15 @@ export default function AssetDetailPage() {
       return;
     }
 
-    if (!confirm('Tem certeza que deseja excluir este bem?')) {
+    const confirmed = await confirm({
+      title: 'Excluir Bem',
+      description: 'Tem certeza que deseja excluir este bem?',
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -517,6 +527,9 @@ export default function AssetDetailPage() {
           />
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      {ConfirmDialog}
     </div>
   );
 }

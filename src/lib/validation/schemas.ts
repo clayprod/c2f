@@ -8,7 +8,10 @@ export const accountSchema = z.object({
   institution: z.string().optional(),
   overdraft_limit_cents: z.number().int().min(0).optional(),
   overdraft_interest_rate_monthly: z.number().min(0).max(100).optional(),
+  // Yield configuration
+  yield_type: z.enum(['fixed', 'cdi_percentage']).default('fixed'),
   yield_rate_monthly: z.number().min(0).max(100).optional(),
+  cdi_percentage: z.number().min(0).max(500).optional(),
 }).refine(
   (data) => {
     // If overdraft_limit_cents > 0, overdraft_interest_rate_monthly must be > 0
@@ -20,6 +23,22 @@ export const accountSchema = z.object({
   {
     message: 'Se o limite de cheque especial for maior que zero, a taxa de juros mensal deve ser informada e maior que zero',
     path: ['overdraft_interest_rate_monthly'],
+  }
+).refine(
+  (data) => {
+    // If yield_type is 'fixed' and has yield, yield_rate_monthly must be provided
+    if (data.yield_type === 'fixed' && data.yield_rate_monthly !== undefined && data.yield_rate_monthly > 0) {
+      return true;
+    }
+    // If yield_type is 'cdi_percentage', cdi_percentage must be provided
+    if (data.yield_type === 'cdi_percentage') {
+      return data.cdi_percentage !== undefined && data.cdi_percentage > 0;
+    }
+    return true;
+  },
+  {
+    message: 'Para rendimento baseado no CDI, informe o percentual do CDI (ex: 100 para 100% do CDI)',
+    path: ['cdi_percentage'],
   }
 );
 

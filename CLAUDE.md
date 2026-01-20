@@ -24,6 +24,7 @@ Este projeto possui servidores MCP configurados que devem ser utilizados para ob
 | **Supabase** | Operações de banco, debugging, schema, functions e storage |
 | **Stripe** | Documentação e operações de billing/pagamentos |
 | **Chrome DevTools** | Debugging, automação e inspeção do navegador |
+| **N8N** | Gerenciar workflows e automações |
 
 ### Context7 - Documentação de APIs
 
@@ -63,6 +64,47 @@ Usar para:
 - Automação de testes e verificação de UI
 
 **Exemplo de uso**: Ao debugar problemas de layout ou erros de JavaScript no frontend, usar o Chrome DevTools MCP para inspecionar o estado da aplicação diretamente no navegador.
+
+### N8N MCP
+
+Usar para:
+
+- Gerenciar workflows do n8n
+- Executar e monitorar automações
+- Consultar status de execuções
+
+### Configuracao do .mcp.json
+
+O arquivo `.mcp.json` na raiz do projeto configura os servidores MCP. O formato correto para Claude Code:
+
+**Servidores HTTP (Streamable HTTP):**
+```json
+{
+  "mcpServers": {
+    "nome-servidor": {
+      "url": "https://...",
+      "headers": { "Authorization": "token" }
+    }
+  }
+}
+```
+
+**Servidores Locais (stdio):**
+```json
+{
+  "mcpServers": {
+    "nome-servidor": {
+      "command": "npx",
+      "args": ["-y", "pacote-mcp"],
+      "env": { "VAR": "valor" }
+    }
+  }
+}
+```
+
+**IMPORTANTE:** Nao usar o campo `"type"`. O Claude Code detecta automaticamente:
+- Se tem `url` -> servidor HTTP
+- Se tem `command` -> servidor local (stdio)
 
 ---
 
