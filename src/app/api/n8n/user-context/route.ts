@@ -71,12 +71,26 @@ export async function GET(request: NextRequest) {
         name: user.fullName || user.email,
         email: user.email,
       },
-      accounts: context.accounts.map((a) => ({
-        id: a.id,
-        name: a.name,
-        type: a.type,
-        balance: (a.currentBalance / 100).toFixed(2),
-        balance_formatted: `R$ ${(a.currentBalance / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+      accounts: context.accounts
+        .filter((a) => a.type !== 'credit_card')
+        .map((a) => ({
+          id: a.id,
+          name: a.name,
+          type: a.type,
+          balance: (a.currentBalance / 100).toFixed(2),
+          balance_formatted: `R$ ${(a.currentBalance / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        })),
+      credit_cards: context.creditCards.map((cc) => ({
+        id: cc.id,
+        name: cc.name,
+        closing_day: cc.closingDay,
+        due_day: cc.dueDay,
+        credit_limit: (cc.creditLimitCents / 100).toFixed(2),
+        credit_limit_formatted: `R$ ${(cc.creditLimitCents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        available_limit: (cc.availableLimitCents / 100).toFixed(2),
+        available_limit_formatted: `R$ ${(cc.availableLimitCents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        current_bill: (cc.currentBillCents / 100).toFixed(2),
+        current_bill_formatted: `R$ ${(cc.currentBillCents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
       })),
       categories: {
         income: context.categories
@@ -111,7 +125,8 @@ export async function GET(request: NextRequest) {
         currency: 'BRL (Real Brasileiro)',
         date_format: 'YYYY-MM-DD',
         amount_unit: 'centavos (dividir por 100 para reais)',
-        default_account: context.accounts[0]?.name || null,
+        default_account: context.accounts.find((a) => a.type !== 'credit_card')?.name || null,
+        credit_cards_available: context.creditCards.map((cc) => cc.name),
       },
     };
 
