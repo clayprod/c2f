@@ -5,6 +5,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { sendWhatsAppMessage } from '@/services/evolution/client';
 
 export interface VerificationStatus {
@@ -213,7 +214,8 @@ export async function validateVerificationCode(
  * Get user by phone number
  */
 export async function getUserByPhoneNumber(phone: string): Promise<UserByPhone | null> {
-  const supabase = await createClient();
+  // Use admin client to bypass RLS (this is called from n8n API routes)
+  const supabase = createAdminClient();
   const normalizedPhone = normalizePhoneNumber(phone);
 
   const { data, error } = await supabase
