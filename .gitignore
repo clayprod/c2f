@@ -54,3 +54,6 @@ nul
 
 # n8n workflows with API keys
 n8n/c2f-whatsapp-agent.json
+
+#desktop.ini
+desktop.ini
