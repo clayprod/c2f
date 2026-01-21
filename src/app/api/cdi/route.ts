@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getLatestCdiRate, dailyToMonthlyRate, dailyToAnnualRate } from '@/services/bacen/cdi';
 
+// Force dynamic rendering since this route may use cookies indirectly
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/cdi
  * Returns the latest CDI rate from BACEN

@@ -3,6 +3,9 @@ import { requireAdmin } from '@/lib/auth';
 import { createErrorResponse } from '@/lib/errors';
 import { getAggregatedTransactions, type AggregationFilters } from '@/services/admin/aggregations';
 
+// Force dynamic rendering since this route uses authentication and may call other dynamic routes
+export const dynamic = 'force-dynamic';
+
 function arrayToCSV(headers: string[], rows: (string | number | null)[][]): string {
   const escape = (value: string | number | null): string => {
     if (value === null || value === undefined) return '';

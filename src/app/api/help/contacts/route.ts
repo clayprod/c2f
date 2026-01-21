@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getGlobalSettings, clearSettingsCache } from '@/services/admin/globalSettings';
 
+// Force dynamic rendering since this route uses admin client that requires SUPABASE_SERVICE_ROLE_KEY
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     // Clear cache and force refresh to ensure fresh data
