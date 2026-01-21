@@ -19,6 +19,12 @@ interface Goal {
   color: string;
   image_url?: string;
   image_position?: string;
+  assigned_to_profile?: {
+    id: string;
+    full_name: string | null;
+    email: string;
+    avatar_url: string | null;
+  } | null;
 }
 
 export default function GoalsPage() {
@@ -197,6 +203,24 @@ export default function GoalsPage() {
                                 </div>
                                 <div className="bg-black/50 px-3 py-2 rounded backdrop-blur-sm inline-block">
                                   <h3 className="font-display font-semibold text-lg mb-1 text-white">{goal.name}</h3>
+                                  {goal.assigned_to_profile && (
+                                    <div className="flex items-center gap-2 mb-1">
+                                      {goal.assigned_to_profile.avatar_url ? (
+                                        <img
+                                          src={goal.assigned_to_profile.avatar_url}
+                                          alt={goal.assigned_to_profile.full_name || 'Avatar'}
+                                          className="w-4 h-4 rounded-full object-cover"
+                                        />
+                                      ) : (
+                                        <div className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center text-white text-xs">
+                                          {(goal.assigned_to_profile.full_name || goal.assigned_to_profile.email)[0].toUpperCase()}
+                                        </div>
+                                      )}
+                                      <span className="text-xs text-gray-200">
+                                        {goal.assigned_to_profile.full_name || goal.assigned_to_profile.email}
+                                      </span>
+                                    </div>
+                                  )}
                                   {goal.target_date && (
                                     <p className="text-sm text-gray-200">
                                       Meta: {new Date(goal.target_date).toLocaleDateString('pt-BR')}
@@ -245,6 +269,24 @@ export default function GoalsPage() {
                                 <h3 className="font-display font-semibold text-lg mb-1">{goal.name}</h3>
                                 {goal.description && (
                                   <p className="text-sm text-muted-foreground mb-2">{goal.description}</p>
+                                )}
+                                {goal.assigned_to_profile && (
+                                  <div className="flex items-center gap-2 mb-2">
+                                    {goal.assigned_to_profile.avatar_url ? (
+                                      <img
+                                        src={goal.assigned_to_profile.avatar_url}
+                                        alt={goal.assigned_to_profile.full_name || 'Avatar'}
+                                        className="w-5 h-5 rounded-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">
+                                        {(goal.assigned_to_profile.full_name || goal.assigned_to_profile.email)[0].toUpperCase()}
+                                      </div>
+                                    )}
+                                    <span className="text-sm text-muted-foreground">
+                                      Responsável: {goal.assigned_to_profile.full_name || goal.assigned_to_profile.email}
+                                    </span>
+                                  </div>
                                 )}
                                 {goal.target_date && (
                                   <p className="text-sm text-muted-foreground">

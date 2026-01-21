@@ -95,6 +95,11 @@ export function BudgetsByCategory() {
 
   const filteredBudgets = useMemo(() => {
     return budgets.filter(budget => {
+      // Filter out income categories - only show expense budgets
+      // Income categories (like "Rendimento - Conta") don't make sense in this expense tracking view
+      const categoryType = budget.categories?.type;
+      if (categoryType === 'income') return false;
+
       const spent = Math.abs(budget.amount_actual || 0);
       const limit = Math.abs((budget.limit_cents || budget.amount_planned_cents || 0) / 100);
       const percentage = limit > 0 ? (spent / limit) * 100 : 0;

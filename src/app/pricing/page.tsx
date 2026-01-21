@@ -4,58 +4,95 @@ import Link from 'next/link';
 import Navbar from '@/components/landing/Navbar';
 import Footer from '@/components/landing/Footer';
 
-const plans = [
-  {
-    name: 'Free',
-    price: 'Grátis',
-    period: 'para sempre',
-    description: 'Comece a organizar suas finanças',
-    features: [
-      { text: 'Até 100 transações/mês', included: true },
-      { text: 'Dashboard básico', included: true },
-      { text: 'Importação CSV', included: true },
-      { text: 'Controle de contas e cartões', included: true },
-      { text: 'AI Advisor', included: false },
-    ],
-    cta: 'Começar agora',
-    popular: false,
-  },
-  {
-    name: 'Pro',
-    price: 'R$29',
-    period: '/mês',
-    description: 'O poder da IA para suas finanças',
-    features: [
-      { text: 'Transações ilimitadas', included: true },
-      { text: 'AI Advisor (10 consultas/mês)', included: true },
-      { text: 'Importação OFX', included: true },
-      { text: 'Orçamentos e Projeções', included: true },
-      { text: 'Investimentos e Dívidas', included: true },
-      { text: 'Patrimônio e Objetivos', included: true },
-      { text: 'Suporte por email', included: true },
-    ],
-    cta: 'Assinar Pro',
-    popular: true,
-  },
-  {
-    name: 'Premium',
-    price: 'R$79',
-    period: '/mês',
-    description: 'Análise avançada e IA ilimitada',
-    features: [
-      { text: 'Tudo do Pro', included: true },
-      { text: 'AI Advisor (100 consultas/mês)', included: true },
-      { text: 'Relatórios Executivos', included: true },
-      { text: 'Categorização inteligente via IA', included: true },
-      { text: 'Análise preditiva de gastos', included: true },
-      { text: 'Suporte prioritário via WhatsApp', included: true },
-    ],
-    cta: 'Assinar Premium',
-    popular: false,
-  },
-];
+interface PlanFeature {
+  id: string;
+  text: string;
+  enabled: boolean;
+}
 
-export default function PricingPage() {
+interface Plan {
+  id: string;
+  name: string;
+  price: number | null;
+  priceFormatted: string;
+  period: string;
+  description: string;
+  cta: string;
+  popular: boolean;
+  features: PlanFeature[];
+}
+
+async function getPricingData(): Promise<Plan[]> {
+  try {
+    // For server components, we can import the service directly
+    // But to keep it simple and avoid circular dependencies, we'll use fetch
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL 
+      || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
+      || 'http://localhost:3000';
+    
+    const res = await fetch(`${baseUrl}/api/public/pricing`, {
+      next: { revalidate: 300 }, // Revalidate every 5 minutes
+    });
+    
+    if (!res.ok) {
+      throw new Error(`Failed to fetch pricing: ${res.status}`);
+    }
+    
+    const data = await res.json();
+    return data.plans || [];
+  } catch (error) {
+    console.error('[Pricing Page] Error fetching pricing data:', error);
+    // Return fallback data
+    return [
+      {
+        id: 'free',
+        name: 'Free',
+        price: null,
+        priceFormatted: 'Grátis',
+        period: 'para sempre',
+        description: 'Comece a organizar suas finanças',
+        cta: 'Começar agora',
+        popular: false,
+        features: [
+          { id: 'transactions_limit', text: 'Até 100 transações/mês', enabled: true },
+          { id: 'csv_import', text: 'Importação CSV', enabled: true },
+        ],
+      },
+      {
+        id: 'pro',
+        name: 'Pro',
+        price: 2900,
+        priceFormatted: 'R$29',
+        period: '/mês',
+        description: 'O poder da IA para suas finanças',
+        cta: 'Assinar Pro',
+        popular: true,
+        features: [
+          { id: 'transactions_unlimited', text: 'Transações ilimitadas', enabled: true },
+          { id: 'ai_advisor', text: 'AI Advisor (10 consultas/mês)', enabled: true },
+          { id: 'ofx_import', text: 'Importação OFX', enabled: true },
+        ],
+      },
+      {
+        id: 'premium',
+        name: 'Premium',
+        price: 7900,
+        priceFormatted: 'R$79',
+        period: '/mês',
+        description: 'Análise avançada e IA ilimitada',
+        cta: 'Assinar Premium',
+        popular: false,
+        features: [
+          { id: 'transactions_unlimited', text: 'Transações ilimitadas', enabled: true },
+          { id: 'ai_advisor', text: 'AI Advisor (100 consultas/mês)', enabled: true },
+        ],
+      },
+    ];
+  }
+}
+
+export default async function PricingPage() {
+  const plans = await getPricingData();
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -93,7 +130,7 @@ export default function PricingPage() {
                 <div className="mb-6">
                   <h3 className="font-display font-semibold text-xl mb-2">{plan.name}</h3>
                   <div className="flex items-baseline gap-1 mb-2">
-                    <span className="font-display text-4xl font-bold">{plan.price}</span>
+                    <span className="font-display text-4xl font-bold">{plan.priceFormatted}</span>
                     <span className="text-muted-foreground text-sm">{plan.period}</span>
                   </div>
                   <p className="text-muted-foreground text-sm">{plan.description}</p>
@@ -101,11 +138,11 @@ export default function PricingPage() {
 
                 <ul className="space-y-3 mb-8">
                   {plan.features.map((feature) => (
-                    <li key={feature.text} className="flex items-start gap-2 text-sm">
+                    <li key={feature.id} className="flex items-start gap-2 text-sm">
                       <i
-                        className={`bx ${feature.included ? 'bx-check text-primary' : 'bx-x text-muted-foreground/50'} text-lg flex-shrink-0`}
+                        className={`bx ${feature.enabled ? 'bx-check text-primary' : 'bx-x text-muted-foreground/50'} text-lg flex-shrink-0`}
                       ></i>
-                      <span className={feature.included ? 'text-foreground/80' : 'text-muted-foreground/50'}>
+                      <span className={feature.enabled ? 'text-foreground/80' : 'text-muted-foreground/50'}>
                         {feature.text}
                       </span>
                     </li>

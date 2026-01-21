@@ -283,26 +283,37 @@ async function ensureYieldCategory(
     return existing.id;
   }
 
-  // Create category
-  const { data: newCategory, error } = await supabase
+  // Create category - try with is_active first, fallback if column doesn't exist
+  const categoryData: any = {
+    user_id: userId,
+    name: 'Rendimento - Conta',
+    type: 'income',
+    icon: '💰',
+    color: '#32CD32',
+    source_type: 'general',
+  };
+
+  // Try with is_active first
+  let result = await supabase
     .from('categories')
-    .insert({
-      user_id: userId,
-      name: 'Rendimento - Conta',
-      type: 'income',
-      icon: '💰',
-      color: '#32CD32',
-      source_type: 'general',
-      is_active: true,
-    })
+    .insert({ ...categoryData, is_active: true })
     .select('id')
     .single();
 
-  if (error) {
-    throw new Error(`Failed to create yield category: ${error.message}`);
+  // If is_active column doesn't exist, retry without it
+  if (result.error?.code === '42703' && result.error?.message?.includes('is_active')) {
+    result = await supabase
+      .from('categories')
+      .insert(categoryData)
+      .select('id')
+      .single();
   }
 
-  return newCategory.id;
+  if (result.error) {
+    throw new Error(`Failed to create yield category: ${result.error.message}`);
+  }
+
+  return result.data.id;
 }
 
 /**

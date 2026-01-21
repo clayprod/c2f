@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientFromRequest } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getUserId } from '@/lib/auth';
 import { debtSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
@@ -49,6 +50,29 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
+    // Fetch assigned_to profiles separately using admin client (bypasses RLS)
+    const assignedToIds = [...new Set((data || [])
+      .map((debt: any) => debt.assigned_to)
+      .filter((id: string | null) => id !== null))] as string[];
+
+    let profilesMap: Record<string, any> = {};
+    if (assignedToIds.length > 0) {
+      const admin = createAdminClient();
+      const { data: profiles, error: profilesError } = await admin
+        .from('profiles')
+        .select('id, full_name, email, avatar_url')
+        .in('id', assignedToIds);
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+      } else if (profiles) {
+        profilesMap = profiles.reduce((acc: Record<string, any>, profile: any) => {
+          acc[profile.id] = profile;
+          return acc;
+        }, {});
+      }
+    }
+
     // Recalculate paid amounts from transactions for each debt
     if (data && data.length > 0) {
       for (const debt of data) {
@@ -83,8 +107,20 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Merge assigned_to_profile data
+    const transformedData = (data || []).map((debt: any) => {
+      const assignedProfile = debt.assigned_to 
+        ? (profilesMap[debt.assigned_to] || null)
+        : null;
+
+      return {
+        ...debt,
+        assigned_to_profile: assignedProfile,
+      };
+    });
+
     // Amounts are already in cents (BIGINT)
-    return NextResponse.json({ data });
+    return NextResponse.json({ data: transformedData });
   } catch (error) {
     const errorResponse = createErrorResponse(error);
     return NextResponse.json(
@@ -163,6 +199,7 @@ export async function POST(request: NextRequest) {
       payment_amount_cents: validated.payment_amount_cents || null,
       installment_count: validated.installment_count || null,
       include_in_plan: includeInPlan ?? true,
+      assigned_to: validated.assigned_to || null,
     };
 
     // Add fields for plan inclusion
@@ -172,6 +209,7 @@ export async function POST(request: NextRequest) {
       debtData.contribution_frequency = hasCustomPlan
         ? null
         : (validated.contribution_frequency || validated.payment_frequency || null);
+      debtData.contribution_count = hasCustomPlan ? null : (validated.contribution_count || null);
       debtData.monthly_payment_cents = validated.monthly_payment_cents || validated.payment_amount_cents || null;
       debtData.installment_amount_cents = validated.installment_amount_cents || validated.payment_amount_cents || null;
       debtData.installment_day = validated.installment_day || null;
@@ -181,6 +219,7 @@ export async function POST(request: NextRequest) {
       // Allow contribution_frequency and monthly_payment_cents even if not negotiated
       if (includeInPlan && !hasCustomPlan) {
         debtData.contribution_frequency = validated.contribution_frequency || null;
+        debtData.contribution_count = validated.contribution_count || null;
         debtData.monthly_payment_cents = validated.monthly_payment_cents || null;
       }
     }
@@ -239,6 +278,7 @@ export async function POST(request: NextRequest) {
             is_negotiated: data.is_negotiated,
             status: data.status,
             contribution_frequency: data.contribution_frequency,
+            contribution_count: data.contribution_count,
             monthly_payment_cents: data.monthly_payment_cents,
             installment_count: data.installment_count,
             installment_amount_cents: data.installment_amount_cents,

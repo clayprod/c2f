@@ -175,7 +175,25 @@ export default function TransactionsPage() {
         description: 'Transação criada com sucesso',
       });
 
-      fetchTransactions();
+      // Reset pagination to first page to show the new transaction
+      setPagination(prev => ({ ...prev, offset: 0 }));
+      
+      // Adjust date filters if the new transaction date is outside the current range
+      const transactionDate = formData.posted_at || new Date().toISOString().split('T')[0];
+      const needsFilterAdjustment = 
+        (filters.fromDate && transactionDate < filters.fromDate) ||
+        (filters.toDate && transactionDate > filters.toDate);
+      
+      if (needsFilterAdjustment) {
+        // Update filters - useEffect will trigger fetchTransactions automatically
+        setFilters(prev => ({
+          ...prev,
+          fromDate: filters.fromDate && transactionDate < filters.fromDate ? transactionDate : prev.fromDate,
+          toDate: filters.toDate && transactionDate > filters.toDate ? transactionDate : prev.toDate,
+        }));
+      }
+      // If date is within range, useEffect will automatically refetch due to offset change
+      
       setFormOpen(false);
     } catch (error: any) {
       toast({

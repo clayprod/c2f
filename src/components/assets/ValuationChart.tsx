@@ -1,6 +1,5 @@
 'use client';
 
-import { formatMonthYear } from '@/lib/utils';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 
@@ -12,16 +11,15 @@ interface Valuation {
   notes?: string;
 }
 
-type DataPointType = 'purchase' | 'current' | 'manual' | 'depreciation' | 'market';
+type DataPointType = 'purchase' | 'manual' | 'depreciation' | 'market';
 
 interface ValuationChartProps {
   valuations: Valuation[];
   purchaseDate: string;
   purchasePriceCents: number;
-  currentValueCents?: number;
 }
 
-export default function ValuationChart({ valuations, purchaseDate, purchasePriceCents, currentValueCents }: ValuationChartProps) {
+export default function ValuationChart({ valuations, purchaseDate, purchasePriceCents }: ValuationChartProps) {
 
   const formatCurrency = (cents: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -32,30 +30,13 @@ export default function ValuationChart({ valuations, purchaseDate, purchasePrice
     }).format(cents / 100);
   };
 
-  const formatDate = (dateString: string, index: number, allDates: string[]) => {
-    const dateObj = new Date(dateString);
-    
-    // Check if there are multiple dates in the same month/year
-    const monthYear = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
-    const sameMonthDates = allDates.filter(d => {
-      const dObj = new Date(d);
-      const dMonthYear = `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, '0')}`;
-      return dMonthYear === monthYear;
-    });
-    
-    // If multiple dates in same month, show day as well to differentiate
-    if (sameMonthDates.length > 1) {
-      return format(dateObj, 'dd/MM/yy', { locale: pt });
-    }
-    
-    // Otherwise, show month/year format
-    const result = formatMonthYear(dateString);
-    return typeof result === 'string' ? result : result.formatted;
+  const formatDateLabel = (dateString: string) => {
+    const dateObj = new Date(dateString + 'T00:00:00');
+    return format(dateObj, 'dd/MM/yy', { locale: pt });
   };
 
   // Combine purchase date with valuations
-  // Remove duplicates by date to avoid showing same date twice
-  const today = new Date().toISOString().split('T')[0];
+  // The last valuation represents the current value of the asset
   const dataPoints: Array<{ date: string; value: number; type: DataPointType; label: string }> = [
     {
       date: purchaseDate,
@@ -70,24 +51,6 @@ export default function ValuationChart({ valuations, purchaseDate, purchasePrice
       label: v.valuation_type === 'manual' ? 'Manual' : v.valuation_type === 'depreciation' ? 'Depreciação' : 'Mercado',
     })),
   ];
-
-  // Add current value point if it's different from purchase and not already in valuations
-  const latestValuationDate = valuations.length > 0 
-    ? valuations[valuations.length - 1].valuation_date 
-    : null;
-  const hasCurrentValueChanged = currentValueCents !== undefined && 
-    currentValueCents !== null && 
-    currentValueCents !== purchasePriceCents;
-  const latestIsNotToday = !latestValuationDate || latestValuationDate !== today;
-  
-  if (hasCurrentValueChanged && latestIsNotToday) {
-    dataPoints.push({
-      date: today,
-      value: currentValueCents,
-      type: 'current',
-      label: 'Atual',
-    });
-  }
 
   const allData = dataPoints
     // Remove duplicates: if purchase date matches a valuation date, keep only the valuation
@@ -108,21 +71,76 @@ export default function ValuationChart({ valuations, purchaseDate, purchasePrice
     );
   }
 
+  // If only one data point, show a simple display instead of a chart
+  if (allData.length === 1) {
+    const point = allData[0];
+    return (
+      <div className="glass-card p-6">
+        <h3 className="font-semibold mb-4">Histórico de Valorização</h3>
+        <div className="text-center py-8">
+          <div className="text-2xl font-bold mb-2">{formatCurrency(point.value)}</div>
+          <div className="text-sm text-muted-foreground">
+            {formatDateLabel(point.date)} - {point.label}
+          </div>
+          <p className="text-sm text-muted-foreground mt-4">
+            Adicione mais avaliações para visualizar o histórico de valorização
+          </p>
+        </div>
+        {/* Legend */}
+        <div className="mt-6 flex flex-wrap gap-4 text-sm justify-center">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+            <span>Compra</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-green-500"></div>
+            <span>Manual</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+            <span>Depreciação</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+            <span>Mercado</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Calculate time-based X positions
+  const dates = allData.map(d => new Date(d.date + 'T00:00:00').getTime());
+  const minDate = Math.min(...dates);
+  const maxDate = Math.max(...dates);
+  const dateRange = maxDate - minDate || 1;
+
   const minValue = Math.min(...allData.map(d => d.value));
   const maxValue = Math.max(...allData.map(d => d.value));
-  const range = maxValue - minValue || 1;
-  const chartHeight = 200;
+  const valueRange = maxValue - minValue;
   
-  // Helper function to calculate safe coordinates
-  const getPointCoordinates = (index: number, value: number) => {
-    const totalPoints = allData.length;
-    if (totalPoints <= 1) {
-      return { x: 50, y: 50 };
-    }
-    const x = Number(((index / (totalPoints - 1)) * 100).toFixed(2));
-    const yPercent = ((maxValue - value) / range) * 100;
+  // Add padding to Y-axis if all values are the same
+  const yPadding = valueRange === 0 ? maxValue * 0.1 || 1000 : 0;
+  const adjustedMinValue = minValue - yPadding;
+  const adjustedMaxValue = maxValue + yPadding;
+  const adjustedRange = adjustedMaxValue - adjustedMinValue;
+  
+  const chartHeight = 200;
+  const chartPadding = 5; // Padding from edges in percentage
+  
+  // Helper function to calculate coordinates based on actual time
+  const getPointCoordinates = (index: number) => {
+    const point = allData[index];
+    const dateTime = new Date(point.date + 'T00:00:00').getTime();
+    
+    // X position based on time (with padding)
+    const xPercent = ((dateTime - minDate) / dateRange) * (100 - 2 * chartPadding) + chartPadding;
+    const x = Number(xPercent.toFixed(2));
+    
+    // Y position based on value
+    const yPercent = ((adjustedMaxValue - point.value) / adjustedRange) * 100;
     const y = Number(Math.max(0, Math.min(100, yPercent)).toFixed(2));
-    // Ensure we return valid numbers, not NaN or Infinity
+    
     if (!isFinite(x) || !isFinite(y)) {
       return { x: 50, y: 50 };
     }
@@ -139,10 +157,23 @@ export default function ValuationChart({ valuations, purchaseDate, purchasePrice
         return 'bg-yellow-500';
       case 'market':
         return 'bg-purple-500';
-      case 'current':
-        return 'bg-cyan-500';
       default:
         return 'bg-gray-500';
+    }
+  };
+
+  const getStrokeColor = (type: string) => {
+    switch (type) {
+      case 'purchase':
+        return '#3b82f6';
+      case 'manual':
+        return '#22c55e';
+      case 'depreciation':
+        return '#eab308';
+      case 'market':
+        return '#a855f7';
+      default:
+        return '#6b7280';
     }
   };
 
@@ -153,110 +184,96 @@ export default function ValuationChart({ valuations, purchaseDate, purchasePrice
       <div className="w-full overflow-x-auto">
         <div className="relative min-w-[400px]" style={{ height: `${chartHeight + 80}px` }}>
           {/* Y-axis labels */}
-          <div className="absolute left-0 top-0 bottom-20 w-14 flex flex-col justify-between text-xs text-muted-foreground pr-2">
-            <span className="text-right">{formatCurrency(maxValue)}</span>
-            <span className="text-right">{formatCurrency((minValue + maxValue) / 2)}</span>
-            <span className="text-right">{formatCurrency(minValue)}</span>
+          <div className="absolute left-0 top-0 bottom-20 w-16 flex flex-col justify-between text-xs text-muted-foreground pr-2">
+            <span className="text-right">{formatCurrency(adjustedMaxValue)}</span>
+            <span className="text-right">{formatCurrency((adjustedMinValue + adjustedMaxValue) / 2)}</span>
+            <span className="text-right">{formatCurrency(adjustedMinValue)}</span>
           </div>
 
           {/* Chart area */}
-          <div className="ml-14 mr-2 relative" style={{ height: `${chartHeight}px` }}>
+          <div className="ml-16 mr-2 relative" style={{ height: `${chartHeight}px` }}>
             {/* Grid lines */}
-            <div className="absolute inset-0 flex flex-col justify-between">
+            <div className="absolute inset-0">
               {[0, 0.5, 1].map((pos) => (
                 <div
                   key={pos}
-                  className="border-t border-border/20 w-full"
-                  style={{ 
-                    position: 'absolute',
-                    top: pos === 0 ? '0' : pos === 0.5 ? '50%' : '100%',
-                    left: 0,
-                    right: 0
-                  }}
+                  className="border-t border-border/20 w-full absolute left-0 right-0"
+                  style={{ top: `${pos * 100}%` }}
                 />
               ))}
             </div>
 
             {/* Data points and line */}
             <svg 
-              className="absolute inset-0 w-full h-full pointer-events-none" 
+              className="absolute inset-0 w-full h-full" 
               viewBox="0 0 100 100"
-              preserveAspectRatio="xMidYMid meet"
+              preserveAspectRatio="none"
             >
               {/* Line connecting points */}
               {allData.length > 1 && (() => {
-                try {
-                  const points = allData.map((d, i) => {
-                    const coords = getPointCoordinates(i, d.value);
-                    return `${coords.x},${coords.y}`;
-                  }).join(' ');
-                  return (
-                    <polyline
-                      points={points}
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1"
-                      className="text-primary opacity-60"
-                    />
-                  );
-                } catch (error) {
-                  console.error('Error rendering polyline:', error);
-                  return null;
-                }
+                const points = allData.map((_, i) => {
+                  const coords = getPointCoordinates(i);
+                  return `${coords.x},${coords.y}`;
+                }).join(' ');
+                return (
+                  <polyline
+                    points={points}
+                    fill="none"
+                    stroke="#14b8a6"
+                    strokeWidth="0.5"
+                    vectorEffect="non-scaling-stroke"
+                    style={{ strokeWidth: '2px' }}
+                  />
+                );
               })()}
 
               {/* Data points */}
               {allData.map((d, i) => {
-                try {
-                  const coords = getPointCoordinates(i, d.value);
-                  return (
-                    <g key={i}>
-                      <circle
-                        cx={coords.x}
-                        cy={coords.y}
-                        r="2"
-                        className={getColor(d.type)}
-                        fill="currentColor"
-                      />
-                      <circle
-                        cx={coords.x}
-                        cy={coords.y}
-                        r="4"
-                        className={getColor(d.type)}
-                        fill="currentColor"
-                        fillOpacity="0.15"
-                      />
-                    </g>
-                  );
-                } catch (error) {
-                  console.error('Error rendering data point:', error);
-                  return null;
-                }
+                const coords = getPointCoordinates(i);
+                const color = getStrokeColor(d.type);
+                return (
+                  <g key={i}>
+                    <circle
+                      cx={coords.x}
+                      cy={coords.y}
+                      r="1.5"
+                      fill={color}
+                      vectorEffect="non-scaling-stroke"
+                      style={{ r: '6px' }}
+                    />
+                    <circle
+                      cx={coords.x}
+                      cy={coords.y}
+                      r="2.5"
+                      fill={color}
+                      fillOpacity="0.2"
+                      vectorEffect="non-scaling-stroke"
+                      style={{ r: '10px' }}
+                    />
+                  </g>
+                );
               })}
             </svg>
-          </div>
 
-          {/* X-axis labels */}
-          <div className="ml-14 mr-2 mt-2 flex justify-between text-xs text-muted-foreground" style={{ height: '60px' }}>
-            {allData.map((d, i) => (
-              <div 
-                key={i} 
-                className="text-center flex-1 flex items-start justify-center px-1"
-                style={{ minWidth: '60px' }}
-              >
-                <span 
-                  className="block whitespace-nowrap"
-                  style={{ 
-                    transform: 'rotate(-45deg)',
-                    transformOrigin: 'top left',
-                    marginLeft: '50%',
-                    marginTop: '8px'
+            {/* X-axis labels - positioned absolutely based on data point positions */}
+            {allData.map((d, i) => {
+              const coords = getPointCoordinates(i);
+              return (
+                <div
+                  key={i}
+                  className="absolute text-xs text-muted-foreground whitespace-nowrap"
+                  style={{
+                    left: `${coords.x}%`,
+                    top: '100%',
+                    transform: 'translateX(-50%) rotate(-45deg)',
+                    transformOrigin: 'top center',
+                    marginTop: '8px',
                   }}
                 >
-                  {formatDate(d.date, i, allData.map(dd => dd.date))}
-                </span>
-              </div>
-            ))}
+                  {formatDateLabel(d.date)}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -266,10 +283,6 @@ export default function ValuationChart({ valuations, purchaseDate, purchasePrice
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-blue-500"></div>
           <span>Compra</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-cyan-500"></div>
-          <span>Atual</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-green-500"></div>

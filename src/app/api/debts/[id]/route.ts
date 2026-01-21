@@ -57,14 +57,27 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    console.log('PATCH /api/debts/[id] - Starting request');
+    
     const userId = await getUserId(request);
     if (!userId) {
+      console.log('PATCH /api/debts/[id] - Unauthorized');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const ownerId = await getEffectiveOwnerId(request, userId);
+    console.log('PATCH /api/debts/[id] - User:', userId, 'Owner:', ownerId);
 
     const { id } = await params;
-    const body = await request.json();
+    console.log('PATCH /api/debts/[id] - Debt ID:', id);
+    
+    let body;
+    try {
+      body = await request.json();
+      console.log('PATCH /api/debts/[id] - Request body:', JSON.stringify(body, null, 2));
+    } catch (parseError) {
+      console.error('PATCH /api/debts/[id] - Error parsing body:', parseError);
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
 
     // Create a partial debt schema for PATCH request
     const partialDebtSchema = z.object({
@@ -74,8 +87,7 @@ export async function PATCH(
       principal_amount_cents: z.number().int().positive('Valor principal deve ser positivo').optional(),
       total_amount_cents: z.number().int().positive('Valor total deve ser positivo').optional(),
       paid_amount_cents: z.number().int().min(0).default(0).optional(),
-      interest_rate_monthly: z.number().min(0).max(100).default(0).optional(),
-      interest_type: z.enum(['simple', 'compound']).default('simple').optional(),
+      interest_rate: z.number().min(0).max(100).default(0).optional(),
       due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (use YYYY-MM-DD)').optional(),
       start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (use YYYY-MM-DD)').optional(),
       status: z.enum(['pendente', 'negociada']).default('pendente').optional(),
@@ -93,15 +105,33 @@ export async function PATCH(
       payment_amount_cents: z.number().int().positive('Valor de pagamento deve ser positivo').optional(),
       include_in_plan: z.boolean().default(true).optional(),
       contribution_frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).optional(),
+      contribution_count: z.number().int().positive().optional(),
       monthly_payment_cents: z.number().int().positive().optional(),
       is_negotiated: z.boolean().optional(), // Added this field which might be needed for updates
+      assigned_to: z.union([
+        z.string().uuid('ID do responsável inválido'),
+        z.literal(''),
+        z.null()
+      ]).optional().transform(val => val === '' || val === null ? undefined : val),
       plan_entries: z.array(z.object({
         month: z.string().regex(/^\d{4}-\d{2}$/, 'Mês inválido (use YYYY-MM)'),
         amount_cents: z.number().int().positive('Valor deve ser positivo'),
       })).optional(),
     });
 
-    const validated = partialDebtSchema.parse(body);
+    console.log('PATCH /api/debts/[id] - About to validate body');
+    const parseResult = partialDebtSchema.safeParse(body);
+    
+    if (!parseResult.success) {
+      console.error('PATCH /api/debts/[id] - Zod validation error:', JSON.stringify(parseResult.error.format(), null, 2));
+      return NextResponse.json(
+        { error: 'Validation error', details: parseResult.error.format() },
+        { status: 400 }
+      );
+    }
+    
+    const validated = parseResult.data;
+    console.log('PATCH /api/debts/[id] - Validated data:', JSON.stringify(validated, null, 2));
 
     const { supabase } = createClientFromRequest(request);
     
@@ -135,29 +165,70 @@ export async function PATCH(
       }
     }
 
-    const { plan_entries, ...debtFields } = validated;
-    const updatePayload: any = {
-      ...debtFields,
-      include_in_plan: hasCustomPlan ? true : validated.include_in_plan,
-      contribution_frequency: hasCustomPlan
-        ? null
-        : (validated.contribution_frequency ?? validated.payment_frequency),
-      monthly_payment_cents: hasCustomPlan
-        ? null
-        : (validated.monthly_payment_cents ?? undefined),
-      ...(validated.status ? { is_negotiated: validated.status === 'negociada' } : {}),
-      updated_at: new Date().toISOString(),
-    };
+    // Only include fields that exist in the database
+    const validDbFields = [
+      'name', 'description', 'creditor_name', 'total_amount_cents', 'paid_amount_cents',
+      'interest_rate', 'due_date', 'start_date', 'status', 'priority', 
+      'account_id', 'category_id', 'notes', 'is_negotiated', 
+      'contribution_frequency', 'contribution_count', 'monthly_payment_cents', 'include_in_plan', 'assigned_to'
+    ];
+    
+    const { plan_entries, assigned_to, ...debtFields } = validated;
+    
+    // Build update payload with only valid DB fields
+    const updatePayload: any = {};
+    
+    for (const key of validDbFields) {
+      if (key === 'assigned_to') continue; // Handle separately
+      if (key in debtFields) {
+        updatePayload[key] = (debtFields as any)[key];
+      }
+    }
+    
+    // Handle special cases
+    updatePayload.include_in_plan = hasCustomPlan ? true : validated.include_in_plan;
+    updatePayload.contribution_frequency = hasCustomPlan
+      ? null
+      : (validated.contribution_frequency ?? undefined);
+    updatePayload.contribution_count = hasCustomPlan
+      ? null
+      : (validated.contribution_count ?? undefined);
+    updatePayload.monthly_payment_cents = hasCustomPlan
+      ? null
+      : (validated.monthly_payment_cents ?? undefined);
+    
+    if (validated.status) {
+      updatePayload.is_negotiated = validated.status === 'negociada';
+    }
+    
+    updatePayload.updated_at = new Date().toISOString();
+
+    // Only include assigned_to if it was provided in the request
+    if ('assigned_to' in validated) {
+      updatePayload.assigned_to = assigned_to || null;
+    }
+
+    // Remove undefined values from updatePayload to avoid issues
+    const cleanUpdatePayload = Object.fromEntries(
+      Object.entries(updatePayload).filter(([_, value]) => value !== undefined)
+    );
+
+    console.log('PATCH /api/debts/[id] - Update payload:', JSON.stringify(cleanUpdatePayload, null, 2));
+    console.log('PATCH /api/debts/[id] - assigned_to in validated:', 'assigned_to' in validated, 'value:', assigned_to);
 
     const { data, error } = await supabase
       .from('debts')
-      .update(updatePayload)
+      .update(cleanUpdatePayload)
       .eq('id', id)
       .eq('user_id', ownerId)
       .select('*, accounts(*), categories(*)')
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error updating debt:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      throw error;
+    }
 
     if (validated.plan_entries) {
       await supabase
@@ -227,6 +298,7 @@ export async function PATCH(
             is_negotiated: data.is_negotiated,
             status: data.status,
             contribution_frequency: data.contribution_frequency,
+            contribution_count: data.contribution_count,
             monthly_payment_cents: data.monthly_payment_cents,
             installment_count: data.installment_count,
             installment_amount_cents: data.installment_amount_cents,
@@ -266,17 +338,25 @@ export async function PATCH(
     }
 
     return NextResponse.json({ data });
-  } catch (error) {
-    if (error instanceof Error && error.name === 'ZodError') {
-      return NextResponse.json(
-        { error: 'Validation error', details: error },
-        { status: 400 }
-      );
-    }
-    const errorResponse = createErrorResponse(error);
+  } catch (error: any) {
+    console.error('PATCH /api/debts/[id] - Error caught:', error);
+    console.error('PATCH /api/debts/[id] - Error name:', error?.name);
+    console.error('PATCH /api/debts/[id] - Error message:', error?.message);
+    console.error('PATCH /api/debts/[id] - Error stack:', error?.stack);
+    
+    // Return detailed error for debugging
+    const errorMessage = error?.message || 'Unknown error';
+    const errorCode = error?.code || 'UNKNOWN';
+    const errorDetails = error?.details || error?.hint || null;
+    
     return NextResponse.json(
-      { error: errorResponse.error },
-      { status: errorResponse.statusCode }
+      { 
+        error: errorMessage,
+        code: errorCode,
+        details: errorDetails,
+        stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined
+      },
+      { status: 500 }
     );
   }
 }

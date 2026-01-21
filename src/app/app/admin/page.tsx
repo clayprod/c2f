@@ -9,6 +9,7 @@ import AdminDashboard from '@/components/admin/AdminDashboard';
 import AdminFiltersWrapper from '@/components/admin/AdminFiltersWrapper';
 import GlobalSettings from '@/components/admin/GlobalSettings';
 import PriceManagement from '@/components/admin/PriceManagement';
+import PlanFeaturesSettings from '@/components/admin/PlanFeaturesSettings';
 import UserManagement from '@/components/admin/UserManagement';
 import WhatsAppSettings from '@/components/admin/WhatsAppSettings';
 
@@ -82,7 +83,7 @@ export default function AdminPage() {
       </div>
 
       <Tabs defaultValue="dashboard" className="w-full">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="map">Mapa</TabsTrigger>
           <TabsTrigger value="reports">Relatorios</TabsTrigger>
@@ -90,6 +91,7 @@ export default function AdminPage() {
           <TabsTrigger value="settings">Config</TabsTrigger>
           <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
           <TabsTrigger value="prices">Precos</TabsTrigger>
+          <TabsTrigger value="plan-features">Planos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="mt-6">
@@ -120,6 +122,10 @@ export default function AdminPage() {
 
         <TabsContent value="prices" className="mt-6">
           <PriceManagement />
+        </TabsContent>
+
+        <TabsContent value="plan-features" className="mt-6">
+          <PlanFeaturesSettings />
         </TabsContent>
       </Tabs>
     </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { assetValuationSchema } from '@/lib/validation/schemas';
@@ -20,15 +20,25 @@ import { useToast } from '@/hooks/use-toast';
 
 type ValuationFormData = z.infer<typeof assetValuationSchema>;
 
+interface Valuation {
+  id: string;
+  valuation_date: string;
+  value_cents: number;
+  valuation_type: 'manual' | 'depreciation' | 'market';
+  notes?: string;
+}
+
 interface ValuationFormProps {
   assetId: string;
+  valuation?: Valuation;
   onSubmit: (data: ValuationFormData) => Promise<void>;
   onCancel?: () => void;
 }
 
-export default function ValuationForm({ assetId, onSubmit, onCancel }: ValuationFormProps) {
+export default function ValuationForm({ assetId, valuation, onSubmit, onCancel }: ValuationFormProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const isEditing = !!valuation;
 
   const {
     register,
@@ -41,24 +51,49 @@ export default function ValuationForm({ assetId, onSubmit, onCancel }: Valuation
     resolver: zodResolver(assetValuationSchema),
     defaultValues: {
       asset_id: assetId,
-      valuation_date: new Date().toISOString().split('T')[0],
-      valuation_type: 'manual',
+      valuation_date: valuation?.valuation_date || new Date().toISOString().split('T')[0],
+      valuation_type: valuation?.valuation_type || 'manual',
+      value_cents: valuation?.value_cents,
+      notes: valuation?.notes || '',
     },
   });
+
+  // Reset form when valuation changes (switching between edit targets)
+  useEffect(() => {
+    if (valuation) {
+      reset({
+        asset_id: assetId,
+        valuation_date: valuation.valuation_date,
+        valuation_type: valuation.valuation_type,
+        value_cents: valuation.value_cents,
+        notes: valuation.notes || '',
+      });
+    } else {
+      reset({
+        asset_id: assetId,
+        valuation_date: new Date().toISOString().split('T')[0],
+        valuation_type: 'manual',
+        value_cents: undefined,
+        notes: '',
+      });
+    }
+  }, [valuation, assetId, reset]);
 
   const onFormSubmit = async (data: ValuationFormData) => {
     try {
       setLoading(true);
       await onSubmit(data);
-      reset();
+      if (!isEditing) {
+        reset();
+      }
       toast({
         title: 'Sucesso',
-        description: 'Avaliação adicionada com sucesso!',
+        description: isEditing ? 'Avaliação atualizada com sucesso!' : 'Avaliação adicionada com sucesso!',
       });
     } catch (error: any) {
       toast({
         title: 'Erro',
-        description: error.message || 'Erro ao adicionar avaliação',
+        description: error.message || (isEditing ? 'Erro ao atualizar avaliação' : 'Erro ao adicionar avaliação'),
         variant: 'destructive',
       });
     } finally {
@@ -86,6 +121,7 @@ export default function ValuationForm({ assetId, onSubmit, onCancel }: Valuation
           id="value_cents"
           type="number"
           step="0.01"
+          defaultValue={valuation ? (valuation.value_cents / 100).toFixed(2) : undefined}
           {...register('value_cents', {
             valueAsNumber: true,
             setValueAs: (v) => Math.round((typeof v === 'string' ? parseFloat(v) : v) * 100),
@@ -131,7 +167,7 @@ export default function ValuationForm({ assetId, onSubmit, onCancel }: Valuation
           </Button>
         )}
         <Button type="submit" disabled={loading}>
-          {loading ? 'Salvando...' : 'Adicionar Avaliação'}
+          {loading ? 'Salvando...' : (isEditing ? 'Salvar Alterações' : 'Adicionar Avaliação')}
         </Button>
       </div>
     </form>

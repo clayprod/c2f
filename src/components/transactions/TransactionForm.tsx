@@ -105,7 +105,21 @@ export default function TransactionForm({
   });
 
   const selectedAccountId = watch('account_id');
+  const selectedCategoryId = watch('category_id');
   const filteredCategories = categories;
+  
+  // Verificar se a categoria selecionada é de cartão de crédito
+  const selectedCategory = selectedCategoryId 
+    ? categories.find(c => c.id === selectedCategoryId)
+    : null;
+  const isCreditCardCategory = selectedCategory?.source_type === 'credit_card';
+  
+  // Pré-selecionar tipo 'expense' quando categoria de cartão de crédito é selecionada (mas permitir mudança)
+  useEffect(() => {
+    if (isCreditCardCategory && transactionType !== 'expense') {
+      setTransactionType('expense');
+    }
+  }, [isCreditCardCategory]);
   
   // Combine accounts and credit cards into a single list
   // Filter out expired credit cards
@@ -128,7 +142,17 @@ export default function TransactionForm({
   useEffect(() => {
     if (transaction) {
       const amount = typeof transaction.amount === 'number' ? transaction.amount : parseFloat(String(transaction.amount));
-      setTransactionType(amount >= 0 ? 'income' : 'expense');
+      
+      // Se a categoria for de cartão de crédito, sempre usar 'expense'
+      const selectedCategory = transaction.category_id 
+        ? categories.find(c => c.id === transaction.category_id)
+        : null;
+      const isCreditCardCategory = selectedCategory?.source_type === 'credit_card';
+      
+      // Determinar tipo: se for categoria de cartão, sempre expense; caso contrário, usar sinal do valor
+      const transactionTypeToSet = isCreditCardCategory ? 'expense' : (amount >= 0 ? 'income' : 'expense');
+      setTransactionType(transactionTypeToSet);
+      
       setIsInstallment(!!(transaction.installment_number && transaction.installment_total));
       setInstallmentNumber(String(transaction.installment_number || 1));
       setInstallmentTotal(String(transaction.installment_total || 1));
@@ -161,7 +185,7 @@ export default function TransactionForm({
         notes: '',
       });
     }
-  }, [transaction, reset, open, members]);
+  }, [transaction, reset, open, members, categories]);
 
   const [showFutureDateDialog, setShowFutureDateDialog] = useState(false);
   const [pendingSubmitData, setPendingSubmitData] = useState<TransactionFormData | null>(null);

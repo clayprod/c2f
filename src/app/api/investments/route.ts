@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientFromRequest } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getUserId } from '@/lib/auth';
 import { investmentSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
@@ -36,6 +37,29 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) throw error;
+
+    // Fetch assigned_to profiles separately using admin client (bypasses RLS)
+    const assignedToIds = [...new Set((data || [])
+      .map((investment: any) => investment.assigned_to)
+      .filter((id: string | null) => id !== null))] as string[];
+
+    let profilesMap: Record<string, any> = {};
+    if (assignedToIds.length > 0) {
+      const admin = createAdminClient();
+      const { data: profiles, error: profilesError } = await admin
+        .from('profiles')
+        .select('id, full_name, email, avatar_url')
+        .in('id', assignedToIds);
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+      } else if (profiles) {
+        profilesMap = profiles.reduce((acc: Record<string, any>, profile: any) => {
+          acc[profile.id] = profile;
+          return acc;
+        }, {});
+      }
+    }
 
     // Recalculate current values from transactions for each investment
     if (data && data.length > 0) {
@@ -75,7 +99,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ data });
+    // Merge assigned_to_profile data
+    const transformedData = (data || []).map((investment: any) => {
+      const assignedProfile = investment.assigned_to 
+        ? (profilesMap[investment.assigned_to] || null)
+        : null;
+
+      return {
+        ...investment,
+        assigned_to_profile: assignedProfile,
+      };
+    });
+
+    return NextResponse.json({ data: transformedData });
   } catch (error) {
     const errorResponse = createErrorResponse(error);
     return NextResponse.json(
@@ -128,9 +164,11 @@ export async function POST(request: NextRequest) {
         user_id: ownerId,
         include_in_plan: includeInPlan,
         contribution_frequency: hasCustomPlan ? null : validated.contribution_frequency || null,
+        contribution_count: hasCustomPlan ? null : validated.contribution_count || null,
         initial_investment_cents: validated.initial_investment_cents,
         current_value_cents: validated.current_value_cents || validated.initial_investment_cents,
         category_id: category?.id,
+        assigned_to: validated.assigned_to || null,
       })
       .select('*, accounts(*), categories(*)')
       .single();
@@ -176,6 +214,7 @@ export async function POST(request: NextRequest) {
             include_in_plan: data.include_in_plan,
             status: data.status,
             contribution_frequency: data.contribution_frequency,
+            contribution_count: data.contribution_count,
             monthly_contribution_cents: data.monthly_contribution_cents,
             purchase_date: data.purchase_date,
           },

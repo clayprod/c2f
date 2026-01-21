@@ -318,11 +318,30 @@ export async function DELETE(
     // First, verify the budget exists and belongs to the user
     // Note: We fetch without user_id filter first to let RLS handle access control
     // Then we verify the user_id matches ownerId
-    const { data: existingBudget, error: fetchError } = await supabase
+    // Try with is_auto_generated first, fallback to without if column doesn't exist
+    let existingBudget: any = null;
+    let fetchError: any = null;
+
+    const fullSelectResult = await supabase
       .from('budgets')
       .select('id, is_auto_generated, source_type, category_id, user_id')
       .eq('id', budgetId)
       .single();
+
+    if (fullSelectResult.error?.code === '42703' && fullSelectResult.error?.message?.includes('is_auto_generated')) {
+      // Column doesn't exist, try without it
+      console.log('[DELETE Budget] is_auto_generated column not found, using fallback query');
+      const fallbackResult = await supabase
+        .from('budgets')
+        .select('id, source_type, category_id, user_id')
+        .eq('id', budgetId)
+        .single();
+      existingBudget = fallbackResult.data ? { ...fallbackResult.data, is_auto_generated: false } : null;
+      fetchError = fallbackResult.error;
+    } else {
+      existingBudget = fullSelectResult.data;
+      fetchError = fullSelectResult.error;
+    }
 
     if (fetchError) {
       // PGRST116 means no rows returned

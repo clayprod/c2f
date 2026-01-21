@@ -10,12 +10,15 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
+import { useMembers } from '@/hooks/useMembers';
 
 export default function NewReceivablePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { confirm, ConfirmDialog } = useConfirmDialog();
+  const { members, loading: loadingMembers } = useMembers();
+  const [assignedTo, setAssignedTo] = useState<string>('');
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -33,6 +36,7 @@ export default function NewReceivablePage() {
     include_in_plan: true,
     contribution_frequency: 'monthly',
     monthly_payment_cents: '',
+    contribution_count: '',
     start_date: '',
   });
   const [useCustomPlan, setUseCustomPlan] = useState(false);
@@ -127,6 +131,9 @@ export default function NewReceivablePage() {
           monthly_payment_cents: !useCustomPlan && formData.include_in_plan && formData.monthly_payment_cents
             ? Math.round(parseFloat(formData.monthly_payment_cents) * 100)
             : undefined,
+          contribution_count: !useCustomPlan && formData.include_in_plan && formData.contribution_count
+            ? parseInt(formData.contribution_count)
+            : undefined,
           start_date: !useCustomPlan && formData.include_in_plan && formData.start_date
             ? formData.start_date
             : undefined,
@@ -136,6 +143,7 @@ export default function NewReceivablePage() {
                 amount_cents: Math.round(entry.amount * 100),
               }))
             : undefined,
+          assigned_to: assignedTo || undefined,
         }),
       });
 
@@ -305,64 +313,46 @@ export default function NewReceivablePage() {
           />
         </div>
 
-        <div className="border-t pt-6 space-y-4">
-          <h3 className="font-semibold mb-4">Informações de Negociação</h3>
-          <p className="text-sm text-muted-foreground">
-            As informações ficam visíveis e são aplicadas quando o status for &quot;Negociada&quot;.
-          </p>
-          <div className="grid md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Frequência de Recebimento *</label>
-              <Select
-                value={formData.payment_frequency}
-                onValueChange={(value) => setFormData({ ...formData, payment_frequency: value })}
-                required={formData.status === 'negociada'}
-                disabled={formData.status !== 'negociada'}
-              >
-                <SelectTrigger className="w-full bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
-                  <SelectValue placeholder="Selecione a frequência" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="daily">Diário</SelectItem>
-                  <SelectItem value="weekly">Semanal</SelectItem>
-                  <SelectItem value="biweekly">Quinzenal</SelectItem>
-                  <SelectItem value="monthly">Mensal</SelectItem>
-                  <SelectItem value="quarterly">Trimestral</SelectItem>
-                  <SelectItem value="yearly">Anual</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Valor de Recebimento Periódico (R$) *</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.payment_amount_cents}
-                onChange={(e) => setFormData({ ...formData, payment_amount_cents: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                placeholder="0.00"
-                required={formData.status === 'negociada'}
-                disabled={formData.status !== 'negociada'}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Número de Parcelas *</label>
-              <input
-                type="number"
-                min="1"
-                value={formData.installment_count}
-                onChange={(e) => setFormData({ ...formData, installment_count: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                placeholder="0"
-                required={formData.status === 'negociada'}
-                disabled={formData.status !== 'negociada'}
-              />
-            </div>
+        {/* Responsible Person */}
+        {members.length > 1 && (
+          <div>
+            <label className="block text-sm font-medium mb-2">Responsável</label>
+            <Select
+              value={assignedTo}
+              onValueChange={setAssignedTo}
+              disabled={loadingMembers}
+            >
+              <SelectTrigger className="w-full bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                <SelectValue placeholder="Selecione o responsável" />
+              </SelectTrigger>
+              <SelectContent>
+                {members.map((member) => (
+                  <SelectItem key={member.id} value={member.id}>
+                    <div className="flex items-center gap-2">
+                      {member.avatarUrl ? (
+                        <img
+                          src={member.avatarUrl}
+                          alt={member.fullName || 'Avatar'}
+                          className="w-5 h-5 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">
+                          {(member.fullName || member.email)[0].toUpperCase()}
+                        </div>
+                      )}
+                      <span>{member.fullName || member.email}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">
+              Quem é responsável por este recebível?
+            </p>
           </div>
+        )}
 
+        <div className="border-t pt-6 space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
             <div className="flex items-center gap-3">
               <Checkbox
@@ -510,6 +500,21 @@ export default function NewReceivablePage() {
                     />
                     <p className="text-xs text-muted-foreground mt-1">
                       Mês em que se iniciam os recebimentos no orçamento
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Número de Recebimentos</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={formData.contribution_count}
+                      onChange={(e) => setFormData({ ...formData, contribution_count: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                      placeholder="Deixe vazio para contínuo"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Quantidade total de recebimentos. Deixe vazio para recebimentos contínuos.
                     </p>
                   </div>
                 </>

@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
+import { useMembers } from '@/hooks/useMembers';
 
 interface Debt {
   id: string;
@@ -41,11 +42,13 @@ export default function DebtDetailPage() {
   const debtId = params?.id as string;
   const { toast } = useToast();
   const { confirm, ConfirmDialog } = useConfirmDialog();
+  const { members, loading: loadingMembers } = useMembers();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [debt, setDebt] = useState<Debt | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [assignedTo, setAssignedTo] = useState<string>('');
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -63,6 +66,7 @@ export default function DebtDetailPage() {
     include_in_plan: true,
     contribution_frequency: 'monthly',
     monthly_payment_cents: '',
+    contribution_count: '',
     start_date: '',
   });
   const [useCustomPlan, setUseCustomPlan] = useState(false);
@@ -108,8 +112,10 @@ export default function DebtDetailPage() {
         include_in_plan: debtData.include_in_plan ?? false,
         contribution_frequency: debtData.contribution_frequency || 'monthly',
         monthly_payment_cents: debtData.monthly_payment_cents ? (debtData.monthly_payment_cents / 100).toFixed(2) : '',
+        contribution_count: debtData.contribution_count?.toString() || '',
         start_date: debtData.start_date || '',
       });
+      setAssignedTo(debtData.assigned_to || '');
       if (debtData.plan_entries && debtData.plan_entries.length > 0) {
         setUseCustomPlan(true);
         setPlanEntries(
@@ -225,7 +231,7 @@ export default function DebtDetailPage() {
         creditor_name: data.creditor_name || undefined,
         total_amount_cents: Math.round(parseFloat(data.total_amount_cents) * 100),
         paid_amount_cents: Math.round(parseFloat(data.paid_amount_cents || '0') * 100),
-        interest_rate_monthly: parseFloat(data.interest_rate || '0'),
+        interest_rate: parseFloat(data.interest_rate || '0'),
         due_date: data.due_date || undefined,
         status: data.status,
         priority: data.priority,
@@ -244,6 +250,9 @@ export default function DebtDetailPage() {
         monthly_payment_cents: !useCustomPlan && data.include_in_plan && data.monthly_payment_cents
           ? Math.round(parseFloat(data.monthly_payment_cents) * 100)
           : undefined,
+        contribution_count: !useCustomPlan && data.include_in_plan && data.contribution_count
+          ? parseInt(data.contribution_count)
+          : undefined,
         start_date: !useCustomPlan && data.include_in_plan && data.start_date
           ? data.start_date
           : undefined,
@@ -253,12 +262,14 @@ export default function DebtDetailPage() {
               amount_cents: Math.round(entry.amount * 100),
             }))
           : [],
+        assigned_to: assignedTo || null,
       }),
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Erro ao salvar dívida');
+      const errorData = await response.json();
+      console.error('Save debt error:', errorData);
+      throw new Error(errorData.error + (errorData.details ? `: ${JSON.stringify(errorData.details)}` : '') || 'Erro ao salvar dívida');
     }
 
     setIsEditing(false);
@@ -628,6 +639,21 @@ export default function DebtDetailPage() {
                         Mês em que se iniciam os pagamentos no orçamento
                       </p>
                     </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Número de Pagamentos</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={formData.contribution_count}
+                        onChange={(e) => setFormData({ ...formData, contribution_count: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        placeholder="Deixe vazio para contínuo"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Quantidade total de pagamentos. Deixe vazio para pagamentos contínuos.
+                      </p>
+                    </div>
                   </>
                 )}
               </div>
@@ -653,6 +679,45 @@ export default function DebtDetailPage() {
               rows={2}
             />
           </div>
+
+          {/* Responsible Person */}
+          {members.length > 1 && (
+            <div>
+              <label className="block text-sm font-medium mb-2">Responsável</label>
+              <Select
+                value={assignedTo}
+                onValueChange={setAssignedTo}
+                disabled={loadingMembers}
+              >
+                <SelectTrigger className="w-full bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                  <SelectValue placeholder="Selecione o responsável" />
+                </SelectTrigger>
+                <SelectContent>
+                  {members.map((member) => (
+                    <SelectItem key={member.id} value={member.id}>
+                      <div className="flex items-center gap-2">
+                        {member.avatarUrl ? (
+                          <img
+                            src={member.avatarUrl}
+                            alt={member.fullName || 'Avatar'}
+                            className="w-5 h-5 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">
+                            {(member.fullName || member.email)[0].toUpperCase()}
+                          </div>
+                        )}
+                        <span>{member.fullName || member.email}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Quem é responsável por esta dívida?
+              </p>
+            </div>
+          )}
 
           <div className="flex gap-4">
             <button type="submit" className="btn-primary" disabled={saving}>

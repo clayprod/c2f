@@ -60,7 +60,6 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
   const { chartData, currentMonthIndex } = useMemo(() => {
     // Primeiro, processar e formatar os dados
     let runningBalance = 0;
-    let lastHistoricalBalance = 0;
     const processedData = data.map((item, index) => {
       runningBalance += item.income - item.expenses;
       // Formatar monthLabel usando formatMonthYear se ainda não estiver formatado
@@ -71,10 +70,6 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
         const monthInfoResult = formatMonthYear(item.month, { returnCurrentMonthInfo: true });
         formattedMonthLabel = typeof monthInfoResult === 'string' ? monthInfoResult : monthInfoResult.formatted;
         isCurrentMonth = typeof monthInfoResult === 'object' ? monthInfoResult.isCurrentMonth : false;
-      }
-
-      if (!item.isProjected) {
-        lastHistoricalBalance = runningBalance;
       }
 
       return {
@@ -130,77 +125,67 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
     ];
 
     // Recalcular saldo acumulado para manter continuidade
-    // Separar acumuladores para histórico (Real) e projetado (Planejado)
+    // A linha projetada deve PARTIR do saldo real atual (mês corrente)
     let cumulativeBalanceHistorical = 0;
-    let cumulativeBalanceProjected = 0;
 
     if (selectedHistorical.length > 0) {
       // Começar do saldo acumulado do último mês histórico (antes do início do gráfico visível)
-      // Ajuste: precisamos pegar o saldo "real" acumulado até o início do período
-      // Para simplificar, assumimos que o primeiro item visível já traz o saldo correto no seu 'cumulativeBalance'
-      // Se não, teríamos que calcular desde o início dos tempos.
-      // Vamos confiar que 'processedData' já calculou o 'runningBalance' corretamente até aquele ponto.
-
       const startBalance = selectedHistorical[0].cumulativeBalance - (selectedHistorical[0].income - selectedHistorical[0].expenses);
       cumulativeBalanceHistorical = startBalance;
-      cumulativeBalanceProjected = startBalance; // Assumimos que começam iguais no início do período visível
     }
 
-    const finalData = reorganizedData.map((item, index) => {
+    // Primeira passada: calcular apenas o saldo histórico até o mês corrente
+    let lastHistoricalBalance = cumulativeBalanceHistorical;
+    const tempData = reorganizedData.map((item, index) => {
       const isCurrentMonth = index === selectedHistorical.length;
       const isProjected = index > selectedHistorical.length;
 
-
-      if (isProjected) {
-        // Para meses futuros, sempre usar projeção
-        cumulativeBalanceProjected += item.income - item.expenses;
-        // Não atualizamos cumulativeBalanceHistorical
-      } else {
-        // Para meses históricos ou mês corrente
-
-        // Calcular saldo real usando dados reais se disponíveis
+      if (!isProjected) {
+        // Para meses históricos ou mês corrente, calcular saldo real
         const incomeActual = item.income_actual !== undefined ? item.income_actual : item.income;
         const expensesActual = item.expenses_actual !== undefined ? item.expenses_actual : item.expenses;
         cumulativeBalanceHistorical += incomeActual - expensesActual;
+        lastHistoricalBalance = cumulativeBalanceHistorical;
+      }
 
-        // Calcular saldo projetado (para comparação ou continuidade)
-        // Se tiver income_planned/expenses_planned, usamos eles, senão usamos o valor base
-        const incomeProjected = item.income_planned !== undefined ? item.income_planned : item.income;
-        const expensesProjected = item.expenses_planned !== undefined ? item.expenses_planned : item.expenses;
+      return {
+        ...item,
+        isCurrentMonth,
+        isProjectedMonth: isProjected,
+        cumulativeBalanceHistorical: !isProjected ? cumulativeBalanceHistorical : null,
+      };
+    });
 
-        // Se for mês corrente, precisamos de um ponto de partida diferente para o projetado?
-        // Geralmente a projeção é "desde o início", mas aqui queremos comparar "Realizado até agora" vs "Planejado até agora"
-        // OU queremos que a projeção do mês corrente parta do saldo do mês anterior?
-        // Simplificação: cumulativeBalanceProjected segue a lógica de planejado
-        cumulativeBalanceProjected += incomeProjected - expensesProjected;
+    // Segunda passada: calcular o saldo projetado PARTINDO do último saldo histórico
+    let cumulativeBalanceProjected = lastHistoricalBalance;
+    const finalData = tempData.map((item, index) => {
+      const isCurrentMonth = item.isCurrentMonth;
+      const isProjected = item.isProjectedMonth;
+
+      if (isProjected) {
+        // Para meses futuros, somar projeção ao saldo real atual
+        cumulativeBalanceProjected += item.income - item.expenses;
       }
 
       // Linha sólida (histórica) deve parar no mês corrente
-      // Se for mês corrente com valores reais, incluir na linha sólida
-      const shouldIncludeInHistorical = !isProjected || (isCurrentMonth && !item.isProjected);
+      const shouldIncludeInHistorical = !isProjected;
 
-      // Para criar continuidade visual na linha projetada se ela começar depois da histórica
-      // Mas com a nova lógica de cálculo separado, elas podem divergir, o que é CORRETO/DESEJADO.
+      // A linha projetada começa no mês corrente (mesmo valor do histórico) 
+      // e continua nos meses futuros
+      const shouldIncludeInProjected = isCurrentMonth || isProjected;
 
       return {
         ...item,
         isProjected: isProjected && !isCurrentMonth,
-        // Não usamos mais um único "cumulativeBalance", mas dois separados
-        cumulativeBalance: cumulativeBalanceHistorical, // Campo legado se for necessário
-
-        cumulativeBalanceHistorical: shouldIncludeInHistorical ? cumulativeBalanceHistorical : null,
-
-        // Mostrar linha projetada para o mês corrente também, se quisermos comparar
-        // Ou apenas para o futuro. 
-        // Se quisermos continuidade, o primeiro ponto projetado deve se alinhar com o último histórico? 
-        // NÃO, se os valores estão incorretos, queremos ver a divergência.
-        cumulativeBalanceProjected: isProjected || isCurrentMonth ? cumulativeBalanceProjected : null,
+        cumulativeBalance: item.cumulativeBalanceHistorical || cumulativeBalanceProjected,
+        cumulativeBalanceHistorical: shouldIncludeInHistorical ? item.cumulativeBalanceHistorical : null,
+        // No mês corrente, a linha projetada tem o mesmo valor da histórica (ponto de encontro)
+        // Nos meses futuros, continua com as projeções somadas
+        cumulativeBalanceProjected: shouldIncludeInProjected 
+          ? (isCurrentMonth ? lastHistoricalBalance : cumulativeBalanceProjected) 
+          : null,
       };
     });
-
-    // Ajuste fino: Se quisermos que a linha projetada "nasça" da histórica no último mês fechado
-    // podemos forçar o valor inicial, mas isso esconde o erro de planejamento acumulado.
-    // Vamos manter linhas separadas para honestidade dos dados.
 
     return {
       chartData: finalData,

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { createClient } from '@/lib/supabase/client';
@@ -103,6 +104,21 @@ export default function SettingsPage() {
   const [cancelling, setCancelling] = useState(false);
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<string>('profile');
+
+  // Sincronizar aba ativa com query params
+  useEffect(() => {
+    const tabFromUrl = searchParams?.get('tab') || 'profile';
+    setActiveTab(tabFromUrl);
+  }, [searchParams]);
+
+  // Atualizar URL quando a aba mudar
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    router.push(`/app/settings?tab=${value}`, { scroll: false });
+  };
 
   useEffect(() => {
     fetchProfile();
@@ -614,7 +630,7 @@ export default function SettingsPage() {
         <p className="text-muted-foreground text-sm md:text-base">Gerencie sua conta e preferencias</p>
       </div>
 
-      <Tabs defaultValue="profile" className="space-y-4 md:space-y-6">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4 md:space-y-6">
         <TabsList className="bg-muted/50 p-1 w-full sm:w-auto">
           <TabsTrigger value="profile" className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm flex-1 sm:flex-initial">
             <i className="bx bx-user"></i>

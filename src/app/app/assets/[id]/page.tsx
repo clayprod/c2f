@@ -64,6 +64,7 @@ export default function AssetDetailPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [showEditForm, setShowEditForm] = useState(false);
   const [showValuationForm, setShowValuationForm] = useState(false);
+  const [editingValuation, setEditingValuation] = useState<any | null>(null);
 
   useEffect(() => {
     if (params && params.id) {
@@ -183,6 +184,86 @@ export default function AssetDetailPage() {
     } catch (error: any) {
       throw error;
     }
+  };
+
+  const handleEditValuation = async (data: any) => {
+    if (!params || !params.id || !editingValuation) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/assets/${params.id}/valuations/${editingValuation.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao atualizar avaliação');
+      }
+
+      setShowValuationForm(false);
+      setEditingValuation(null);
+      fetchAsset();
+    } catch (error: any) {
+      throw error;
+    }
+  };
+
+  const handleDeleteValuation = async (valuationId: string) => {
+    if (!params || !params.id) {
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: 'Excluir Avaliação',
+      description: 'Tem certeza que deseja excluir esta avaliação? O valor atual do bem será recalculado com base nas avaliações restantes.',
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/assets/${params.id}/valuations/${valuationId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || 'Erro ao excluir avaliação');
+      }
+
+      toast({
+        title: 'Sucesso',
+        description: 'Avaliação excluída com sucesso!',
+      });
+
+      fetchAsset();
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message || 'Erro ao excluir avaliação',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const openEditValuation = (valuation: any) => {
+    setEditingValuation(valuation);
+    setShowValuationForm(true);
+  };
+
+  const closeValuationForm = () => {
+    setShowValuationForm(false);
+    setEditingValuation(null);
   };
 
   const handleDelete = async () => {
@@ -447,7 +528,6 @@ export default function AssetDetailPage() {
         valuations={asset.valuations || []}
         purchaseDate={asset.purchase_date}
         purchasePriceCents={asset.purchase_price_cents}
-        currentValueCents={asset.current_value_cents}
       />
 
       {/* Valuation History */}
@@ -474,6 +554,25 @@ export default function AssetDetailPage() {
                   {valuation.notes && (
                     <div className="text-sm text-muted-foreground mt-1">{valuation.notes}</div>
                   )}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => openEditValuation(valuation)}
+                    title="Editar avaliação"
+                  >
+                    <i className='bx bx-edit'></i>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteValuation(valuation.id)}
+                    title="Excluir avaliação"
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <i className='bx bx-trash'></i>
+                  </Button>
                 </div>
               </div>
             ))}
@@ -512,18 +611,25 @@ export default function AssetDetailPage() {
       </Dialog>
 
       {/* Valuation Form Dialog */}
-      <Dialog open={showValuationForm} onOpenChange={setShowValuationForm}>
+      <Dialog open={showValuationForm} onOpenChange={(open) => {
+        if (!open) {
+          closeValuationForm();
+        } else {
+          setShowValuationForm(true);
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Nova Avaliação</DialogTitle>
+            <DialogTitle>{editingValuation ? 'Editar Avaliação' : 'Nova Avaliação'}</DialogTitle>
             <DialogDescription>
-              Adicione uma nova avaliação ao histórico
+              {editingValuation ? 'Atualize os dados da avaliação' : 'Adicione uma nova avaliação ao histórico'}
             </DialogDescription>
           </DialogHeader>
           <ValuationForm
             assetId={asset.id}
-            onSubmit={handleAddValuation}
-            onCancel={() => setShowValuationForm(false)}
+            valuation={editingValuation}
+            onSubmit={editingValuation ? handleEditValuation : handleAddValuation}
+            onCancel={closeValuationForm}
           />
         </DialogContent>
       </Dialog>

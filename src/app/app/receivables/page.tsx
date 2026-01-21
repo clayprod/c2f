@@ -16,6 +16,12 @@ interface Receivable {
   priority: string;
   due_date?: string;
   interest_rate?: number;
+  assigned_to_profile?: {
+    id: string;
+    full_name: string | null;
+    email: string;
+    avatar_url: string | null;
+  } | null;
 }
 
 export default function ReceivablesPage() {
@@ -248,6 +254,24 @@ export default function ReceivablesPage() {
                         <p className="text-sm text-muted-foreground mb-2">
                           Devedor: {receivable.debtor_name}
                         </p>
+                      )}
+                      {receivable.assigned_to_profile && (
+                        <div className="flex items-center gap-2 mb-2">
+                          {receivable.assigned_to_profile.avatar_url ? (
+                            <img
+                              src={receivable.assigned_to_profile.avatar_url}
+                              alt={receivable.assigned_to_profile.full_name || 'Avatar'}
+                              className="w-5 h-5 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">
+                              {(receivable.assigned_to_profile.full_name || receivable.assigned_to_profile.email)[0].toUpperCase()}
+                            </div>
+                          )}
+                          <span className="text-sm text-muted-foreground">
+                            Responsável: {receivable.assigned_to_profile.full_name || receivable.assigned_to_profile.email}
+                          </span>
+                        </div>
                       )}
                       {receivable.due_date && (
                         <p className="text-sm text-muted-foreground">

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientFromRequest } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getUserId } from '@/lib/auth';
 import { creditCardSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
@@ -32,6 +33,29 @@ export async function GET(request: NextRequest) {
     // If no cards, return empty array
     if (!cards || cards.length === 0) {
       return NextResponse.json({ data: [] });
+    }
+
+    // Fetch assigned_to profiles separately using admin client (bypasses RLS)
+    const assignedToIds = [...new Set((cards || [])
+      .map((card: any) => card.assigned_to)
+      .filter((id: string | null) => id !== null))] as string[];
+
+    let profilesMap: Record<string, any> = {};
+    if (assignedToIds.length > 0) {
+      const admin = createAdminClient();
+      const { data: profiles, error: profilesError } = await admin
+        .from('profiles')
+        .select('id, full_name, email, avatar_url')
+        .in('id', assignedToIds);
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+      } else if (profiles) {
+        profilesMap = profiles.reduce((acc: Record<string, any>, profile: any) => {
+          acc[profile.id] = profile;
+          return acc;
+        }, {});
+      }
     }
 
     // Get current bills for each card
@@ -75,6 +99,9 @@ export async function GET(request: NextRequest) {
           : 0;
 
         const expired = isCreditCardExpired(card.expiration_date);
+        const assignedProfile = card.assigned_to 
+          ? (profilesMap[card.assigned_to] || null)
+          : null;
 
         return {
           ...card,
@@ -85,11 +112,16 @@ export async function GET(request: NextRequest) {
           usage_percentage: usagePercentage,
           expiration_date: card.expiration_date || null,
           is_expired: expired,
+          assigned_to_profile: assignedProfile,
+          category_id: card.category_id || null,
         };
       } catch (cardError) {
         console.error('Error processing card:', card.id, cardError);
         // Return card without processing if there's an error
         const expired = isCreditCardExpired(card.expiration_date);
+        const assignedProfile = card.assigned_to 
+          ? (profilesMap[card.assigned_to] || null)
+          : null;
 
         return {
           ...card,
@@ -100,6 +132,8 @@ export async function GET(request: NextRequest) {
           usage_percentage: 0,
           expiration_date: card.expiration_date || null,
           is_expired: expired,
+          assigned_to_profile: assignedProfile,
+          category_id: card.category_id || null,
         };
       }
     });
@@ -175,6 +209,7 @@ export async function POST(request: NextRequest) {
         color: validated.color || '#1a1a2e',
         icon: '💳', // Fixed icon for all credit cards
         is_default: isDefault,
+        assigned_to: validated.assigned_to || null,
       })
       .select('id, user_id, name, type, institution, last_four_digits, card_brand, currency, current_balance, available_balance, credit_limit, closing_day, due_day, expiration_date, color, icon, is_default, created_at, updated_at')
       .single();

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientFromRequest } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getUserId } from '@/lib/auth';
 import { assetSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
@@ -35,6 +36,29 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
+    // Fetch assigned_to profiles separately using admin client (bypasses RLS)
+    const assignedToIds = [...new Set((assets || [])
+      .map((asset: any) => asset.assigned_to)
+      .filter((id: string | null) => id !== null))] as string[];
+
+    let profilesMap: Record<string, any> = {};
+    if (assignedToIds.length > 0) {
+      const admin = createAdminClient();
+      const { data: profiles, error: profilesError } = await admin
+        .from('profiles')
+        .select('id, full_name, email, avatar_url')
+        .in('id', assignedToIds);
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+      } else if (profiles) {
+        profilesMap = profiles.reduce((acc: Record<string, any>, profile: any) => {
+          acc[profile.id] = profile;
+          return acc;
+        }, {});
+      }
+    }
+
     // Get latest valuation for each asset
     if (assets && assets.length > 0) {
       const assetIds = assets.map(a => a.id);
@@ -54,20 +78,35 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      // Add latest valuation to each asset
+      // Add latest valuation and assigned_to_profile to each asset
       const processedAssets = assets.map((asset: any) => {
         const latestValuation = valuationsMap.get(asset.id);
+        const assignedProfile = asset.assigned_to 
+          ? (profilesMap[asset.assigned_to] || null)
+          : null;
         return {
           ...asset,
           current_value_cents: latestValuation?.value_cents || asset.current_value_cents || asset.purchase_price_cents,
           last_valuation_date: latestValuation?.valuation_date || null,
+          assigned_to_profile: assignedProfile,
         };
       });
 
       return NextResponse.json({ data: processedAssets });
     }
 
-    return NextResponse.json({ data: assets || [] });
+    // Merge assigned_to_profile data even if no valuations
+    const transformedAssets = (assets || []).map((asset: any) => {
+      const assignedProfile = asset.assigned_to 
+        ? (profilesMap[asset.assigned_to] || null)
+        : null;
+      return {
+        ...asset,
+        assigned_to_profile: assignedProfile,
+      };
+    });
+
+    return NextResponse.json({ data: transformedAssets });
   } catch (error) {
     console.error('Assets GET error:', error);
     const errorResponse = createErrorResponse(error);
@@ -158,6 +197,7 @@ export async function POST(request: NextRequest) {
         account_id: validated.account_id || null,
         category_id: categoryId || validated.category_id || null,
         notes: validated.notes || null,
+        assigned_to: validated.assigned_to || null,
       })
       .select('*, accounts(*), categories(*)')
       .single();

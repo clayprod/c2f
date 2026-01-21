@@ -112,6 +112,12 @@ export async function PATCH(
       monthly_contribution_cents: z.number().int().positive().optional(),
       include_in_plan: z.boolean().optional(),
       contribution_frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).optional(),
+      contribution_count: z.number().int().positive().optional(),
+      assigned_to: z.union([
+        z.string().uuid('ID do responsável inválido'),
+        z.literal(''),
+        z.null()
+      ]).optional().transform(val => val === '' || val === null ? undefined : val),
       plan_entries: z.array(z.object({
         month: z.string().regex(/^\d{4}-\d{2}$/, 'Mês inválido (use YYYY-MM)'),
         amount_cents: z.number().int().positive('Valor deve ser positivo'),
@@ -196,17 +202,23 @@ export async function PATCH(
         }
         if (key === 'image_url' || key === 'image_position') {
           imageFields[key] = value;
-        } else if (key === 'include_in_plan' || key === 'contribution_frequency') {
+        } else if (key === 'include_in_plan' || key === 'contribution_frequency' || key === 'contribution_count') {
           contributionFields[key] = value;
         } else {
           regularFields[key] = value;
         }
       }
     });
+    
+    // Explicitly handle assigned_to field (can be undefined after transform, should be null)
+    if ('assigned_to' in validated) {
+      regularFields.assigned_to = validated.assigned_to || null;
+    }
 
     if (hasCustomPlan) {
       contributionFields.include_in_plan = true;
       delete contributionFields.contribution_frequency;
+      delete contributionFields.contribution_count;
     }
 
     // First try to update with all fields
@@ -334,6 +346,7 @@ export async function PATCH(
               include_in_plan: data.include_in_plan,
               status: data.status,
               contribution_frequency: data.contribution_frequency,
+              contribution_count: data.contribution_count,
               monthly_contribution_cents: data.monthly_contribution_cents,
               target_amount_cents: data.target_amount_cents,
               current_amount_cents: data.current_amount_cents || 0,

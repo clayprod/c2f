@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { useMembers } from '@/hooks/useMembers';
 
 interface Investment {
   id: string;
@@ -40,8 +41,10 @@ export default function InvestmentDetailPage() {
   const params = useParams();
   const investmentId = params?.id as string;
   const { toast } = useToast();
+  const { members, loading: loadingMembers } = useMembers();
 
   const [loading, setLoading] = useState(true);
+  const [assignedTo, setAssignedTo] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [investment, setInvestment] = useState<Investment | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -59,6 +62,7 @@ export default function InvestmentDetailPage() {
     include_in_plan: true,
     contribution_frequency: 'monthly',
     monthly_contribution_cents: '',
+    contribution_count: '',
     start_date: '',
   });
   const [useCustomPlan, setUseCustomPlan] = useState(false);
@@ -107,8 +111,10 @@ export default function InvestmentDetailPage() {
         monthly_contribution_cents: investmentData.monthly_contribution_cents 
           ? (investmentData.monthly_contribution_cents / 100).toFixed(2) 
           : '',
+        contribution_count: investmentData.contribution_count?.toString() || '',
         start_date: investmentData.start_date || '',
       });
+      setAssignedTo(investmentData.assigned_to || '');
 
       // Check for custom plan entries
       if (investmentData.plan_entries && investmentData.plan_entries.length > 0) {
@@ -195,6 +201,9 @@ export default function InvestmentDetailPage() {
         monthly_contribution_cents: !useCustomPlan && data.monthly_contribution_cents
           ? Math.round(parseFloat(data.monthly_contribution_cents) * 100)
           : undefined,
+        contribution_count: !useCustomPlan && data.include_in_plan && data.contribution_count
+          ? parseInt(data.contribution_count)
+          : undefined,
         start_date: !useCustomPlan && data.include_in_plan && data.start_date
           ? data.start_date
           : undefined,
@@ -204,6 +213,7 @@ export default function InvestmentDetailPage() {
               amount_cents: Math.round(entry.amount * 100),
             }))
           : [],
+        assigned_to: assignedTo || undefined,
       }),
     });
 
@@ -421,6 +431,45 @@ export default function InvestmentDetailPage() {
             />
           </div>
 
+          {/* Responsible Person */}
+          {members.length > 1 && (
+            <div>
+              <label className="block text-sm font-medium mb-2">Responsável</label>
+              <Select
+                value={assignedTo}
+                onValueChange={setAssignedTo}
+                disabled={loadingMembers}
+              >
+                <SelectTrigger className="w-full bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                  <SelectValue placeholder="Selecione o responsável" />
+                </SelectTrigger>
+                <SelectContent>
+                  {members.map((member) => (
+                    <SelectItem key={member.id} value={member.id}>
+                      <div className="flex items-center gap-2">
+                        {member.avatarUrl ? (
+                          <img
+                            src={member.avatarUrl}
+                            alt={member.fullName || 'Avatar'}
+                            className="w-5 h-5 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">
+                            {(member.fullName || member.email)[0].toUpperCase()}
+                          </div>
+                        )}
+                        <span>{member.fullName || member.email}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Quem é responsável por este investimento?
+              </p>
+            </div>
+          )}
+
           <div className="border-t pt-6 space-y-4">
             <div className="flex items-center gap-3">
               <Checkbox
@@ -566,6 +615,21 @@ export default function InvestmentDetailPage() {
                       />
                       <p className="text-xs text-muted-foreground mt-1">
                         Mês em que se iniciam os aportes no orçamento
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Número de Aportes</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={formData.contribution_count}
+                        onChange={(e) => setFormData({ ...formData, contribution_count: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        placeholder="Deixe vazio para contínuo"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Quantidade total de aportes. Deixe vazio para aportes contínuos.
                       </p>
                     </div>
                   </>

@@ -175,6 +175,11 @@ export async function PATCH(
       account_id: z.string().uuid('ID da conta inválido').optional(),
       category_id: z.string().uuid('ID da categoria inválido').optional(),
       notes: z.string().optional(),
+      assigned_to: z.union([
+        z.string().uuid('ID do responsável inválido'),
+        z.literal(''),
+        z.null()
+      ]).optional().transform(val => val === '' || val === null ? undefined : val),
     });
 
     const validated = partialAssetSchema.parse(body);
@@ -235,6 +240,7 @@ export async function PATCH(
     if (validated.account_id !== undefined) updateData.account_id = validated.account_id || null;
     if (validated.category_id !== undefined) updateData.category_id = validated.category_id || null;
     if (validated.notes !== undefined) updateData.notes = validated.notes || null;
+    if (validated.assigned_to !== undefined) updateData.assigned_to = validated.assigned_to || null;
 
     console.log('PATCH /api/assets/[id] - Update data:', JSON.stringify(updateData, null, 2));
     console.log('PATCH /api/assets/[id] - Update data keys:', Object.keys(updateData));

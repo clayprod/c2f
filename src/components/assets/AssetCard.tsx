@@ -26,6 +26,12 @@ interface Asset {
   last_valuation_date?: string;
   account_id?: string;
   category_id?: string;
+  assigned_to_profile?: {
+    id: string;
+    full_name: string | null;
+    email: string;
+    avatar_url: string | null;
+  } | null;
 }
 
 interface AssetCardProps {
@@ -173,6 +179,24 @@ export default function AssetCard({ asset }: AssetCardProps) {
                 🚗 {asset.license_plate}
               </p>
             )}
+            {asset.assigned_to_profile && (
+              <div className="flex items-center gap-2 mt-2">
+                {asset.assigned_to_profile.avatar_url ? (
+                  <img
+                    src={asset.assigned_to_profile.avatar_url}
+                    alt={asset.assigned_to_profile.full_name || 'Avatar'}
+                    className="w-5 h-5 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">
+                    {(asset.assigned_to_profile.full_name || asset.assigned_to_profile.email)[0].toUpperCase()}
+                  </div>
+                )}
+                <span className="text-sm text-muted-foreground">
+                  Responsável: {asset.assigned_to_profile.full_name || asset.assigned_to_profile.email}
+                </span>
+              </div>
+            )}
           </div>
         </div>
         <Link
@@ -231,10 +255,10 @@ export default function AssetCard({ asset }: AssetCardProps) {
             categories={categories}
             transaction={{
               account_id: asset.account_id || '',
-              category_id: asset.category_id || '',
+              category_id: categories.find(c => c.name === 'VENDA DE ATIVOS' && c.type === 'income')?.id || '',
               posted_at: format(new Date(), 'yyyy-MM-dd'),
               description: `Venda: ${asset.name}`,
-              amount: '',
+              amount: asset.current_value_cents, // Positive value triggers income type
             }}
           />
         </DialogContent>

@@ -10,12 +10,15 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
+import { useMembers } from '@/hooks/useMembers';
 
 export default function NewDebtPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { confirm, ConfirmDialog } = useConfirmDialog();
+  const { members, loading: loadingMembers } = useMembers();
+  const [assignedTo, setAssignedTo] = useState<string>('');
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -33,6 +36,7 @@ export default function NewDebtPage() {
     include_in_plan: true,
     contribution_frequency: 'monthly',
     monthly_payment_cents: '',
+    contribution_count: '',
     start_date: '',
   });
   const [useCustomPlan, setUseCustomPlan] = useState(false);
@@ -127,6 +131,9 @@ export default function NewDebtPage() {
           monthly_payment_cents: !useCustomPlan && formData.include_in_plan && formData.monthly_payment_cents
             ? Math.round(parseFloat(formData.monthly_payment_cents) * 100)
             : undefined,
+          contribution_count: !useCustomPlan && formData.include_in_plan && formData.contribution_count
+            ? parseInt(formData.contribution_count)
+            : undefined,
           start_date: !useCustomPlan && formData.include_in_plan && formData.start_date
             ? formData.start_date
             : undefined,
@@ -136,6 +143,7 @@ export default function NewDebtPage() {
                 amount_cents: Math.round(entry.amount * 100),
               }))
             : undefined,
+          assigned_to: assignedTo || undefined,
         }),
       });
 
@@ -304,6 +312,45 @@ export default function NewDebtPage() {
             placeholder="Notas adicionais..."
           />
         </div>
+
+        {/* Responsible Person */}
+        {members.length > 1 && (
+          <div>
+            <label className="block text-sm font-medium mb-2">Responsável</label>
+            <Select
+              value={assignedTo}
+              onValueChange={setAssignedTo}
+              disabled={loadingMembers}
+            >
+              <SelectTrigger className="w-full bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                <SelectValue placeholder="Selecione o responsável" />
+              </SelectTrigger>
+              <SelectContent>
+                {members.map((member) => (
+                  <SelectItem key={member.id} value={member.id}>
+                    <div className="flex items-center gap-2">
+                      {member.avatarUrl ? (
+                        <img
+                          src={member.avatarUrl}
+                          alt={member.fullName || 'Avatar'}
+                          className="w-5 h-5 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">
+                          {(member.fullName || member.email)[0].toUpperCase()}
+                        </div>
+                      )}
+                      <span>{member.fullName || member.email}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">
+              Quem é responsável por esta dívida?
+            </p>
+          </div>
+        )}
 
         <div className="border-t pt-6 space-y-4">
           <h3 className="font-semibold mb-4">Informações de Negociação</h3>
@@ -510,6 +557,21 @@ export default function NewDebtPage() {
                     />
                     <p className="text-xs text-muted-foreground mt-1">
                       Mês em que se iniciam os pagamentos no orçamento
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Número de Pagamentos</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={formData.contribution_count}
+                      onChange={(e) => setFormData({ ...formData, contribution_count: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                      placeholder="Deixe vazio para contínuo"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Quantidade total de pagamentos. Deixe vazio para pagamentos contínuos.
                     </p>
                   </div>
                 </>

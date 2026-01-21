@@ -14,6 +14,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import CreditCardForm from '@/components/credit-cards/CreditCardForm';
 import BillDetailModal from '@/components/credit-cards/BillDetailModal';
+import TransactionForm from '@/components/transactions/TransactionForm';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceArea, PieChart, Pie, Cell } from 'recharts';
 import { MonthYearPicker } from '@/components/ui/month-year-picker';
 import { formatMonthYear } from '@/lib/utils';
@@ -39,6 +40,13 @@ interface CreditCard {
   is_default: boolean;
   current_bill: Bill | null;
   is_expired?: boolean;
+  category_id?: string | null;
+  assigned_to_profile?: {
+    id: string;
+    full_name: string | null;
+    email: string;
+    avatar_url: string | null;
+  } | null;
 }
 
 interface Bill {
@@ -92,6 +100,16 @@ export default function CreditCardsPage() {
   const [chartData, setChartData] = useState<any[]>([]);
   const [currentMonthIndex, setCurrentMonthIndex] = useState<number>(0);
   const [categorySpending, setCategorySpending] = useState<any[]>([]);
+  const [payBillDialogOpen, setPayBillDialogOpen] = useState(false);
+  const [selectedBillForPayment, setSelectedBillForPayment] = useState<{
+    cardId: string;
+    billId: string;
+    cardName: string;
+    categoryId: string | null;
+    remainingAmount: number;
+  } | null>(null);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -227,7 +245,6 @@ export default function CreditCardsPage() {
 
         let totalToPay = 0;
         let totalPaid = 0;
-        let projected = 0;
 
         if (monthInfo.type === 'historical') {
           // Buscar faturas históricas
@@ -251,37 +268,27 @@ export default function CreditCardsPage() {
           lastHistoricalTotal = totalToPay / 100;
           lastHistoricalPaid = totalPaid / 100;
         } else {
-          // Calcular projeção baseada em transações parceladas futuras
+          // Buscar faturas futuras para projeção
           for (const card of cardsList) {
             try {
-              // Buscar transações parceladas futuras
-              const txRes = await fetch(`/api/transactions?account_id=${card.id}&limit=500`);
-              const txData = await txRes.json();
-              const transactions = txData.data || [];
-
-              // Filtrar transações parceladas que se aplicam a este mês
-              transactions.forEach((tx: any) => {
-                if (tx.installment_number && tx.installment_total && tx.installment_number < tx.installment_total) {
-                  // Transações parceladas - calcular se esta parcela cai neste mês
-                  const txDate = new Date(tx.posted_at);
-                  const monthsDiff = (monthDate.getFullYear() - txDate.getFullYear()) * 12 + 
-                                    (monthDate.getMonth() - txDate.getMonth());
-                  
-                  // Verificar se esta parcela específica cai no mês projetado
-                  if (monthsDiff > 0) {
-                    const parcelNumber = tx.installment_number + monthsDiff;
-                    if (parcelNumber <= tx.installment_total) {
-                      // O valor da transação já é o valor da parcela individual
-                      projected += Math.abs(Math.round((tx.amount || 0) * 100));
-                    }
-                  }
-                }
+              // Buscar todas as faturas do cartão
+              const res = await fetch(`/api/credit-cards/${card.id}/bills?limit=12`);
+              const data = await res.json();
+              const cardBills = (data.data || []) as Bill[];
+              
+              // Filtrar faturas futuras (reference_month >= mês atual)
+              const futureBills = cardBills.filter(bill => {
+                const billMonth = bill.reference_month.substring(0, 7);
+                return billMonth === monthDateStr;
               });
+
+              // Somar total_cents e paid_cents das faturas futuras
+              totalToPay += futureBills.reduce((sum, bill) => sum + bill.total_cents, 0);
+              totalPaid += futureBills.reduce((sum, bill) => sum + bill.paid_cents, 0);
             } catch (error) {
-              console.error(`Error fetching transactions for projection: ${card.id}`, error);
+              console.error(`Error fetching future bills for projection: ${card.id}`, error);
             }
           }
-          totalToPay = projected;
         }
 
         const monthInfoResult = formatMonthYear(monthDate, { returnCurrentMonthInfo: true });
@@ -289,15 +296,17 @@ export default function CreditCardsPage() {
         const isCurrentMonth = typeof monthInfoResult === 'object' ? monthInfoResult.isCurrentMonth : false;
         const isProjected = monthInfo.type === 'projection';
         
-        // Para criar continuidade visual: primeiro ponto projetado também tem valor histórico (último histórico)
-        // Último ponto histórico também tem valor projetado (mesmo valor) para conectar
+        // Simplificar estrutura: histórico usa total/pago, projeção usa totalProj/pagoProj
+        // Criar continuidade visual conectando último histórico com primeira projeção
         const isFirstProjected = isProjected && chartDataPoints.length > 0 && !chartDataPoints[chartDataPoints.length - 1].isProjected;
         const isLastHistorical = !isProjected && chartDataPoints.length > 0 && chartDataPoints[chartDataPoints.length - 1].isProjected === false;
         
         chartDataPoints.push({
           month: monthLabel,
+          // Histórico: usar total/pago. Projeção: null para não mostrar na linha histórica
           total: !isProjected ? totalToPay / 100 : (isFirstProjected ? lastHistoricalTotal : null),
           totalProj: isProjected ? totalToPay / 100 : (isLastHistorical ? lastHistoricalTotal : null),
+          // Histórico: usar pago. Projeção: null para não mostrar na linha histórica
           pago: !isProjected ? totalPaid / 100 : (isFirstProjected ? lastHistoricalPaid : null),
           pagoProj: isProjected ? totalPaid / 100 : (isLastHistorical ? lastHistoricalPaid : null),
           isProjected,
@@ -479,6 +488,132 @@ export default function CreditCardsPage() {
   const openBillDetail = (cardId: string, billId: string) => {
     setSelectedBill({ cardId, billId });
     setBillDetailOpen(true);
+  };
+
+  const fetchAccounts = async () => {
+    try {
+      const res = await fetch('/api/accounts');
+      const data = await res.json();
+      // Filter only non-credit card accounts for payment source
+      setAccounts((data.data || []).filter((a: any) => a.type !== 'credit_card'));
+    } catch (error) {
+      console.error('Error fetching accounts:', error);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch('/api/categories');
+      const data = await res.json();
+      setCategories(data.data || []);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
+
+  const handlePayBill = async (cardId: string, bill: Bill) => {
+    try {
+      // Buscar dados completos do cartão incluindo category_id
+      const cardRes = await fetch(`/api/credit-cards/${cardId}`);
+      const cardData = await cardRes.json();
+      const card = cardData.data;
+      
+      if (!card) {
+        toast({
+          title: 'Erro',
+          description: 'Cartão não encontrado',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const remainingAmount = bill.total_cents - bill.paid_cents;
+      
+      if (remainingAmount <= 0) {
+        toast({
+          title: 'Aviso',
+          description: 'Esta fatura já está totalmente paga',
+        });
+        return;
+      }
+
+      // Buscar contas e categorias se ainda não foram buscadas
+      await fetchAccounts();
+      await fetchCategories();
+
+      // Verificar se há categoria do cartão
+      if (!card.category_id) {
+        toast({
+          title: 'Aviso',
+          description: 'Este cartão não possui categoria associada. Por favor, edite o cartão primeiro.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      setSelectedBillForPayment({
+        cardId,
+        billId: bill.id,
+        cardName: card.name,
+        categoryId: card.category_id,
+        remainingAmount,
+      });
+      setPayBillDialogOpen(true);
+    } catch (error: any) {
+      console.error('Error preparing payment:', error);
+      toast({
+        title: 'Erro',
+        description: error.message || 'Não foi possível preparar o pagamento',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleTransactionSubmit = async (data: any) => {
+    try {
+      const res = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account_id: data.account_id,
+          category_id: data.category_id,
+          posted_at: data.posted_at,
+          description: data.description,
+          amount_cents: data.amount_cents,
+          type: 'expense',
+          currency: 'BRL',
+          notes: data.notes || null,
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Erro ao criar transação');
+      }
+
+      toast({
+        title: 'Sucesso',
+        description: 'Pagamento registrado com sucesso',
+      });
+
+      setPayBillDialogOpen(false);
+      setSelectedBillForPayment(null);
+      
+      // Atualizar lista de cartões
+      await fetchCards();
+      if (cards.length > 0 && selectedMonth) {
+        await fetchCurrentMonthBills(cards, selectedMonth);
+        await fetchChartData(cards);
+      }
+    } catch (error: any) {
+      console.error('Error submitting transaction:', error);
+      toast({
+        title: 'Erro',
+        description: error.message || 'Não foi possível registrar o pagamento',
+        variant: 'destructive',
+      });
+      throw error;
+    }
   };
 
   const filteredCards = cards.filter(card =>
@@ -739,7 +874,12 @@ export default function CreditCardsPage() {
                         tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
                       />
                       <Tooltip
-                        formatter={(value: number) => formatCurrency(value * 100)}
+                        formatter={(value: number) => {
+                          if (value === null || value === undefined || isNaN(value)) {
+                            return 'N/A';
+                          }
+                          return formatCurrency(value * 100);
+                        }}
                         contentStyle={{
                           backgroundColor: 'hsl(var(--card))',
                           border: '1px solid hsl(var(--border))',
@@ -982,6 +1122,24 @@ export default function CreditCardsPage() {
                         )}
                       </div>
                       <h3 className="text-base font-bold">{card.name}</h3>
+                      {card.assigned_to_profile && (
+                        <div className="flex items-center gap-1.5 mt-1">
+                          {card.assigned_to_profile.avatar_url ? (
+                            <img
+                              src={card.assigned_to_profile.avatar_url}
+                              alt={card.assigned_to_profile.full_name || 'Avatar'}
+                              className="w-4 h-4 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center text-white text-[10px]">
+                              {(card.assigned_to_profile.full_name || card.assigned_to_profile.email)[0].toUpperCase()}
+                            </div>
+                          )}
+                          <span className="text-[10px] text-white/80">
+                            {card.assigned_to_profile.full_name || card.assigned_to_profile.email}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div className="flex gap-1">
                       <button
@@ -1065,35 +1223,42 @@ export default function CreditCardsPage() {
                 {/* Card Bills Consolidation */}
                 {(() => {
                   const cardBills = cardBillsMap.get(card.id) || [];
-                  const now = new Date();
-                  const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-                  const currentMonthStr = currentMonth.toISOString().split('T')[0].substring(0, 7);
                   
-                  const currentMonthCardBills = cardBills.filter(bill => {
+                  // Usar o mês selecionado ao invés do mês atual
+                  const monthToUse = selectedMonth || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+                  const [year, month] = monthToUse.split('-');
+                  const selectedMonthDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+                  const selectedMonthStr = selectedMonthDate.toISOString().split('T')[0].substring(0, 7);
+                  
+                  // Buscar faturas do mês selecionado
+                  const selectedMonthCardBills = cardBills.filter(bill => {
                     const billMonth = bill.reference_month.substring(0, 7);
-                    return billMonth === currentMonthStr;
+                    return billMonth === selectedMonthStr;
                   });
 
-                  if (currentMonthCardBills.length === 0) return null;
+                  if (selectedMonthCardBills.length === 0) return null;
 
-                  const cardTotalToPay = currentMonthCardBills.reduce((sum, bill) => sum + bill.total_cents, 0);
-                  const cardTotalPaid = currentMonthCardBills.reduce((sum, bill) => sum + bill.paid_cents, 0);
+                  // Pegar a primeira fatura do mês selecionado (ou a mais recente)
+                  const selectedBill = selectedMonthCardBills[0];
+                  
+                  const cardTotalToPay = selectedMonthCardBills.reduce((sum, bill) => sum + bill.total_cents, 0);
+                  const cardTotalPaid = selectedMonthCardBills.reduce((sum, bill) => sum + bill.paid_cents, 0);
                   const cardRemaining = cardTotalToPay - cardTotalPaid;
 
                   return (
                     <div className="border-t border-border pt-3">
-                      {card.current_bill && (
+                      {selectedBill && (
                         <>
                           <div className="flex items-center justify-between mb-2">
                             <h5 className="text-xs font-medium flex items-center gap-1.5">
                               <i className='bx bx-file text-xs'></i>
-                              Fatura Atual
+                              Fatura {selectedMonthStr}
                             </h5>
-                            {getStatusBadge(card.current_bill.status)}
+                            {getStatusBadge(selectedBill.status)}
                           </div>
                           <div className="mb-2">
                             <p className="text-[10px] text-muted-foreground mb-0.5">Total</p>
-                            <p className="font-semibold text-sm">{formatCurrency(card.current_bill.total_cents)}</p>
+                            <p className="font-semibold text-sm">{formatCurrency(selectedBill.total_cents || 0)}</p>
                           </div>
                         </>
                       )}
@@ -1125,23 +1290,47 @@ export default function CreditCardsPage() {
                           </div>
                         </div>
                       )}
-                      {card.current_bill && (
+                      {selectedBill && (
                         <>
                           <div className="mb-2">
                             <p className="text-[10px] text-muted-foreground mb-0.5">Vencimento</p>
-                            <p className="font-medium text-xs">{formatDate(card.current_bill.due_date)}</p>
+                            <p className="font-medium text-xs">{formatDate(selectedBill.due_date)}</p>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full text-xs h-7"
-                            onClick={() => openBillDetail(card.id, card.current_bill!.id)}
-                            disabled={isExpired}
-                            title={isExpired ? 'Cartão expirado - não é possível visualizar faturas' : 'Ver detalhes da fatura'}
-                          >
-                            <i className='bx bx-show mr-1.5 text-xs'></i>
-                            Ver Detalhes da Fatura
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 text-xs h-7"
+                              onClick={() => openBillDetail(card.id, selectedBill.id)}
+                              disabled={isExpired}
+                              title={isExpired ? 'Cartão expirado - não é possível visualizar faturas' : 'Ver detalhes da fatura'}
+                            >
+                              <i className='bx bx-show mr-1.5 text-xs'></i>
+                              Ver Detalhes da Fatura
+                            </Button>
+                            {(() => {
+                              const totalCents = selectedBill.total_cents || 0;
+                              const paidCents = selectedBill.paid_cents || 0;
+                              const billRemaining = totalCents - paidCents;
+                              
+                              // Mostrar botão sempre que há fatura, mesmo se restante for zero (para permitir pagamento parcial)
+                              // Mas só se não estiver totalmente paga
+                              const canPay = selectedBill.status !== 'paid' && !isExpired;
+                              
+                              return canPay ? (
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  className="flex-1 text-xs h-7"
+                                  onClick={() => handlePayBill(card.id, selectedBill)}
+                                  title={billRemaining > 0 ? `Pagar fatura - Restante: ${formatCurrency(billRemaining)}` : 'Pagar fatura'}
+                                >
+                                  <i className='bx bx-money mr-1.5 text-xs'></i>
+                                  Pagar Fatura
+                                </Button>
+                              ) : null;
+                            })()}
+                          </div>
                         </>
                       )}
                     </div>
@@ -1275,6 +1464,30 @@ export default function CreditCardsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Pay Bill Transaction Form */}
+      {selectedBillForPayment && selectedBillForPayment.categoryId && (
+        <TransactionForm
+          open={payBillDialogOpen}
+          onOpenChange={(open) => {
+            setPayBillDialogOpen(open);
+            if (!open) {
+              setSelectedBillForPayment(null);
+            }
+          }}
+          onSubmit={handleTransactionSubmit}
+          transaction={{
+            account_id: accounts.length > 0 ? accounts[0].id : '',
+            category_id: selectedBillForPayment.categoryId,
+            posted_at: new Date().toISOString().split('T')[0],
+            description: `Pagamento fatura ${selectedBillForPayment.cardName}`,
+            amount: (selectedBillForPayment.remainingAmount / 100).toFixed(2),
+          }}
+          accounts={accounts}
+          creditCards={[]}
+          categories={categories}
+        />
+      )}
     </div>
   );
 }

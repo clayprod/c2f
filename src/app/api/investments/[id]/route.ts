@@ -83,6 +83,12 @@ export async function PATCH(
       contribution_day: z.number().int().min(1).max(31).optional(),
       include_in_plan: z.boolean().default(true).optional(),
       contribution_frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).optional(),
+      contribution_count: z.number().int().positive().optional(),
+      assigned_to: z.union([
+        z.string().uuid('ID do responsável inválido'),
+        z.literal(''),
+        z.null()
+      ]).optional().transform(val => val === '' || val === null ? undefined : val),
       plan_entries: z.array(z.object({
         month: z.string().regex(/^\d{4}-\d{2}$/, 'Mês inválido (use YYYY-MM)'),
         amount_cents: z.number().int().positive('Valor deve ser positivo'),
@@ -109,13 +115,19 @@ export async function PATCH(
     }
 
     const hasCustomPlan = !!validated.plan_entries && validated.plan_entries.length > 0;
-    const { plan_entries, ...investmentFields } = validated;
-    const updatePayload = {
+    const { plan_entries, assigned_to, ...investmentFields } = validated;
+    const updatePayload: any = {
       ...investmentFields,
       include_in_plan: hasCustomPlan ? true : validated.include_in_plan,
       contribution_frequency: hasCustomPlan ? null : validated.contribution_frequency,
+      contribution_count: hasCustomPlan ? null : validated.contribution_count,
       updated_at: new Date().toISOString(),
     };
+
+    // Only include assigned_to if it was provided in the request
+    if ('assigned_to' in validated) {
+      updatePayload.assigned_to = assigned_to || null;
+    }
 
     const { data, error } = await supabase
       .from('investments')
@@ -179,6 +191,7 @@ export async function PATCH(
             include_in_plan: data.include_in_plan,
             status: data.status,
             contribution_frequency: data.contribution_frequency,
+            contribution_count: data.contribution_count,
             monthly_contribution_cents: data.monthly_contribution_cents,
             purchase_date: data.purchase_date,
           },

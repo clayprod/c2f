@@ -16,6 +16,12 @@ interface Debt {
   priority: string;
   due_date?: string;
   interest_rate?: number;
+  assigned_to_profile?: {
+    id: string;
+    full_name: string | null;
+    email: string;
+    avatar_url: string | null;
+  } | null;
 }
 
 export default function DebtsPage() {
@@ -248,6 +254,24 @@ export default function DebtsPage() {
                         <p className="text-sm text-muted-foreground mb-2">
                           Credor: {debt.creditor_name}
                         </p>
+                      )}
+                      {debt.assigned_to_profile && (
+                        <div className="flex items-center gap-2 mb-2">
+                          {debt.assigned_to_profile.avatar_url ? (
+                            <img
+                              src={debt.assigned_to_profile.avatar_url}
+                              alt={debt.assigned_to_profile.full_name || 'Avatar'}
+                              className="w-5 h-5 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">
+                              {(debt.assigned_to_profile.full_name || debt.assigned_to_profile.email)[0].toUpperCase()}
+                            </div>
+                          )}
+                          <span className="text-sm text-muted-foreground">
+                            Responsável: {debt.assigned_to_profile.full_name || debt.assigned_to_profile.email}
+                          </span>
+                        </div>
                       )}
                       {debt.due_date && (
                         <p className="text-sm text-muted-foreground">

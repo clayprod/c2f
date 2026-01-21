@@ -6,6 +6,38 @@
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+export interface PlanFeature {
+  enabled: boolean;
+  text: string;
+}
+
+export type PlanFeatures = Record<string, PlanFeature>;
+
+export interface PlanDisplayConfig {
+  free?: {
+    name?: string;
+    description?: string;
+    priceFormatted?: string;
+    period?: string;
+    cta?: string;
+    popular?: boolean;
+  };
+  pro?: {
+    name?: string;
+    description?: string;
+    period?: string;
+    cta?: string;
+    popular?: boolean;
+  };
+  premium?: {
+    name?: string;
+    description?: string;
+    period?: string;
+    cta?: string;
+    popular?: boolean;
+  };
+}
+
 export interface GlobalSettings {
   // SMTP
   smtp_host?: string | null;
@@ -43,6 +75,11 @@ export interface GlobalSettings {
   evolution_webhook_secret?: string | null;
   n8n_api_key?: string | null;
   whatsapp_enabled?: boolean | null;
+  // Plan Features
+  plan_features_free?: PlanFeatures | null;
+  plan_features_pro?: PlanFeatures | null;
+  plan_features_premium?: PlanFeatures | null;
+  plan_display_config?: PlanDisplayConfig | null;
 }
 
 let cachedSettings: GlobalSettings | null = null;
@@ -64,7 +101,7 @@ export async function getGlobalSettings(forceRefresh = false): Promise<GlobalSet
     const supabase = createAdminClient();
 
     // Define columns - some may not exist in older databases
-    const allColumns = 'support_email, support_whatsapp, smtp_host, smtp_port, smtp_user, smtp_password, smtp_from_email, smtp_secure, groq_api_key, openai_api_key, ai_model, ai_model_name, advisor_prompt, tips_prompt, tips_enabled, chat_max_tokens, session_ttl_minutes, stripe_price_id_pro, stripe_price_id_business, advisor_limit_pro, advisor_limit_premium, evolution_api_url, evolution_api_key, evolution_instance_name, evolution_webhook_secret, n8n_api_key, whatsapp_enabled';
+    const allColumns = 'support_email, support_whatsapp, smtp_host, smtp_port, smtp_user, smtp_password, smtp_from_email, smtp_secure, groq_api_key, openai_api_key, ai_model, ai_model_name, advisor_prompt, tips_prompt, tips_enabled, chat_max_tokens, session_ttl_minutes, stripe_price_id_pro, stripe_price_id_business, advisor_limit_pro, advisor_limit_premium, evolution_api_url, evolution_api_key, evolution_instance_name, evolution_webhook_secret, n8n_api_key, whatsapp_enabled, plan_features_free, plan_features_pro, plan_features_premium, plan_display_config';
     // Minimal columns that should exist in all database versions
     const minimalColumns = 'support_email, support_whatsapp, smtp_host, smtp_port, smtp_user, smtp_password, smtp_from_email, groq_api_key, openai_api_key, ai_model, ai_model_name, advisor_prompt, stripe_price_id_pro, stripe_price_id_business, evolution_api_url, evolution_api_key, evolution_instance_name, evolution_webhook_secret, n8n_api_key, whatsapp_enabled';
 
@@ -122,6 +159,11 @@ export async function getGlobalSettings(forceRefresh = false): Promise<GlobalSet
       settings.evolution_webhook_secret = data.evolution_webhook_secret;
       settings.n8n_api_key = data.n8n_api_key;
       settings.whatsapp_enabled = data.whatsapp_enabled;
+      // Plan Features
+      settings.plan_features_free = data.plan_features_free as PlanFeatures | null;
+      settings.plan_features_pro = data.plan_features_pro as PlanFeatures | null;
+      settings.plan_features_premium = data.plan_features_premium as PlanFeatures | null;
+      settings.plan_display_config = data.plan_display_config as PlanDisplayConfig | null;
 
       console.log('[GlobalSettings] Fetched settings:', {
         hasSupportEmail: !!data.support_email,
@@ -217,6 +259,11 @@ export async function updateGlobalSettings(updates: Partial<GlobalSettings>): Pr
   if (updates.evolution_webhook_secret !== undefined) updateData.evolution_webhook_secret = updates.evolution_webhook_secret;
   if (updates.n8n_api_key !== undefined) updateData.n8n_api_key = updates.n8n_api_key;
   if (updates.whatsapp_enabled !== undefined) updateData.whatsapp_enabled = updates.whatsapp_enabled;
+  // Plan Features
+  if (updates.plan_features_free !== undefined) updateData.plan_features_free = updates.plan_features_free;
+  if (updates.plan_features_pro !== undefined) updateData.plan_features_pro = updates.plan_features_pro;
+  if (updates.plan_features_premium !== undefined) updateData.plan_features_premium = updates.plan_features_premium;
+  if (updates.plan_display_config !== undefined) updateData.plan_display_config = updates.plan_display_config;
 
   try {
     console.log('updateGlobalSettings - updateData keys:', Object.keys(updateData));
@@ -297,6 +344,66 @@ export async function updateGlobalSettings(updates: Partial<GlobalSettings>): Pr
 export function clearSettingsCache(): void {
   cachedSettings = null;
   cacheTimestamp = 0;
+}
+
+/**
+ * Get plan features for a specific plan
+ */
+export async function getPlanFeatures(plan: 'free' | 'pro' | 'premium'): Promise<PlanFeatures> {
+  const settings = await getGlobalSettings();
+  const featuresKey = `plan_features_${plan}` as keyof GlobalSettings;
+  const features = settings[featuresKey] as PlanFeatures | null | undefined;
+  
+  if (!features) {
+    // Return empty features if not configured
+    return {};
+  }
+  
+  return features;
+}
+
+/**
+ * Get all plan features
+ */
+export async function getAllPlanFeatures(): Promise<{
+  free: PlanFeatures;
+  pro: PlanFeatures;
+  premium: PlanFeatures;
+}> {
+  const settings = await getGlobalSettings();
+  
+  return {
+    free: (settings.plan_features_free as PlanFeatures) || {},
+    pro: (settings.plan_features_pro as PlanFeatures) || {},
+    premium: (settings.plan_features_premium as PlanFeatures) || {},
+  };
+}
+
+/**
+ * Get plan display configuration
+ */
+export async function getPlanDisplayConfig(): Promise<PlanDisplayConfig> {
+  const settings = await getGlobalSettings();
+  return (settings.plan_display_config as PlanDisplayConfig) || {};
+}
+
+/**
+ * Update plan features for a specific plan
+ */
+export async function updatePlanFeatures(
+  plan: 'free' | 'pro' | 'premium',
+  features: PlanFeatures
+): Promise<void> {
+  const updates: Partial<GlobalSettings> = {};
+  updates[`plan_features_${plan}` as keyof GlobalSettings] = features as any;
+  await updateGlobalSettings(updates);
+}
+
+/**
+ * Update plan display configuration
+ */
+export async function updatePlanDisplayConfig(config: PlanDisplayConfig): Promise<void> {
+  await updateGlobalSettings({ plan_display_config: config });
 }
 
 

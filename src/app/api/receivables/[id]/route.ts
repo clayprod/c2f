@@ -93,8 +93,14 @@ export async function PATCH(
       payment_amount_cents: z.number().int().positive('Valor de pagamento deve ser positivo').optional(),
       include_in_plan: z.boolean().default(true).optional(),
       contribution_frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).optional(),
+      contribution_count: z.number().int().positive().optional(),
       monthly_payment_cents: z.number().int().positive().optional(),
       is_negotiated: z.boolean().optional(),
+      assigned_to: z.union([
+        z.string().uuid('ID do responsável inválido'),
+        z.literal(''),
+        z.null()
+      ]).optional().transform(val => val === '' || val === null ? undefined : val),
       plan_entries: z.array(z.object({
         month: z.string().regex(/^\d{4}-\d{2}$/, 'Mês inválido (use YYYY-MM)'),
         amount_cents: z.number().int().positive('Valor deve ser positivo'),
@@ -135,19 +141,27 @@ export async function PATCH(
       }
     }
 
-    const { plan_entries, ...receivableFields } = validated;
+    const { plan_entries, assigned_to, ...receivableFields } = validated;
     const updatePayload: any = {
       ...receivableFields,
       include_in_plan: hasCustomPlan ? true : validated.include_in_plan,
       contribution_frequency: hasCustomPlan
         ? null
         : (validated.contribution_frequency ?? validated.payment_frequency),
+      contribution_count: hasCustomPlan
+        ? null
+        : (validated.contribution_count ?? undefined),
       monthly_payment_cents: hasCustomPlan
         ? null
         : (validated.monthly_payment_cents ?? undefined),
       ...(validated.status ? { is_negotiated: validated.status === 'negociada' } : {}),
       updated_at: new Date().toISOString(),
     };
+
+    // Only include assigned_to if it was provided in the request
+    if ('assigned_to' in validated) {
+      updatePayload.assigned_to = assigned_to || null;
+    }
 
     const { data, error } = await supabase
       .from('receivables')
@@ -227,6 +241,7 @@ export async function PATCH(
             is_negotiated: data.is_negotiated,
             status: data.status,
             contribution_frequency: data.contribution_frequency,
+            contribution_count: data.contribution_count,
             monthly_payment_cents: data.monthly_payment_cents,
             installment_count: data.installment_count,
             installment_amount_cents: data.installment_amount_cents,

@@ -109,6 +109,63 @@ export default function AppLayout({ children }: AppLayoutProps) {
     };
   }, [activeAccountId]); // Reload profile when active account changes
 
+  // Reset scroll position when navigating to a new page
+  useEffect(() => {
+    const resetScroll = () => {
+      const mainElement = document.querySelector('main');
+      if (mainElement) {
+        mainElement.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      }
+      // Also reset window scroll as fallback
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    };
+
+    // Immediate reset
+    resetScroll();
+    
+    // Multiple delayed resets to catch any late DOM updates
+    const timeouts: NodeJS.Timeout[] = [];
+    [0, 50, 100, 200, 300, 500, 800, 1000, 1500].forEach((delay) => {
+      timeouts.push(setTimeout(resetScroll, delay));
+    });
+    
+    // Also use requestAnimationFrame
+    requestAnimationFrame(() => {
+      resetScroll();
+      requestAnimationFrame(() => {
+        resetScroll();
+        requestAnimationFrame(() => {
+          resetScroll();
+        });
+      });
+    });
+
+    // Use MutationObserver to watch for DOM changes
+    const observer = new MutationObserver(() => {
+      resetScroll();
+    });
+
+    const mainElement = document.querySelector('main');
+    if (mainElement) {
+      observer.observe(mainElement, {
+        childList: true,
+        subtree: true,
+      });
+    }
+
+    // Clean up observer after 2 seconds
+    const cleanupTimeout = setTimeout(() => {
+      observer.disconnect();
+      timeouts.forEach(clearTimeout);
+    }, 2000);
+
+    return () => {
+      observer.disconnect();
+      timeouts.forEach(clearTimeout);
+      clearTimeout(cleanupTimeout);
+    };
+  }, [pathname]);
+
   // Filter menu items:
   // - Own account: based on user's plan (current behavior)
   // - Shared account: ignore invited user's plan and respect shared permissions instead
@@ -559,7 +616,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                     )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      onClick={() => router.push('/app/settings')}
+                      onClick={() => router.push('/app/settings?tab=sharing')}
                     >
                       <i className="bx bx-share-alt mr-2 text-muted-foreground" />
                       Gerenciar compartilhamento

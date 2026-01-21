@@ -25,6 +25,12 @@ interface Investment {
   purchase_date: string;
   account_id?: string;
   category_id?: string;
+  assigned_to_profile?: {
+    id: string;
+    full_name: string | null;
+    email: string;
+    avatar_url: string | null;
+  } | null;
 }
 
 export default function InvestmentsPage() {
@@ -254,6 +260,24 @@ export default function InvestmentsPage() {
                         <p className="text-sm text-muted-foreground mb-2">
                           {investment.institution}
                         </p>
+                      )}
+                      {investment.assigned_to_profile && (
+                        <div className="flex items-center gap-2 mb-2">
+                          {investment.assigned_to_profile.avatar_url ? (
+                            <img
+                              src={investment.assigned_to_profile.avatar_url}
+                              alt={investment.assigned_to_profile.full_name || 'Avatar'}
+                              className="w-5 h-5 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">
+                              {(investment.assigned_to_profile.full_name || investment.assigned_to_profile.email)[0].toUpperCase()}
+                            </div>
+                          )}
+                          <span className="text-sm text-muted-foreground">
+                            Responsável: {investment.assigned_to_profile.full_name || investment.assigned_to_profile.email}
+                          </span>
+                        </div>
                       )}
                       <p className="text-sm text-muted-foreground">
                         Comprado em: {new Date(investment.purchase_date).toLocaleDateString('pt-BR')}

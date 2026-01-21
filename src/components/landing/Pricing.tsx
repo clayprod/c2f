@@ -1,56 +1,94 @@
 import Link from 'next/link';
 
-const plans = [
-  {
-    name: 'Free',
-    price: 'Grátis',
-    period: 'para sempre',
-    description: 'Comece a organizar suas finanças',
-    features: [
-      'Até 100 transações/mês',
-      'Dashboard básico',
-      'Importação CSV',
-      'Controle de contas e cartões',
-      '❌ Sem AI Advisor',
-    ],
-    cta: 'Começar agora',
-    popular: false,
-  },
-  {
-    name: 'Pro',
-    price: 'R$29',
-    period: '/mês',
-    description: 'O poder da IA para suas finanças',
-    features: [
-      'Transações ilimitadas',
-      'AI Advisor (10 consultas/mês)',
-      'Importação OFX',
-      'Orçamentos e Projeções',
-      'Investimentos e Dívidas',
-      'Patrimônio e Objetivos',
-    ],
-    cta: 'Assinar Pro',
-    popular: true,
-  },
-  {
-    name: 'Premium',
-    price: 'R$79',
-    period: '/mês',
-    description: 'Análise avançada e IA ilimitada',
-    features: [
-      'Tudo do Pro',
-      'AI Advisor (100 consultas/mês)',
-      'Relatórios Executivos',
-      'Categorização inteligente via IA',
-      'Análise preditiva de gastos',
-      'Suporte prioritário',
-    ],
-    cta: 'Assinar Premium',
-    popular: false,
-  },
-];
+interface PlanFeature {
+  id: string;
+  text: string;
+  enabled: boolean;
+}
 
-const Pricing = () => {
+interface Plan {
+  id: string;
+  name: string;
+  price: number | null;
+  priceFormatted: string;
+  period: string;
+  description: string;
+  cta: string;
+  popular: boolean;
+  features: PlanFeature[];
+}
+
+async function getPricingData(): Promise<Plan[]> {
+  try {
+    // For server components, we can import the service directly
+    // But to keep it simple and avoid circular dependencies, we'll use fetch
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL 
+      || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
+      || 'http://localhost:3000';
+    
+    const res = await fetch(`${baseUrl}/api/public/pricing`, {
+      next: { revalidate: 300 }, // Revalidate every 5 minutes
+    });
+    
+    if (!res.ok) {
+      throw new Error(`Failed to fetch pricing: ${res.status}`);
+    }
+    
+    const data = await res.json();
+    return data.plans || [];
+  } catch (error) {
+    console.error('[Pricing] Error fetching pricing data:', error);
+    // Return fallback data
+    return [
+      {
+        id: 'free',
+        name: 'Free',
+        price: null,
+        priceFormatted: 'Grátis',
+        period: 'para sempre',
+        description: 'Comece a organizar suas finanças',
+        cta: 'Começar agora',
+        popular: false,
+        features: [
+          { id: 'transactions_limit', text: 'Até 100 transações/mês', enabled: true },
+          { id: 'csv_import', text: 'Importação CSV', enabled: true },
+        ],
+      },
+      {
+        id: 'pro',
+        name: 'Pro',
+        price: 2900,
+        priceFormatted: 'R$29',
+        period: '/mês',
+        description: 'O poder da IA para suas finanças',
+        cta: 'Assinar Pro',
+        popular: true,
+        features: [
+          { id: 'transactions_unlimited', text: 'Transações ilimitadas', enabled: true },
+          { id: 'ai_advisor', text: 'AI Advisor (10 consultas/mês)', enabled: true },
+          { id: 'ofx_import', text: 'Importação OFX', enabled: true },
+        ],
+      },
+      {
+        id: 'premium',
+        name: 'Premium',
+        price: 7900,
+        priceFormatted: 'R$79',
+        period: '/mês',
+        description: 'Análise avançada e IA ilimitada',
+        cta: 'Assinar Premium',
+        popular: false,
+        features: [
+          { id: 'transactions_unlimited', text: 'Transações ilimitadas', enabled: true },
+          { id: 'ai_advisor', text: 'AI Advisor (100 consultas/mês)', enabled: true },
+        ],
+      },
+    ];
+  }
+}
+
+const Pricing = async () => {
+  const plans = await getPricingData();
   return (
     <section id="pricing" className="section-padding">
       <div className="container-custom">
@@ -93,9 +131,9 @@ const Pricing = () => {
 
               <ul className="space-y-3 mb-8">
                 {plan.features.map((feature) => (
-                  <li key={feature} className="flex items-start gap-2 text-sm">
+                  <li key={feature.id} className="flex items-start gap-2 text-sm">
                     <i className='bx bx-check text-primary text-lg flex-shrink-0'></i>
-                    <span className="text-foreground/80">{feature}</span>
+                    <span className="text-foreground/80">{feature.text}</span>
                   </li>
                 ))}
               </ul>

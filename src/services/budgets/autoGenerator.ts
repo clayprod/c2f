@@ -24,6 +24,7 @@ export async function generateAutoBudgetsForGoal(
     include_in_plan: boolean;
     status: string;
     contribution_frequency: string | null;
+    contribution_count: number | null;
     monthly_contribution_cents: number | null;
     target_amount_cents: number;
     current_amount_cents: number;
@@ -129,8 +130,14 @@ export async function generateAutoBudgetsForGoal(
 
   const budgetsToUpsert: any[] = [];
   let current = new Date(startYear, startMonth - 1, 1);
+  let generatedCount = 0;
 
   while (current <= new Date(endYear, endMonth - 1, 1)) {
+    // Check if contribution_count limit is reached
+    if (goal.contribution_count && generatedCount >= goal.contribution_count) {
+      break;
+    }
+
     // Check if should include this month based on frequency
     if (!shouldIncludeInMonth(frequency, startDate, current)) {
       current.setMonth(current.getMonth() + 1);
@@ -164,6 +171,7 @@ export async function generateAutoBudgetsForGoal(
       is_auto_generated: true,
     });
 
+    generatedCount++;
     current.setMonth(current.getMonth() + 1);
   }
 
@@ -247,6 +255,7 @@ export async function generateAutoBudgetsForDebt(
     is_negotiated: boolean;
     status: string;
     contribution_frequency: string | null;
+    contribution_count: number | null;
     monthly_payment_cents: number | null;
     installment_count: number | null;
     installment_amount_cents: number | null;
@@ -378,8 +387,14 @@ export async function generateAutoBudgetsForDebt(
   else if (debt.contribution_frequency && debt.monthly_payment_cents) {
     const frequency = debt.contribution_frequency as ContributionFrequency;
     let current = new Date(startYear, startMonth - 1, 1);
+    let generatedCount = 0;
 
     while (current <= new Date(endYear, endMonth - 1, 1)) {
+      // Check if contribution_count limit is reached
+      if (debt.contribution_count && generatedCount >= debt.contribution_count) {
+        break;
+      }
+
       if (!shouldIncludeInMonth(frequency, startDate, current)) {
         current.setMonth(current.getMonth() + 1);
         continue;
@@ -403,6 +418,7 @@ export async function generateAutoBudgetsForDebt(
         is_auto_generated: true,
       });
 
+      generatedCount++;
       current.setMonth(current.getMonth() + 1);
     }
   } else {
@@ -489,6 +505,7 @@ export async function generateAutoBudgetsForReceivable(
     is_negotiated: boolean;
     status: string;
     contribution_frequency: string | null;
+    contribution_count: number | null;
     monthly_payment_cents: number | null;
     installment_count: number | null;
     installment_amount_cents: number | null;
@@ -620,8 +637,14 @@ export async function generateAutoBudgetsForReceivable(
   else if (receivable.contribution_frequency && receivable.monthly_payment_cents) {
     const frequency = receivable.contribution_frequency as ContributionFrequency;
     let current = new Date(startYear, startMonth - 1, 1);
+    let generatedCount = 0;
 
     while (current <= new Date(endYear, endMonth - 1, 1)) {
+      // Check if contribution_count limit is reached
+      if (receivable.contribution_count && generatedCount >= receivable.contribution_count) {
+        break;
+      }
+
       if (!shouldIncludeInMonth(frequency, startDate, current)) {
         current.setMonth(current.getMonth() + 1);
         continue;
@@ -645,6 +668,7 @@ export async function generateAutoBudgetsForReceivable(
         is_auto_generated: true,
       });
 
+      generatedCount++;
       current.setMonth(current.getMonth() + 1);
     }
   } else {
@@ -730,6 +754,7 @@ export async function generateAutoBudgetsForInvestment(
     include_in_plan: boolean;
     status: string;
     contribution_frequency: string | null;
+    contribution_count: number | null;
     monthly_contribution_cents: number | null;
     purchase_date: string | Date;
   },
@@ -817,8 +842,14 @@ export async function generateAutoBudgetsForInvestment(
     : investment.purchase_date;
 
   let current = new Date(startYear, startMonth - 1, 1);
+  let generatedCount = 0;
 
   while (current <= new Date(endYear, endMonth - 1, 1)) {
+    // Check if contribution_count limit is reached
+    if (investment.contribution_count && generatedCount >= investment.contribution_count) {
+      break;
+    }
+
     // Check if should include this month based on frequency
     if (!shouldIncludeInMonth(frequency, purchaseDate, current)) {
       current.setMonth(current.getMonth() + 1);
@@ -838,6 +869,7 @@ export async function generateAutoBudgetsForInvestment(
       is_auto_generated: true,
     });
 
+    generatedCount++;
     current.setMonth(current.getMonth() + 1);
   }
 

@@ -69,7 +69,11 @@ export const transactionSchema = z.object({
   installment_number: z.number().int().positive().optional(),
   installment_total: z.number().int().positive().optional(),
   // Assigned to (for shared accounts)
-  assigned_to: z.string().uuid('ID do responsável inválido').optional().or(z.literal('')).transform(val => val || undefined),
+  assigned_to: z.union([
+    z.string().uuid('ID do responsável inválido'),
+    z.literal(''),
+    z.null()
+  ]).optional().transform(val => val === '' || val === null ? undefined : val),
 });
 
 export const budgetSchema = z.object({
@@ -171,6 +175,7 @@ export const debtSchema = z.object({
   // Plan inclusion and frequency
   include_in_plan: z.boolean().default(true),
   contribution_frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).optional(),
+  contribution_count: z.number().int().positive('Número de pagamentos deve ser positivo').optional(),
   plan_entries: z.array(z.object({
     month: z.string().regex(/^\d{4}-\d{2}$/, 'Mês inválido (use YYYY-MM)'),
     amount_cents: z.number().int().positive('Valor deve ser positivo'),
@@ -179,6 +184,12 @@ export const debtSchema = z.object({
   is_negotiated: z.boolean().optional(),
   // Monthly payment amount for budgeting
   monthly_payment_cents: z.number().int().positive().optional(),
+  // Assigned to (for shared accounts)
+  assigned_to: z.union([
+    z.string().uuid('ID do responsável inválido'),
+    z.literal(''),
+    z.null()
+  ]).optional().transform(val => val === '' || val === null ? undefined : val),
 }).refine(
   (data) => {
     if (data.status === 'negociada') {
@@ -249,6 +260,7 @@ export const receivableSchema = z.object({
   // Plan inclusion and frequency
   include_in_plan: z.boolean().default(true),
   contribution_frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).optional(),
+  contribution_count: z.number().int().positive('Número de recebimentos deve ser positivo').optional(),
   plan_entries: z.array(z.object({
     month: z.string().regex(/^\d{4}-\d{2}$/, 'Mês inválido (use YYYY-MM)'),
     amount_cents: z.number().int().positive('Valor deve ser positivo'),
@@ -257,6 +269,12 @@ export const receivableSchema = z.object({
   is_negotiated: z.boolean().optional(),
   // Monthly payment amount for budgeting
   monthly_payment_cents: z.number().int().positive().optional(),
+  // Assigned to (for shared accounts)
+  assigned_to: z.union([
+    z.string().uuid('ID do responsável inválido'),
+    z.literal(''),
+    z.null()
+  ]).optional().transform(val => val === '' || val === null ? undefined : val),
 }).refine(
   (data) => {
     if (data.status === 'negociada') {
@@ -312,11 +330,18 @@ export const investmentSchema = z.object({
   // Plan inclusion and frequency
   include_in_plan: z.boolean().default(true),
   contribution_frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).optional(),
+  contribution_count: z.number().int().positive('Número de aportes deve ser positivo').optional(),
   plan_entries: z.array(z.object({
     month: z.string().regex(/^\d{4}-\d{2}$/, 'Mês inválido (use YYYY-MM)'),
     amount_cents: z.number().int().positive('Valor deve ser positivo'),
   })).optional(),
   start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (use YYYY-MM-DD)').optional(),
+  // Assigned to (for shared accounts)
+  assigned_to: z.union([
+    z.string().uuid('ID do responsável inválido'),
+    z.literal(''),
+    z.null()
+  ]).optional().transform(val => val === '' || val === null ? undefined : val),
 }).refine(
   (data) => !data.include_in_plan || data.contribution_frequency !== undefined || (data.plan_entries && data.plan_entries.length > 0),
   {
@@ -365,10 +390,17 @@ export const goalSchema = z.object({
   // Plan inclusion and frequency
   include_in_plan: z.boolean().default(true),
   contribution_frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).optional(),
+  contribution_count: z.number().int().positive('Número de aportes deve ser positivo').optional(),
   plan_entries: z.array(z.object({
     month: z.string().regex(/^\d{4}-\d{2}$/, 'Mês inválido (use YYYY-MM)'),
     amount_cents: z.number().int().positive('Valor deve ser positivo'),
   })).optional(),
+  // Assigned to (for shared accounts)
+  assigned_to: z.union([
+    z.string().uuid('ID do responsável inválido'),
+    z.literal(''),
+    z.null()
+  ]).optional().transform(val => val === '' || val === null ? undefined : val),
 }).refine(
   (data) => !data.include_in_plan || data.contribution_frequency !== undefined || (data.plan_entries && data.plan_entries.length > 0),
   {
@@ -441,6 +473,12 @@ export const creditCardSchema = z.object({
   interest_rate_annual: z.number().min(0).optional().or(z.null()).transform(() => undefined),
   color: z.string().default('#1a1a2e'),
   is_default: z.boolean().default(false),
+  // Assigned to (for shared accounts)
+  assigned_to: z.union([
+    z.string().uuid('ID do responsável inválido'),
+    z.literal(''),
+    z.null()
+  ]).optional().transform(val => val === '' || val === null ? undefined : val),
 });
 
 export const creditCardUpdateSchema = creditCardSchema.partial();
@@ -559,6 +597,12 @@ export const assetSchema = z.object({
   account_id: z.string().uuid('ID da conta inválido').optional(),
   category_id: z.string().uuid('ID da categoria inválido').optional(),
   notes: z.string().optional(),
+  // Assigned to (for shared accounts)
+  assigned_to: z.union([
+    z.string().uuid('ID do responsável inválido'),
+    z.literal(''),
+    z.null()
+  ]).optional().transform(val => val === '' || val === null ? undefined : val),
 }).refine(
   (data) => data.status !== 'sold' || (data.sale_date && data.sale_price_cents !== undefined),
   { message: 'Data e valor de venda são obrigatórios para bens vendidos', path: ['sale_date'] }

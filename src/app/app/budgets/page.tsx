@@ -83,9 +83,111 @@ export default function BudgetsPage() {
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const missingAlertSessionKey = 'budgets_missing_alert_shown_session';
 
-  // Scroll to top immediately when component mounts
+  // Scroll to top immediately when component mounts and prevent scroll during initial render
   useLayoutEffect(() => {
-    window.scrollTo(0, 0);
+    const resetScroll = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      const mainElement = document.querySelector('main');
+      if (mainElement) {
+        mainElement.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      }
+    };
+
+    // Reset immediately
+    resetScroll();
+
+    // Prevent scroll during initial render by intercepting scroll events
+    let isInitialLoad = true;
+    const preventScroll = (e: Event) => {
+      if (isInitialLoad) {
+        e.preventDefault();
+        e.stopPropagation();
+        resetScroll();
+        return false;
+      }
+    };
+
+    // Add scroll prevention listeners
+    window.addEventListener('scroll', preventScroll, { passive: false, capture: true });
+    const mainElement = document.querySelector('main');
+    if (mainElement) {
+      mainElement.addEventListener('scroll', preventScroll, { passive: false, capture: true });
+    }
+
+    // Use MutationObserver to watch for DOM changes and reset scroll
+    const observer = new MutationObserver(() => {
+      if (isInitialLoad) {
+        resetScroll();
+      }
+    });
+
+    // Observe the main content area
+    if (mainElement) {
+      observer.observe(mainElement, {
+        childList: true,
+        subtree: true,
+      });
+    }
+
+    // Also observe the document body for any changes
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+
+    // Reset scroll periodically during initial load
+    const intervals: NodeJS.Timeout[] = [];
+    for (let i = 0; i < 30; i++) {
+      intervals.push(setTimeout(resetScroll, i * 100));
+    }
+
+    // Monitor scroll position continuously and reset if it moves away from top
+    let scrollCheckCount = 0;
+    const MAX_SCROLL_CHECKS = 60; // Monitor for ~6 seconds (60 * 100ms)
+    
+    const checkAndResetScroll = () => {
+      const currentMainElement = document.querySelector('main');
+      const mainScrollTop = currentMainElement?.scrollTop || 0;
+      const windowScrollTop = window.scrollY || window.pageYOffset || 0;
+      
+      // If scroll moved away from top (more than 10px), reset it
+      if (mainScrollTop > 10 || windowScrollTop > 10) {
+        resetScroll();
+        scrollCheckCount = 0; // Reset counter when we detect unwanted scroll
+      }
+      
+      scrollCheckCount++;
+      
+      // Continue monitoring
+      if (scrollCheckCount < MAX_SCROLL_CHECKS) {
+        setTimeout(checkAndResetScroll, 100);
+      }
+    };
+
+    // Start continuous monitoring
+    setTimeout(checkAndResetScroll, 100);
+
+    // Clean up after 6 seconds
+    const cleanupTimeout = setTimeout(() => {
+      isInitialLoad = false;
+      observer.disconnect();
+      intervals.forEach(clearTimeout);
+      window.removeEventListener('scroll', preventScroll, { capture: true });
+      if (mainElement) {
+        mainElement.removeEventListener('scroll', preventScroll, { capture: true });
+      }
+    }, 6000);
+
+    return () => {
+      isInitialLoad = false;
+      observer.disconnect();
+      intervals.forEach(clearTimeout);
+      clearTimeout(cleanupTimeout);
+      window.removeEventListener('scroll', preventScroll, { capture: true });
+      if (mainElement) {
+        mainElement.removeEventListener('scroll', preventScroll, { capture: true });
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -112,15 +214,129 @@ export default function BudgetsPage() {
     }
   }, [loading, budgets, categories, selectedMonth]);
 
-  // Also scroll to top when loading finishes
+  // Scroll to top when loading finishes and keep it there
   useEffect(() => {
     if (!loading) {
-      // Use requestAnimationFrame to ensure DOM is fully rendered
-      requestAnimationFrame(() => {
+      const scrollToTop = () => {
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        const mainElement = document.querySelector('main');
+        if (mainElement) {
+          mainElement.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        }
+      };
+
+      // Immediate scroll
+      scrollToTop();
+      
+      // Multiple delayed scrolls to catch any late DOM updates
+      const timeouts: NodeJS.Timeout[] = [];
+      [0, 50, 100, 200, 300, 500, 800, 1000, 1500, 2000].forEach((delay) => {
+        timeouts.push(setTimeout(scrollToTop, delay));
       });
+      
+      // Also use requestAnimationFrame
+      requestAnimationFrame(() => {
+        scrollToTop();
+        requestAnimationFrame(() => {
+          scrollToTop();
+          requestAnimationFrame(() => {
+            scrollToTop();
+          });
+        });
+      });
+
+      // Monitor scroll position after loading finishes
+      let monitorCount = 0;
+      const MAX_MONITOR_CHECKS = 40; // Monitor for ~4 seconds after loading
+      
+      const monitorScroll = () => {
+        const mainElement = document.querySelector('main');
+        const mainScrollTop = mainElement?.scrollTop || 0;
+        const windowScrollTop = window.scrollY || window.pageYOffset || 0;
+        
+        // If scroll moved away from top, reset it
+        if (mainScrollTop > 10 || windowScrollTop > 10) {
+          scrollToTop();
+          monitorCount = 0; // Reset counter when we detect unwanted scroll
+        }
+        
+        monitorCount++;
+        
+        // Continue monitoring
+        if (monitorCount < MAX_MONITOR_CHECKS) {
+          setTimeout(monitorScroll, 100);
+        }
+      };
+
+      // Start monitoring after a short delay
+      setTimeout(monitorScroll, 200);
+
+      return () => {
+        timeouts.forEach(clearTimeout);
+      };
     }
   }, [loading]);
+
+  // Keep scroll at top when alert dialog opens
+  useEffect(() => {
+    if (showMissingBudgetAlert) {
+      const resetScroll = () => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        const mainElement = document.querySelector('main');
+        if (mainElement) {
+          mainElement.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        }
+      };
+
+      // Reset immediately and multiple times
+      resetScroll();
+      const timeouts: NodeJS.Timeout[] = [];
+      [50, 100, 200, 300, 500, 800, 1000, 1500].forEach((delay) => {
+        timeouts.push(setTimeout(resetScroll, delay));
+      });
+      
+      // Also use requestAnimationFrame
+      requestAnimationFrame(() => {
+        resetScroll();
+        requestAnimationFrame(() => {
+          resetScroll();
+          requestAnimationFrame(() => {
+            resetScroll();
+          });
+        });
+      });
+
+      // Monitor scroll while dialog is open
+      let monitorCount = 0;
+      const MAX_MONITOR_CHECKS = 30; // Monitor while dialog is open
+      
+      const monitorScroll = () => {
+        const mainElement = document.querySelector('main');
+        const mainScrollTop = mainElement?.scrollTop || 0;
+        const windowScrollTop = window.scrollY || window.pageYOffset || 0;
+        
+        // If scroll moved away from top, reset it
+        if (mainScrollTop > 10 || windowScrollTop > 10) {
+          resetScroll();
+          monitorCount = 0; // Reset counter when we detect unwanted scroll
+        }
+        
+        monitorCount++;
+        
+        // Continue monitoring while dialog is open
+        if (monitorCount < MAX_MONITOR_CHECKS && showMissingBudgetAlert) {
+          setTimeout(monitorScroll, 100);
+        }
+      };
+
+      // Start monitoring
+      setTimeout(monitorScroll, 200);
+      
+      return () => {
+        timeouts.forEach(clearTimeout);
+      };
+    }
+  }, [showMissingBudgetAlert]);
 
   // Fetch minimum amounts for categories without budget
   useEffect(() => {
@@ -357,6 +573,54 @@ export default function BudgetsPage() {
     }
 
     setReplicateAllModalOpen(true);
+  };
+
+  const handleDeleteAllBudgets = async () => {
+    if (manualBudgets.length === 0) {
+      toast({
+        title: 'Aviso',
+        description: `Não há orçamentos manuais para excluir no mês de ${getMonthLabel(selectedMonth)}`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: `Excluir Todos os Orçamentos de ${getMonthLabel(selectedMonth)}`,
+      description: `Tem certeza que deseja excluir todos os ${manualBudgets.length} orçamento(s) manual(is) do mês de ${getMonthLabel(selectedMonth)}? Esta ação não pode ser desfeita.`,
+      confirmText: 'Excluir Todos',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/budgets?month=${selectedMonth}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Erro ao excluir orçamentos');
+      }
+
+      const data = await res.json();
+      toast({
+        title: 'Sucesso',
+        description: `${data.deleted_count || manualBudgets.length} orçamento(s) do mês de ${getMonthLabel(selectedMonth)} excluído(s) com sucesso`,
+      });
+
+      await fetchBudgets();
+    } catch (error: any) {
+      toast({
+        title: 'Falha ao excluir orçamentos',
+        description: error.message || 'Não foi possível excluir os orçamentos. Tente novamente.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const formatCurrency = (value: number) => {
@@ -724,8 +988,19 @@ export default function BudgetsPage() {
               className="text-xs h-8"
               title="Replicar categoria específica"
             >
-              <i className='bx bx-target-lock'></i>
+              <i className='bx bx-copy'></i>
               <span className="hidden md:inline ml-1">Categoria</span>
+            </Button>
+            <Button
+              onClick={handleDeleteAllBudgets}
+              variant="outline"
+              size="sm"
+              className="text-xs h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+              disabled={manualBudgets.length === 0}
+              title={`Excluir todos os orçamentos do mês de ${getMonthLabel(selectedMonth)}`}
+            >
+              <i className='bx bx-trash'></i>
+              <span className="hidden md:inline ml-1">Excluir Todos</span>
             </Button>
           </div>
         </div>

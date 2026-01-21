@@ -21,6 +21,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Checkbox } from '@/components/ui/checkbox';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { useMembers } from '@/hooks/useMembers';
 
 type AssetFormData = z.infer<typeof assetSchema>;
 
@@ -65,9 +66,11 @@ export default function AssetForm({
   onCancel,
 }: AssetFormProps) {
   const { toast } = useToast();
+  const { members, loading: loadingMembers } = useMembers();
   const [loading, setLoading] = useState(false);
   const [selectedType, setSelectedType] = useState<string>(asset?.type || 'real_estate');
   const [createPurchaseTransaction, setCreatePurchaseTransaction] = useState(false);
+  const [assignedTo, setAssignedTo] = useState<string>(asset?.assigned_to || '');
 
   const {
     register,
@@ -101,11 +104,13 @@ export default function AssetForm({
       account_id: asset.account_id || '',
       category_id: asset.category_id || '',
       notes: asset.notes || '',
+      assigned_to: asset.assigned_to || '',
     } : {
       type: 'real_estate',
       status: 'active',
       depreciation_method: 'none',
       current_value_cents: undefined,
+      assigned_to: '',
     },
   });
 
@@ -146,6 +151,9 @@ export default function AssetForm({
           delete cleanedData[key];
         }
       }
+      
+      // Add assigned_to
+      cleanedData.assigned_to = assignedTo || undefined;
       
       // Add create_purchase_transaction flag if creating new asset
       if (!asset && createPurchaseTransaction) {
@@ -549,6 +557,45 @@ export default function AssetForm({
           rows={3}
         />
       </div>
+
+      {/* Responsible Person */}
+      {members.length > 1 && (
+        <div>
+          <Label htmlFor="assigned_to">Responsável</Label>
+          <Select
+            value={assignedTo}
+            onValueChange={setAssignedTo}
+            disabled={loadingMembers}
+          >
+            <SelectTrigger id="assigned_to" className="w-full">
+              <SelectValue placeholder="Selecione o responsável" />
+            </SelectTrigger>
+            <SelectContent>
+              {members.map((member) => (
+                <SelectItem key={member.id} value={member.id}>
+                  <div className="flex items-center gap-2">
+                    {member.avatarUrl ? (
+                      <img
+                        src={member.avatarUrl}
+                        alt={member.fullName || 'Avatar'}
+                        className="w-5 h-5 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">
+                        {(member.fullName || member.email)[0].toUpperCase()}
+                      </div>
+                    )}
+                    <span>{member.fullName || member.email}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground mt-1">
+            Quem é responsável por este bem?
+          </p>
+        </div>
+      )}
 
       {/* Criar transação de compra (apenas para novos assets) */}
       {!asset && (

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientFromRequest } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getUserId } from '@/lib/auth';
 import { goalSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
@@ -33,6 +34,29 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) throw error;
+
+    // Fetch assigned_to profiles separately using admin client (bypasses RLS)
+    const assignedToIds = [...new Set((data || [])
+      .map((goal: any) => goal.assigned_to)
+      .filter((id: string | null) => id !== null))] as string[];
+
+    let profilesMap: Record<string, any> = {};
+    if (assignedToIds.length > 0) {
+      const admin = createAdminClient();
+      const { data: profiles, error: profilesError } = await admin
+        .from('profiles')
+        .select('id, full_name, email, avatar_url')
+        .in('id', assignedToIds);
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+      } else if (profiles) {
+        profilesMap = profiles.reduce((acc: Record<string, any>, profile: any) => {
+          acc[profile.id] = profile;
+          return acc;
+        }, {});
+      }
+    }
 
     // Recalculate current amounts from transactions for each goal
     if (data && data.length > 0) {
@@ -72,7 +96,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ data });
+    // Merge assigned_to_profile data
+    const transformedData = (data || []).map((goal: any) => {
+      const assignedProfile = goal.assigned_to 
+        ? (profilesMap[goal.assigned_to] || null)
+        : null;
+
+      return {
+        ...goal,
+        assigned_to_profile: assignedProfile,
+      };
+    });
+
+    return NextResponse.json({ data: transformedData });
   } catch (error) {
     const errorResponse = createErrorResponse(error);
     return NextResponse.json(
@@ -151,6 +187,7 @@ export async function POST(request: NextRequest) {
       account_id: validated.account_id,
       category_id: category?.id || validated.category_id,
       notes: validated.notes,
+      assigned_to: validated.assigned_to || null,
     };
 
     // Add contribution fields that may not exist
@@ -162,6 +199,9 @@ export async function POST(request: NextRequest) {
     }
     if (!hasCustomPlan && validated.contribution_frequency !== undefined) {
       contributionFields.contribution_frequency = validated.contribution_frequency;
+    }
+    if (!hasCustomPlan && validated.contribution_count !== undefined) {
+      contributionFields.contribution_count = validated.contribution_count;
     }
 
     // Add image fields that may not exist
@@ -265,6 +305,7 @@ export async function POST(request: NextRequest) {
           include_in_plan: data.include_in_plan,
             status: data.status,
             contribution_frequency: data.contribution_frequency,
+            contribution_count: data.contribution_count,
             monthly_contribution_cents: data.monthly_contribution_cents,
             target_amount_cents: data.target_amount_cents,
             current_amount_cents: data.current_amount_cents || 0,

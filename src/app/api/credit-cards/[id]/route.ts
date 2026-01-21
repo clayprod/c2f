@@ -128,6 +128,7 @@ export async function PATCH(
     }
     // Note: interest_rate_monthly and interest_rate_annual columns don't exist in accounts table, so we skip them
     if (validated.color !== undefined) updateData.color = validated.color;
+    if (validated.assigned_to !== undefined) updateData.assigned_to = validated.assigned_to || null;
 
     // Handle default card
     if (validated.is_default === true) {

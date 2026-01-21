@@ -4,7 +4,6 @@ import TopBanner from '@/components/landing/TopBanner';
 import Navbar from '@/components/landing/Navbar';
 import Hero from '@/components/landing/Hero';
 import Metrics from '@/components/landing/Metrics';
-import LogoCloud from '@/components/landing/LogoCloud';
 import Evolution from '@/components/landing/Evolution';
 import Features from '@/components/landing/Features';
 import Demo from '@/components/landing/Demo';
@@ -22,7 +21,6 @@ export default function HomePage() {
       <main>
         <Hero />
         <Metrics />
-        <LogoCloud />
         <Evolution />
         <Features />
         <Demo />

@@ -48,6 +48,12 @@ const formatCurrency = (value: number) => {
   }).format(value);
 };
 
+// Função para truncar texto do início (mostrar o final)
+const truncateStart = (text: string, maxLength: number) => {
+  if (text.length <= maxLength) return text;
+  return '...' + text.slice(-(maxLength - 3));
+};
+
 // Função para obter o nome do mês atual no timezone do Brasil (UTC-3)
 const getCurrentMonthName = () => {
   const now = new Date();
@@ -67,6 +73,8 @@ export default function DashboardPage() {
   const { isFree, loading: profileLoading } = useProfile();
   const [maxVisibleItems, setMaxVisibleItems] = useState(9);
   const containerRef = useRef<HTMLDivElement>(null);
+  const budgetsContainerRef = useRef<HTMLDivElement>(null);
+  const transactionsContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -88,6 +96,57 @@ export default function DashboardPage() {
     observer.observe(containerRef.current);
     return () => observer.disconnect();
   }, [loading]); // Re-attach if loading state changes layout, though mostly static ref.
+
+  // Sincronizar altura entre orçamentos e transações no desktop
+  useEffect(() => {
+    let lastHeight = 0;
+
+    const syncHeights = () => {
+      if (!transactionsContainerRef.current) return;
+
+      if (window.innerWidth < 1024) {
+        transactionsContainerRef.current.style.height = '';
+        lastHeight = 0;
+        return;
+      }
+
+      if (!budgetsContainerRef.current) return;
+
+      const budgetsCard = budgetsContainerRef.current.querySelector('.glass-card') as HTMLElement;
+      if (!budgetsCard) return;
+
+      const budgetsHeight = budgetsCard.offsetHeight;
+
+      // Só atualizar se a altura mudou e é válida
+      if (budgetsHeight > 100 && budgetsHeight !== lastHeight) {
+        lastHeight = budgetsHeight;
+        transactionsContainerRef.current.style.height = `${budgetsHeight}px`;
+        transactionsContainerRef.current.style.overflow = 'hidden';
+      }
+    };
+
+    // Intervalo contínuo para manter sincronizado
+    const intervalId = setInterval(syncHeights, 200);
+
+    // ResizeObserver como backup
+    const resizeObserver = new ResizeObserver(syncHeights);
+
+    if (budgetsContainerRef.current) {
+      resizeObserver.observe(budgetsContainerRef.current);
+      const budgetsCard = budgetsContainerRef.current.querySelector('.glass-card');
+      if (budgetsCard) {
+        resizeObserver.observe(budgetsCard);
+      }
+    }
+
+    window.addEventListener('resize', syncHeights);
+
+    return () => {
+      clearInterval(intervalId);
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', syncHeights);
+    };
+  }, [loading, recentTransactions.length]);
 
   // Memoizar o nome do mês atual para evitar recálculos
   const currentMonthName = useMemo(() => {
@@ -547,11 +606,13 @@ export default function DashboardPage() {
 
       <ExpensesByCategoryChart />
 
-      <div className="grid md:grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+      <div className="grid md:grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 lg:items-stretch items-start">
         <PlanGuard minPlan="pro" showFallback={false}>
-          <BudgetsByCategory />
+          <div ref={budgetsContainerRef}>
+            <BudgetsByCategory />
+          </div>
         </PlanGuard>
-        <div className="glass-card p-4 md:p-6 h-full flex flex-col">
+        <div ref={transactionsContainerRef} className="glass-card p-4 md:p-6 flex flex-col lg:overflow-hidden">
           <div className="flex items-center justify-between mb-4 flex-shrink-0">
             <div className="flex items-center gap-2">
               <h2 className="font-display font-semibold text-sm md:text-base">Transações Recentes</h2>
@@ -607,7 +668,7 @@ export default function DashboardPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Descrição</th>
+                      <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground w-[40%]">Descrição</th>
                       <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Data</th>
                       <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">Valor</th>
                     </tr>
@@ -615,8 +676,10 @@ export default function DashboardPage() {
                   <tbody>
                     {recentTransactions.slice(0, 9).map((tx) => (
                       <tr key={tx.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                        <td className="py-2 px-3 text-xs min-w-0">
-                          <div className="truncate max-w-[200px]" title={tx.description}>{tx.description}</div>
+                        <td className="py-2 px-3 text-xs min-w-0 max-w-[140px]">
+                          <div className="text-left" title={tx.description}>
+                            {truncateStart(tx.description, 25)}
+                          </div>
                           <div className="text-[10px] text-muted-foreground mt-0.5">
                             {tx.categories?.name || 'Sem categoria'}
                           </div>
@@ -643,11 +706,11 @@ export default function DashboardPage() {
                 </table>
               </div>
               {/* Desktop: Full table view */}
-              <div className="hidden lg:block overflow-x-hidden">
+              <div className="hidden lg:block overflow-hidden">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Descrição</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground w-[30%]">Descrição</th>
                       <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Categoria</th>
                       <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Data</th>
                       <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Valor</th>
@@ -656,8 +719,10 @@ export default function DashboardPage() {
                   <tbody>
                     {recentTransactions.slice(0, maxVisibleItems).map((tx) => (
                       <tr key={tx.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                        <td className="py-3 px-4 text-sm min-w-0 max-w-[150px] xl:max-w-[300px]">
-                          <div className="truncate" title={tx.description}>{tx.description}</div>
+                        <td className="py-3 px-4 text-sm min-w-0 max-w-[180px]">
+                          <div className="text-left" title={tx.description}>
+                            {truncateStart(tx.description, 35)}
+                          </div>
                         </td>
                         <td className="py-3 px-4">
                           <span className="badge-pill text-xs">

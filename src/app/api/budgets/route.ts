@@ -742,3 +742,159 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function DELETE(request: NextRequest) {
+  try {
+    const userId = await getUserId(request);
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const ownerId = await getEffectiveOwnerId(request, userId);
+
+    const { searchParams } = new URL(request.url);
+    const month = searchParams.get('month');
+
+    if (!month) {
+      return NextResponse.json(
+        { error: 'Parâmetro month é obrigatório' },
+        { status: 400 }
+      );
+    }
+
+    const [yearStr, monthStr] = month.split('-');
+    const yearNum = parseInt(yearStr, 10);
+    const monthNum = parseInt(monthStr, 10);
+
+    if (isNaN(yearNum) || isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+      return NextResponse.json(
+        { error: 'Formato de mês inválido. Use YYYY-MM' },
+        { status: 400 }
+      );
+    }
+
+    const { supabase } = createClientFromRequest(request);
+
+    // First, get all manual budgets for this month to verify they exist
+    // Only delete manual budgets (not auto-generated ones)
+    let query = supabase
+      .from('budgets')
+      .select('id, is_auto_generated, source_type')
+      .eq('user_id', ownerId)
+      .eq('year', yearNum)
+      .eq('month', monthNum);
+
+    // Try with is_auto_generated column first
+    const budgetsResult = await query;
+
+    // If column doesn't exist, fallback to checking source_type
+    if (budgetsResult.error?.code === '42703' && budgetsResult.error?.message?.includes('is_auto_generated')) {
+      const fallbackQuery = supabase
+        .from('budgets')
+        .select('id, source_type')
+        .eq('user_id', ownerId)
+        .eq('year', yearNum)
+        .eq('month', monthNum);
+      
+      const fallbackResult = await fallbackQuery;
+      
+      if (fallbackResult.error) {
+        return NextResponse.json(
+          { error: 'Erro ao buscar orçamentos', details: fallbackResult.error.message },
+          { status: 500 }
+        );
+      }
+
+      // Filter out auto-generated budgets based on source_type
+      const manualBudgets = (fallbackResult.data || []).filter(
+        (b: any) => !b.source_type || b.source_type === 'manual'
+      );
+
+      if (manualBudgets.length === 0) {
+        return NextResponse.json(
+          { message: 'Nenhum orçamento manual encontrado para excluir', deleted_count: 0 },
+          { status: 200 }
+        );
+      }
+
+      // Delete manual budgets
+      const budgetIds = manualBudgets.map((b: any) => b.id);
+      const { error: deleteError } = await supabase
+        .from('budgets')
+        .delete()
+        .eq('user_id', ownerId)
+        .in('id', budgetIds);
+
+      if (deleteError) {
+        return NextResponse.json(
+          { error: 'Erro ao excluir orçamentos', details: deleteError.message },
+          { status: 500 }
+        );
+      }
+
+      // Clear cache
+      try {
+        projectionCache.invalidateUser(ownerId);
+      } catch (cacheError) {
+        console.error('Cache invalidation error:', cacheError);
+      }
+
+      return NextResponse.json(
+        { message: `${manualBudgets.length} orçamento(s) excluído(s) com sucesso`, deleted_count: manualBudgets.length },
+        { status: 200 }
+      );
+    }
+
+    if (budgetsResult.error) {
+      return NextResponse.json(
+        { error: 'Erro ao buscar orçamentos', details: budgetsResult.error.message },
+        { status: 500 }
+      );
+    }
+
+    // Filter out auto-generated budgets
+    const manualBudgets = (budgetsResult.data || []).filter(
+      (b: any) => !b.is_auto_generated && (!b.source_type || b.source_type === 'manual')
+    );
+
+    if (manualBudgets.length === 0) {
+      return NextResponse.json(
+        { message: 'Nenhum orçamento manual encontrado para excluir', deleted_count: 0 },
+        { status: 200 }
+      );
+    }
+
+    // Delete manual budgets
+    const budgetIds = manualBudgets.map((b: any) => b.id);
+    const { error: deleteError } = await supabase
+      .from('budgets')
+      .delete()
+      .eq('user_id', ownerId)
+      .in('id', budgetIds);
+
+    if (deleteError) {
+      return NextResponse.json(
+        { error: 'Erro ao excluir orçamentos', details: deleteError.message },
+        { status: 500 }
+      );
+    }
+
+    // Clear cache
+    try {
+      projectionCache.invalidateUser(ownerId);
+    } catch (cacheError) {
+      console.error('Cache invalidation error:', cacheError);
+    }
+
+    return NextResponse.json(
+      { message: `${manualBudgets.length} orçamento(s) excluído(s) com sucesso`, deleted_count: manualBudgets.length },
+      { status: 200 }
+    );
+  } catch (error: any) {
+    console.error('Delete all budgets error:', error);
+    const errorResponse = createErrorResponse(error);
+    return NextResponse.json(
+      { error: errorResponse.error || 'Erro ao excluir orçamentos' },
+      { status: errorResponse.statusCode || 500 }
+    );
+  }
+}
+

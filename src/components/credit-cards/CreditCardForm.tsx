@@ -15,6 +15,8 @@ import {
 } from '@/components/ui/dialog';
 import { MonthYearPicker } from '@/components/ui/month-year-picker';
 import { useToast } from '@/hooks/use-toast';
+import { useMembers } from '@/hooks/useMembers';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface CreditCard {
   id: string;
@@ -76,6 +78,8 @@ export default function CreditCardForm({
     is_default: false,
   });
   const { toast } = useToast();
+  const { members, loading: loadingMembers } = useMembers();
+  const [assignedTo, setAssignedTo] = useState<string>('');
 
   useEffect(() => {
     if (card) {
@@ -117,6 +121,7 @@ export default function CreditCardForm({
         color: '#1a1a2e',
         is_default: false,
       });
+      setAssignedTo('');
     }
   }, [card, open]);
 
@@ -190,6 +195,7 @@ export default function CreditCardForm({
         interest_rate_annual: formData.interest_rate_annual ? parseFloat(formData.interest_rate_annual) : 0,
         color: formData.color,
         is_default: formData.is_default,
+        assigned_to: assignedTo || undefined,
       };
 
       const res = await fetch(url, {
@@ -433,6 +439,45 @@ export default function CreditCardForm({
               </div>
             </div>
           </div>
+
+          {/* Responsible Person */}
+          {members.length > 1 && (
+            <div>
+              <Label htmlFor="assigned_to">Responsável</Label>
+              <Select
+                value={assignedTo}
+                onValueChange={setAssignedTo}
+                disabled={loadingMembers}
+              >
+                <SelectTrigger id="assigned_to" className="w-full">
+                  <SelectValue placeholder="Selecione o responsável" />
+                </SelectTrigger>
+                <SelectContent>
+                  {members.map((member) => (
+                    <SelectItem key={member.id} value={member.id}>
+                      <div className="flex items-center gap-2">
+                        {member.avatarUrl ? (
+                          <img
+                            src={member.avatarUrl}
+                            alt={member.fullName || 'Avatar'}
+                            className="w-5 h-5 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">
+                            {(member.fullName || member.email)[0].toUpperCase()}
+                          </div>
+                        )}
+                        <span>{member.fullName || member.email}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Quem é responsável por este cartão?
+              </p>
+            </div>
+          )}
 
           {/* Default Option */}
           <div className="flex items-center gap-3">
