@@ -83,6 +83,43 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function PATCH(request: NextRequest) {
+  try {
+    await requireAdmin(request);
+
+    const body = await request.json();
+    const { product_id, description } = body;
+
+    if (!product_id) {
+      return NextResponse.json(
+        { error: 'product_id is required' },
+        { status: 400 }
+      );
+    }
+
+    const stripe = getStripeClient();
+
+    // Update product description in Stripe
+    const updatedProduct = await stripe.products.update(product_id, {
+      description: description || '',
+    });
+
+    return NextResponse.json({
+      product: {
+        id: updatedProduct.id,
+        name: updatedProduct.name,
+        description: updatedProduct.description,
+      },
+      message: 'Product description updated successfully.',
+    });
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error.message || 'Failed to update product description' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PUT(request: NextRequest) {
   try {
     await requireAdmin(request);

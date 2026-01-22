@@ -17,7 +17,7 @@ interface Category {
   id: string;
   name: string;
   type: string;
-  source_type?: 'general' | 'credit_card' | 'investment' | 'goal' | 'debt' | 'asset' | null;
+  source_type?: 'general' | 'credit_card' | 'investment' | 'goal' | 'debt' | 'asset' | 'receivable' | null;
 }
 
 interface ReplicateCategoryModalProps {

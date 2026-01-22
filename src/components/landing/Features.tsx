@@ -15,7 +15,7 @@ const features = [
     description: 'Defina metas de gastos e veja projeções baseadas no seu histórico.',
   },
   {
-    icon: 'bx-sparkles-alt',
+    icon: 'bx-sparkles',
     title: 'AI Advisor',
     description: 'Insights personalizados e ações sugeridas pela inteligência artificial.',
   },

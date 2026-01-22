@@ -183,7 +183,7 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
         <div className={`${inDialog ? 'lg:col-span-2' : 'md:col-span-2 lg:col-span-2'} glass-card p-3 sm:p-4 md:p-6 flex flex-col min-h-0 overflow-hidden max-w-full min-w-0`}>
           <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-2">
             <div className="flex items-center gap-2 min-w-0">
-              <i className='bx bx-sparkles-alt text-xl sm:text-2xl text-purple-600 flex-shrink-0'></i>
+              <i className='bx bx-sparkles text-xl sm:text-2xl text-purple-600 flex-shrink-0'></i>
               <h2 className="font-display font-semibold text-base sm:text-lg truncate">Chat com Advisor</h2>
             </div>
             {messages.length > 1 && (
@@ -228,7 +228,7 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
                       <ul className="space-y-1">
                         {msg.insights.map((insight, i) => (
                           <li key={i} className="flex items-start gap-2 text-xs sm:text-sm">
-                            <i className={`bx ${insight.severity === 'high' ? 'bx-error-circle text-red-500' : insight.severity === 'medium' ? 'bx-error text-yellow-500' : 'bx-sparkles-alt text-purple-600'} mt-0.5 flex-shrink-0`}></i>
+                            <i className={`bx ${insight.severity === 'high' ? 'bx-error-circle text-red-500' : insight.severity === 'medium' ? 'bx-error text-yellow-500' : 'bx-sparkles text-purple-600'} mt-0.5 flex-shrink-0`}></i>
                             <span className="break-words">{typeof insight === 'string' ? insight : insight.message}</span>
                           </li>
                         ))}

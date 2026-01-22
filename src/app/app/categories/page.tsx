@@ -61,6 +61,35 @@ export default function CategoriesPage() {
   });
   const { toast } = useToast();
 
+  // Reset scroll imediatamente no mount e quando loading terminar
+  useEffect(() => {
+    const resetScroll = () => {
+      const mainElement = document.querySelector('main');
+      if (mainElement) {
+        mainElement.scrollTop = 0;
+      }
+      window.scrollTo(0, 0);
+    };
+
+    // Reset imediato
+    resetScroll();
+
+    // Reset após pequeno delay para pegar qualquer scroll restoration do navegador
+    const timer = setTimeout(resetScroll, 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Reset scroll adicional quando o loading terminar
+  useEffect(() => {
+    if (!loading) {
+      const mainElement = document.querySelector('main');
+      if (mainElement) {
+        mainElement.scrollTop = 0;
+      }
+      window.scrollTo(0, 0);
+    }
+  }, [loading]);
+
   useEffect(() => {
     fetchCategories();
     fetchCategoriesWithTransactions();

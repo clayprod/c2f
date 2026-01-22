@@ -40,6 +40,7 @@ interface Budget {
   amount_actual?: number;
   categories?: Category;
   is_projected?: boolean;
+  source_type?: 'manual' | 'credit_card' | 'goal' | 'debt' | 'installment' | 'investment' | 'receivable';
 }
 
 type FilterStatus = 'all' | 'over' | 'warning' | 'ok';
@@ -210,6 +211,13 @@ export function BudgetsByCategory() {
             const categoryName = budget.categories?.name || 'Sem categoria';
             const categoryIcon = budget.categories?.icon || '🎯';
             const categoryColor = budget.categories?.color || '#3b82f6';
+            
+            // Identify if budget is automatic (same logic as budgets page)
+            const autoSourceTypes = ['credit_card', 'investment', 'goal', 'debt', 'receivable'];
+            const categorySourceType = (budget.categories as any)?.source_type;
+            const isAutomatic = autoSourceTypes.includes(categorySourceType || '') ||
+              autoSourceTypes.includes(budget.source_type || '') ||
+              budget.is_projected === true;
 
             return (
               <div
@@ -285,12 +293,14 @@ export function BudgetsByCategory() {
 
                   <div className="grid grid-cols-2 gap-1 md:gap-1.5 lg:gap-2 pt-1 border-t border-border/10 hidden md:grid">
                     <div className="flex flex-col">
-                      <span className="text-[8px] md:text-[9px] lg:text-[10px] text-muted-foreground uppercase font-semibold">Objetivo</span>
+                      <span className="text-[8px] md:text-[9px] lg:text-[10px] text-muted-foreground uppercase font-semibold">
+                        {isAutomatic ? "Pendente" : "Objetivo"}
+                      </span>
                       <span className="text-[9px] md:text-[10px] lg:text-xs font-medium truncate">{formatCurrency(limit)}</span>
                     </div>
                     <div className="flex flex-col text-right">
                       <span className="text-[8px] md:text-[9px] lg:text-[10px] text-muted-foreground uppercase font-semibold">
-                        {isOver ? "Excedente" : "Disponível"}
+                        {isOver ? "Excedente" : (isAutomatic ? "A pagar" : "Disponível")}
                       </span>
                       <span className={cn(
                         "text-[9px] md:text-[10px] lg:text-xs font-bold",

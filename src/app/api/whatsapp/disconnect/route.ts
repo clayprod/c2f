@@ -5,23 +5,20 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getUserId } from '@/lib/auth';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 import { disconnectWhatsApp } from '@/services/whatsapp/verification';
 
-async function getUserId(request: NextRequest): Promise<string | null> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  return user?.id || null;
-}
-
 export async function DELETE(request: NextRequest) {
-  const userId = await getUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   try {
-    const result = await disconnectWhatsApp(userId);
+    const userId = await getUserId(request);
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const ownerId = await getEffectiveOwnerId(request, userId);
+
+    const result = await disconnectWhatsApp(ownerId);
 
     if (!result.success) {
       return NextResponse.json({

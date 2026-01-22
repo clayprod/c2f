@@ -1,16 +1,47 @@
+import { getGlobalSettings } from '@/services/admin/globalSettings';
+
 interface PluggyConfig {
   clientId: string;
   clientSecret: string;
   baseUrl: string;
 }
 
-let config: PluggyConfig | null = null;
+let cachedConfig: PluggyConfig | null = null;
+let configCacheTime: number = 0;
+const CONFIG_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 let accessToken: string | null = null;
 let tokenExpiresAt: number = 0;
 
-export function getPluggyConfig(): PluggyConfig {
-  if (!config) {
-    config = {
+/**
+ * Get Pluggy configuration from GlobalSettings with fallback to env vars
+ */
+export async function getPluggyConfig(): Promise<PluggyConfig> {
+  // Check cache
+  if (cachedConfig && Date.now() - configCacheTime < CONFIG_CACHE_TTL) {
+    return cachedConfig;
+  }
+
+  try {
+    const settings = await getGlobalSettings();
+    
+    const config: PluggyConfig = {
+      clientId: settings.pluggy_client_id || process.env.PLUGGY_CLIENT_ID || '',
+      clientSecret: settings.pluggy_client_secret || process.env.PLUGGY_CLIENT_SECRET || '',
+      baseUrl: process.env.PLUGGY_BASE_URL || 'https://api.pluggy.ai',
+    };
+
+    if (!config.clientId || !config.clientSecret) {
+      throw new Error('Pluggy credentials not configured');
+    }
+
+    cachedConfig = config;
+    configCacheTime = Date.now();
+
+    return config;
+  } catch (error: any) {
+    // Fallback to env vars only
+    const config: PluggyConfig = {
       clientId: process.env.PLUGGY_CLIENT_ID || '',
       clientSecret: process.env.PLUGGY_CLIENT_SECRET || '',
       baseUrl: process.env.PLUGGY_BASE_URL || 'https://api.pluggy.ai',
@@ -19,8 +50,31 @@ export function getPluggyConfig(): PluggyConfig {
     if (!config.clientId || !config.clientSecret) {
       throw new Error('Pluggy credentials not configured');
     }
+
+    return config;
   }
-  return config;
+}
+
+/**
+ * Check if Pluggy integration is enabled
+ */
+export async function isPluggyEnabled(): Promise<boolean> {
+  try {
+    const settings = await getGlobalSettings();
+    return settings.pluggy_enabled || false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Clear the config cache (call after settings update)
+ */
+export function clearPluggyConfigCache(): void {
+  cachedConfig = null;
+  configCacheTime = 0;
+  accessToken = null;
+  tokenExpiresAt = 0;
 }
 
 async function getAccessToken(): Promise<string> {
@@ -29,7 +83,7 @@ async function getAccessToken(): Promise<string> {
     return accessToken;
   }
 
-  const cfg = getPluggyConfig();
+  const cfg = await getPluggyConfig();
   const response = await fetch(`${cfg.baseUrl}/auth`, {
     method: 'POST',
     headers: {
@@ -62,7 +116,7 @@ async function request<T>(
   retries = 3
 ): Promise<T> {
   const token = await getAccessToken();
-  const cfg = getPluggyConfig();
+  const cfg = await getPluggyConfig();
   const url = `${cfg.baseUrl}${endpoint}`;
 
   for (let attempt = 0; attempt < retries; attempt++) {
@@ -120,4 +174,3 @@ export const pluggyClient = {
     return request<T>('DELETE', endpoint);
   },
 };
-

@@ -20,6 +20,11 @@ import { useToast } from '@/hooks/use-toast';
 
 type ValuationFormData = z.infer<typeof assetValuationSchema>;
 
+// Form data type that accepts value as string (reais) before conversion
+type ValuationFormInput = Omit<ValuationFormData, 'value_cents'> & {
+  value_reais: string;
+};
+
 interface Valuation {
   id: string;
   valuation_date: string;
@@ -35,6 +40,21 @@ interface ValuationFormProps {
   onCancel?: () => void;
 }
 
+// Schema for form input (accepts value as string in reais)
+const valuationFormInputSchema = z.object({
+  asset_id: z.string().uuid('ID do bem inválido'),
+  valuation_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (use YYYY-MM-DD)'),
+  value_reais: z.string().min(1, 'Valor é obrigatório').refine(
+    (val) => {
+      const num = parseFloat(val.replace(',', '.'));
+      return !isNaN(num) && num > 0;
+    },
+    { message: 'Valor deve ser um número positivo' }
+  ),
+  valuation_type: z.enum(['manual', 'depreciation', 'market']).default('manual'),
+  notes: z.string().optional(),
+});
+
 export default function ValuationForm({ assetId, valuation, onSubmit, onCancel }: ValuationFormProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -47,13 +67,13 @@ export default function ValuationForm({ assetId, valuation, onSubmit, onCancel }
     setValue,
     watch,
     reset,
-  } = useForm<ValuationFormData>({
-    resolver: zodResolver(assetValuationSchema),
+  } = useForm<ValuationFormInput>({
+    resolver: zodResolver(valuationFormInputSchema),
     defaultValues: {
       asset_id: assetId,
       valuation_date: valuation?.valuation_date || new Date().toISOString().split('T')[0],
       valuation_type: valuation?.valuation_type || 'manual',
-      value_cents: valuation?.value_cents,
+      value_reais: valuation ? (valuation.value_cents / 100).toFixed(2).replace('.', ',') : '',
       notes: valuation?.notes || '',
     },
   });
@@ -65,7 +85,7 @@ export default function ValuationForm({ assetId, valuation, onSubmit, onCancel }
         asset_id: assetId,
         valuation_date: valuation.valuation_date,
         valuation_type: valuation.valuation_type,
-        value_cents: valuation.value_cents,
+        value_reais: (valuation.value_cents / 100).toFixed(2).replace('.', ','),
         notes: valuation.notes || '',
       });
     } else {
@@ -73,16 +93,29 @@ export default function ValuationForm({ assetId, valuation, onSubmit, onCancel }
         asset_id: assetId,
         valuation_date: new Date().toISOString().split('T')[0],
         valuation_type: 'manual',
-        value_cents: undefined,
+        value_reais: '',
         notes: '',
       });
     }
   }, [valuation, assetId, reset]);
 
-  const onFormSubmit = async (data: ValuationFormData) => {
+  const onFormSubmit = async (data: ValuationFormInput) => {
     try {
       setLoading(true);
-      await onSubmit(data);
+      // Convert value_reais (string) to value_cents (number)
+      const valueInReais = parseFloat(data.value_reais.replace(',', '.'));
+      const valueCents = Math.round(valueInReais * 100);
+
+      // Transform to the expected API format
+      const apiData: ValuationFormData = {
+        asset_id: data.asset_id,
+        valuation_date: data.valuation_date,
+        value_cents: valueCents,
+        valuation_type: data.valuation_type,
+        notes: data.notes,
+      };
+
+      await onSubmit(apiData);
       if (!isEditing) {
         reset();
       }
@@ -116,20 +149,16 @@ export default function ValuationForm({ assetId, valuation, onSubmit, onCancel }
       </div>
 
       <div>
-        <Label htmlFor="value_cents">Valor *</Label>
+        <Label htmlFor="value_reais">Valor (R$) *</Label>
         <Input
-          id="value_cents"
-          type="number"
-          step="0.01"
-          defaultValue={valuation ? (valuation.value_cents / 100).toFixed(2) : undefined}
-          {...register('value_cents', {
-            valueAsNumber: true,
-            setValueAs: (v) => Math.round((typeof v === 'string' ? parseFloat(v) : v) * 100),
-          })}
-          placeholder="0.00"
+          id="value_reais"
+          type="text"
+          inputMode="decimal"
+          {...register('value_reais')}
+          placeholder="0,00"
         />
-        {errors.value_cents && (
-          <p className="text-sm text-red-500 mt-1">{errors.value_cents.message}</p>
+        {errors.value_reais && (
+          <p className="text-sm text-red-500 mt-1">{errors.value_reais.message}</p>
         )}
       </div>
 

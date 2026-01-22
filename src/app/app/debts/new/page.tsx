@@ -7,16 +7,13 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { format } from 'date-fns';
-import { pt } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
-import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import { useMembers } from '@/hooks/useMembers';
 
 export default function NewDebtPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { confirm, ConfirmDialog } = useConfirmDialog();
   const { members, loading: loadingMembers } = useMembers();
   const [assignedTo, setAssignedTo] = useState<string>('');
   const [formData, setFormData] = useState({
@@ -30,9 +27,6 @@ export default function NewDebtPage() {
     status: 'pendente',
     priority: 'medium',
     notes: '',
-    payment_frequency: '',
-    payment_amount_cents: '',
-    installment_count: '',
     include_in_plan: true,
     contribution_frequency: 'monthly',
     monthly_payment_cents: '',
@@ -82,27 +76,6 @@ export default function NewDebtPage() {
         }
       }
 
-      // Validate installment calculation if status is 'negociada'
-      if (formData.status === 'negociada') {
-        const paymentAmount = parseFloat(formData.payment_amount_cents) * 100;
-        const installmentCount = parseInt(formData.installment_count || '0');
-        const totalAmount = parseFloat(formData.total_amount_cents) * 100;
-        const totalFromInstallments = paymentAmount * installmentCount;
-
-        if (totalFromInstallments > totalAmount) {
-          const confirmed = await confirm({
-            title: 'Ajustar Valor da Dívida',
-            description: `O valor total das parcelas (${(totalFromInstallments / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}) é maior que o valor da dívida (${(totalAmount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}). Deseja ajustar o valor total da dívida para ${(totalFromInstallments / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}?`,
-            confirmText: 'Ajustar',
-            cancelText: 'Cancelar',
-          });
-
-          if (confirmed) {
-            formData.total_amount_cents = (totalFromInstallments / 100).toFixed(2);
-          }
-        }
-      }
-
       const response = await fetch('/api/debts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -118,13 +91,6 @@ export default function NewDebtPage() {
           priority: formData.priority,
           notes: formData.notes || undefined,
           include_in_plan: formData.include_in_plan || useCustomPlan,
-          payment_frequency: formData.status === 'negociada' ? formData.payment_frequency : undefined,
-          payment_amount_cents: formData.status === 'negociada' && formData.payment_amount_cents
-            ? Math.round(parseFloat(formData.payment_amount_cents) * 100)
-            : undefined,
-          installment_count: formData.status === 'negociada' && formData.installment_count
-            ? parseInt(formData.installment_count)
-            : undefined,
           contribution_frequency: !useCustomPlan && formData.include_in_plan && formData.contribution_frequency
             ? formData.contribution_frequency
             : undefined,
@@ -353,62 +319,10 @@ export default function NewDebtPage() {
         )}
 
         <div className="border-t pt-6 space-y-4">
-          <h3 className="font-semibold mb-4">Informações de Negociação</h3>
+          <h3 className="font-semibold mb-4">Orçamento e Projeções</h3>
           <p className="text-sm text-muted-foreground">
-            As informações ficam visíveis e são aplicadas quando o status for &quot;Negociada&quot;.
+            Configure como esta dívida será incluída no orçamento e projeções.
           </p>
-          <div className="grid md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Frequência de Pagamento *</label>
-              <Select
-                value={formData.payment_frequency}
-                onValueChange={(value) => setFormData({ ...formData, payment_frequency: value })}
-                required={formData.status === 'negociada'}
-                disabled={formData.status !== 'negociada'}
-              >
-                <SelectTrigger className="w-full bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
-                  <SelectValue placeholder="Selecione a frequência" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="daily">Diário</SelectItem>
-                  <SelectItem value="weekly">Semanal</SelectItem>
-                  <SelectItem value="biweekly">Quinzenal</SelectItem>
-                  <SelectItem value="monthly">Mensal</SelectItem>
-                  <SelectItem value="quarterly">Trimestral</SelectItem>
-                  <SelectItem value="yearly">Anual</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Valor de Pagamento Periódico (R$) *</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.payment_amount_cents}
-                onChange={(e) => setFormData({ ...formData, payment_amount_cents: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                placeholder="0.00"
-                required={formData.status === 'negociada'}
-                disabled={formData.status !== 'negociada'}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Número de Parcelas *</label>
-              <input
-                type="number"
-                min="1"
-                value={formData.installment_count}
-                onChange={(e) => setFormData({ ...formData, installment_count: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                placeholder="0"
-                required={formData.status === 'negociada'}
-                disabled={formData.status !== 'negociada'}
-              />
-            </div>
-          </div>
 
           <div className="grid md:grid-cols-2 gap-4">
             <div className="flex items-center gap-3">
@@ -589,9 +503,6 @@ export default function NewDebtPage() {
           </Link>
         </div>
       </form>
-
-      {/* Adjust Value Confirmation Dialog */}
-      {ConfirmDialog}
     </div>
   );
 }

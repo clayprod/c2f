@@ -24,7 +24,7 @@ const steps = [
     number: '04',
     title: 'Advisor com ações e alertas',
     description: 'IA que detecta anomalias e sugere ações concretas.',
-    icon: 'bx-sparkles-alt',
+    icon: 'bx-sparkles',
     status: 'after',
   },
 ];

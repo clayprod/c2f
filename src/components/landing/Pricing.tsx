@@ -123,7 +123,7 @@ const Pricing = async () => {
               <div className="mb-6">
                 <h3 className="font-display font-semibold text-xl mb-2">{plan.name}</h3>
                 <div className="flex items-baseline gap-1 mb-2">
-                  <span className="font-display text-4xl font-bold">{plan.price}</span>
+                  <span className="font-display text-4xl font-bold">{plan.priceFormatted}</span>
                   <span className="text-muted-foreground text-sm">{plan.period}</span>
                 </div>
                 <p className="text-muted-foreground text-sm">{plan.description}</p>

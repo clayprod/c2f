@@ -12,6 +12,7 @@ import PriceManagement from '@/components/admin/PriceManagement';
 import PlanFeaturesSettings from '@/components/admin/PlanFeaturesSettings';
 import UserManagement from '@/components/admin/UserManagement';
 import WhatsAppSettings from '@/components/admin/WhatsAppSettings';
+import PluggySettings from '@/components/admin/PluggySettings';
 
 // Importação dinâmica para evitar problemas de resolução de módulos durante o build
 const BrazilMap = dynamic(() => import('@/components/admin/BrazilMap'), {
@@ -83,14 +84,15 @@ export default function AdminPage() {
       </div>
 
       <Tabs defaultValue="dashboard" className="w-full">
-        <TabsList className="grid w-full grid-cols-8">
+        <TabsList className="grid w-full grid-cols-9">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="map">Mapa</TabsTrigger>
           <TabsTrigger value="reports">Relatorios</TabsTrigger>
           <TabsTrigger value="users">Usuarios</TabsTrigger>
           <TabsTrigger value="settings">Config</TabsTrigger>
           <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
-          <TabsTrigger value="prices">Precos</TabsTrigger>
+          <TabsTrigger value="openfinance">Open Finance</TabsTrigger>
+          <TabsTrigger value="prices">Preços</TabsTrigger>
           <TabsTrigger value="plan-features">Planos</TabsTrigger>
         </TabsList>
 
@@ -118,6 +120,10 @@ export default function AdminPage() {
 
         <TabsContent value="whatsapp" className="mt-6">
           <WhatsAppSettings />
+        </TabsContent>
+
+        <TabsContent value="openfinance" className="mt-6">
+          <PluggySettings />
         </TabsContent>
 
         <TabsContent value="prices" className="mt-6">

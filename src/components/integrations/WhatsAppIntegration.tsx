@@ -17,6 +17,9 @@ interface WhatsAppStatus {
   verified: boolean;
   message?: string;
   instancePhoneNumber: string | null;
+  error?: string;
+  requiresUpgrade?: boolean;
+  currentPlan?: string;
 }
 
 interface WhatsAppIntegrationProps {
@@ -40,19 +43,59 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
       const data = await res.json();
 
       if (res.status === 403 && data.requiresUpgrade) {
-        // Premium required - this will be handled by parent component
-        setStatus(null);
+        // Plan doesn't have WhatsApp access - show upgrade message
+        setStatus({
+          enabled: false,
+          configured: false,
+          phoneNumber: null,
+          phoneNumberRaw: null,
+          status: null,
+          verifiedAt: null,
+          verified: false,
+          message: `A integração WhatsApp está disponível apenas nos planos Pro e Premium. Seu plano atual: ${data.currentPlan || 'Free'}`,
+          instancePhoneNumber: null,
+          error: data.error,
+          requiresUpgrade: true,
+          currentPlan: data.currentPlan,
+        });
+        setLoading(false);
         return;
       }
 
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to fetch status');
+        // Other errors - show error message
+        setStatus({
+          enabled: false,
+          configured: false,
+          phoneNumber: null,
+          phoneNumberRaw: null,
+          status: null,
+          verifiedAt: null,
+          verified: false,
+          message: data.error || data.message || 'Erro ao verificar status do WhatsApp',
+          instancePhoneNumber: null,
+          error: data.error,
+        });
+        setLoading(false);
+        return;
       }
 
       setStatus(data);
+      setLoading(false);
     } catch (error) {
       console.error('Error fetching WhatsApp status:', error);
-    } finally {
+      setStatus({
+        enabled: false,
+        configured: false,
+        phoneNumber: null,
+        phoneNumberRaw: null,
+        status: null,
+        verifiedAt: null,
+        verified: false,
+        message: 'Erro ao conectar com o servidor. Tente novamente mais tarde.',
+        instancePhoneNumber: null,
+        error: 'Network error',
+      });
       setLoading(false);
     }
   }, []);
@@ -250,8 +293,10 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
   }
 
   if (viewState === 'not_available') {
+    const isUpgradeRequired = status?.requiresUpgrade;
+    
     return (
-      <Card className="border-yellow-500/20 bg-yellow-500/5">
+      <Card className={`${isUpgradeRequired ? 'border-blue-500/20 bg-blue-500/5' : 'border-yellow-500/20 bg-yellow-500/5'}`}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <i className="bxl bx-whatsapp text-green-500 text-2xl"></i>
@@ -262,11 +307,21 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-2 text-yellow-600">
-            <i className="bx bx-info-circle"></i>
-            <span>
-              {status?.message || 'Esta integracao sera disponibilizada em breve'}
-            </span>
+          <div className={`flex items-start gap-2 ${isUpgradeRequired ? 'text-blue-600' : 'text-yellow-600'}`}>
+            <i className={`bx ${isUpgradeRequired ? 'bx-up-arrow-circle' : 'bx-info-circle'} mt-0.5`}></i>
+            <div className="flex-1">
+              <p className="font-medium mb-1">
+                {status?.message || 'Esta integracao sera disponibilizada em breve'}
+              </p>
+              {isUpgradeRequired && (
+                <a
+                  href="/pricing"
+                  className="text-sm underline hover:no-underline mt-2 inline-block"
+                >
+                  Ver planos disponíveis →
+                </a>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>

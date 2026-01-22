@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getUserId } from '@/lib/auth';
+import { getUserId, isAdmin } from '@/lib/auth';
 import { createErrorResponse } from '@/lib/errors';
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = await getUserId();
+    const userId = await getUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if user is admin (Pluggy/OpenFinance is admin-only)
+    const admin = await isAdmin(userId, request);
+    if (!admin) {
+      return NextResponse.json(
+        { error: 'A integração Open Finance está disponível apenas para administradores' },
+        { status: 403 }
+      );
     }
 
     const supabase = await createClient();

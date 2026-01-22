@@ -104,6 +104,34 @@ export function formatCurrency(cents: number | null | undefined): string {
 }
 
 /**
+ * Formata uma data para exibição no formato dd/mm/yyyy
+ * @param date - Data como Date, string (ISO ou YYYY-MM-DD) ou timestamp
+ * @returns String formatada no formato "dd/mm/yyyy"
+ */
+export function formatDate(date: Date | string | number | null | undefined): string {
+  if (!date) return '-';
+  
+  try {
+    let dateObj: Date;
+    
+    if (typeof date === 'string') {
+      // Handle ISO date strings or YYYY-MM-DD format
+      dateObj = new Date(date);
+    } else if (typeof date === 'number') {
+      dateObj = new Date(date);
+    } else {
+      dateObj = date;
+    }
+    
+    if (isNaN(dateObj.getTime())) return '-';
+    
+    return format(dateObj, 'dd/MM/yyyy', { locale: pt });
+  } catch {
+    return '-';
+  }
+}
+
+/**
  * Formata um valor em reais para exibição em reais brasileiros
  * @param value - Valor em reais
  * @returns String formatada no formato "R$ 1.234,56"

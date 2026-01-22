@@ -329,22 +329,37 @@ async function getBudgetsReport(
   userId: string,
   filters: ReportFilters
 ) {
-  const startMonth = filters.startDate.substring(0, 7) + '-01';
-  const endMonth = filters.endDate.substring(0, 7) + '-01';
+  // Extract year and month as integers from the date strings
+  const startYear = parseInt(filters.startDate.substring(0, 4), 10);
+  const startMonthNum = parseInt(filters.startDate.substring(5, 7), 10);
+  const endYear = parseInt(filters.endDate.substring(0, 4), 10);
+  const endMonthNum = parseInt(filters.endDate.substring(5, 7), 10);
+
+  // Build budgets query - fetch all budgets in the year range, then filter in code
+  // This handles multi-year periods correctly
+  let budgetsQuery = supabase
+    .from('budgets')
+    .select('amount_planned_cents, year, month, category_id, categories(name, type)')
+    .eq('user_id', userId)
+    .gte('year', startYear)
+    .lte('year', endYear);
+
+  // Build transactions query
+  let transactionsQuery = supabase
+    .from('transactions')
+    .select('amount, posted_at, category_id, categories(type)')
+    .eq('user_id', userId)
+    .gte('posted_at', filters.startDate)
+    .lte('posted_at', filters.endDate);
+
+  // Apply assignedTo filter to transactions for consistency with other reports
+  if (filters.assignedTo) {
+    transactionsQuery = transactionsQuery.eq('assigned_to', filters.assignedTo);
+  }
 
   const [budgetsResult, transactionsResult] = await Promise.all([
-    supabase
-      .from('budgets')
-      .select('amount_planned_cents, month, category_id, categories(name, type)')
-      .eq('user_id', userId)
-      .gte('month', startMonth)
-      .lte('month', endMonth),
-    supabase
-      .from('transactions')
-      .select('amount, posted_at, category_id, categories(type)')
-      .eq('user_id', userId)
-      .gte('posted_at', filters.startDate)
-      .lte('posted_at', filters.endDate),
+    budgetsQuery,
+    transactionsQuery,
   ]);
 
   if (budgetsResult.error) throw budgetsResult.error;
@@ -352,7 +367,8 @@ async function getBudgetsReport(
 
   interface BudgetWithCategory {
     amount_planned_cents: number;
-    month: string;
+    year: number;
+    month: number;
     category_id: string;
     categories?: { name: string; type: string } | null;
   }
@@ -364,8 +380,17 @@ async function getBudgetsReport(
     categories?: { type: string } | null;
   }
 
-  const budgets = budgetsResult.data as unknown as BudgetWithCategory[];
+  const allBudgets = budgetsResult.data as unknown as BudgetWithCategory[];
   const transactions = transactionsResult.data as unknown as TxForBudget[];
+
+  // Filter budgets by the exact month range (handles multi-year periods)
+  const budgets = allBudgets.filter((budget) => {
+    // Convert budget year/month to a comparable number (YYYYMM)
+    const budgetPeriod = budget.year * 100 + budget.month;
+    const startPeriod = startYear * 100 + startMonthNum;
+    const endPeriod = endYear * 100 + endMonthNum;
+    return budgetPeriod >= startPeriod && budgetPeriod <= endPeriod;
+  });
 
   const spentByCategory = new Map<string, number>();
   for (const tx of transactions) {
@@ -427,7 +452,7 @@ async function getGoalsReport(supabase: SupabaseClient, userId: string, filters:
 
   if (error) throw error;
 
-  const typedGoals = goals as unknown as GoalRow[];
+  const typedGoals = (goals || []) as unknown as GoalRow[];
 
   let totalTarget = 0;
   let totalCurrent = 0;
@@ -435,16 +460,20 @@ async function getGoalsReport(supabase: SupabaseClient, userId: string, filters:
   let activeCount = 0;
 
   const goalDetails = typedGoals.map((goal) => {
-    totalTarget += goal.target_amount_cents;
-    totalCurrent += goal.current_amount_cents;
+    // Handle null/undefined values safely
+    const targetAmount = goal.target_amount_cents || 0;
+    const currentAmount = goal.current_amount_cents || 0;
+    
+    totalTarget += targetAmount;
+    totalCurrent += currentAmount;
     if (goal.status === 'completed') completedCount++;
     if (goal.status === 'active') activeCount++;
 
-    const progress = goal.target_amount_cents > 0
-      ? (goal.current_amount_cents / goal.target_amount_cents) * 100
+    const progress = targetAmount > 0
+      ? (currentAmount / targetAmount) * 100
       : 0;
 
-    const remaining = goal.target_amount_cents - goal.current_amount_cents;
+    const remaining = targetAmount - currentAmount;
 
     let daysRemaining: number | null = null;
     let monthlyNeeded: number | null = null;
@@ -459,8 +488,8 @@ async function getGoalsReport(supabase: SupabaseClient, userId: string, filters:
     return {
       id: goal.id,
       name: goal.name,
-      target_cents: goal.target_amount_cents,
-      current_cents: goal.current_amount_cents,
+      target_cents: targetAmount,
+      current_cents: currentAmount,
       remaining_cents: remaining,
       progress,
       status: goal.status,

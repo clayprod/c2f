@@ -55,6 +55,7 @@ export interface GlobalSettings {
   // Prompts
   advisor_prompt?: string | null;
   tips_prompt?: string | null;
+  categorization_prompt?: string | null;
   // Advisor Settings
   tips_enabled?: boolean | null;
   chat_max_tokens?: number | null;
@@ -75,6 +76,10 @@ export interface GlobalSettings {
   evolution_webhook_secret?: string | null;
   n8n_api_key?: string | null;
   whatsapp_enabled?: boolean | null;
+  // Pluggy (Open Finance Integration)
+  pluggy_client_id?: string | null;
+  pluggy_client_secret?: string | null;
+  pluggy_enabled?: boolean | null;
   // Plan Features
   plan_features_free?: PlanFeatures | null;
   plan_features_pro?: PlanFeatures | null;
@@ -101,7 +106,7 @@ export async function getGlobalSettings(forceRefresh = false): Promise<GlobalSet
     const supabase = createAdminClient();
 
     // Define columns - some may not exist in older databases
-    const allColumns = 'support_email, support_whatsapp, smtp_host, smtp_port, smtp_user, smtp_password, smtp_from_email, smtp_secure, groq_api_key, openai_api_key, ai_model, ai_model_name, advisor_prompt, tips_prompt, tips_enabled, chat_max_tokens, session_ttl_minutes, stripe_price_id_pro, stripe_price_id_business, advisor_limit_pro, advisor_limit_premium, evolution_api_url, evolution_api_key, evolution_instance_name, evolution_webhook_secret, n8n_api_key, whatsapp_enabled, plan_features_free, plan_features_pro, plan_features_premium, plan_display_config';
+    const allColumns = 'support_email, support_whatsapp, smtp_host, smtp_port, smtp_user, smtp_password, smtp_from_email, smtp_secure, groq_api_key, openai_api_key, ai_model, ai_model_name, advisor_prompt, tips_prompt, categorization_prompt, tips_enabled, chat_max_tokens, session_ttl_minutes, stripe_price_id_pro, stripe_price_id_business, advisor_limit_pro, advisor_limit_premium, evolution_api_url, evolution_api_key, evolution_instance_name, evolution_webhook_secret, n8n_api_key, whatsapp_enabled, pluggy_client_id, pluggy_client_secret, pluggy_enabled, plan_features_free, plan_features_pro, plan_features_premium, plan_display_config';
     // Minimal columns that should exist in all database versions
     const minimalColumns = 'support_email, support_whatsapp, smtp_host, smtp_port, smtp_user, smtp_password, smtp_from_email, groq_api_key, openai_api_key, ai_model, ai_model_name, advisor_prompt, stripe_price_id_pro, stripe_price_id_business, evolution_api_url, evolution_api_key, evolution_instance_name, evolution_webhook_secret, n8n_api_key, whatsapp_enabled';
 
@@ -159,6 +164,11 @@ export async function getGlobalSettings(forceRefresh = false): Promise<GlobalSet
       settings.evolution_webhook_secret = data.evolution_webhook_secret;
       settings.n8n_api_key = data.n8n_api_key;
       settings.whatsapp_enabled = data.whatsapp_enabled;
+      // Pluggy / Open Finance Integration
+      settings.pluggy_client_id = data.pluggy_client_id;
+      settings.pluggy_client_secret = data.pluggy_client_secret;
+      settings.pluggy_enabled = data.pluggy_enabled;
+      settings.categorization_prompt = data.categorization_prompt;
       // Plan Features
       settings.plan_features_free = data.plan_features_free as PlanFeatures | null;
       settings.plan_features_pro = data.plan_features_pro as PlanFeatures | null;
@@ -259,6 +269,11 @@ export async function updateGlobalSettings(updates: Partial<GlobalSettings>): Pr
   if (updates.evolution_webhook_secret !== undefined) updateData.evolution_webhook_secret = updates.evolution_webhook_secret;
   if (updates.n8n_api_key !== undefined) updateData.n8n_api_key = updates.n8n_api_key;
   if (updates.whatsapp_enabled !== undefined) updateData.whatsapp_enabled = updates.whatsapp_enabled;
+  // Pluggy / Open Finance Integration
+  if (updates.pluggy_client_id !== undefined) updateData.pluggy_client_id = updates.pluggy_client_id;
+  if (updates.pluggy_client_secret !== undefined) updateData.pluggy_client_secret = updates.pluggy_client_secret;
+  if (updates.pluggy_enabled !== undefined) updateData.pluggy_enabled = updates.pluggy_enabled;
+  if (updates.categorization_prompt !== undefined) updateData.categorization_prompt = updates.categorization_prompt;
   // Plan Features
   if (updates.plan_features_free !== undefined) updateData.plan_features_free = updates.plan_features_free;
   if (updates.plan_features_pro !== undefined) updateData.plan_features_pro = updates.plan_features_pro;
@@ -282,13 +297,19 @@ export async function updateGlobalSettings(updates: Partial<GlobalSettings>): Pr
         
         // If columns don't exist, try without the new fields
         if (error.code === '42703' || error.message?.includes('column')) {
-          console.log('Column error detected, retrying without new fields');
+          console.log('Column error detected, retrying without new fields. Error:', error.message);
           const basicData = { ...updateData };
+          // Remove fields that may not exist in older database schemas
           delete basicData.tips_prompt;
           delete basicData.tips_enabled;
           delete basicData.chat_max_tokens;
           delete basicData.session_ttl_minutes;
           delete basicData.smtp_secure;
+          delete basicData.categorization_prompt;
+          // Pluggy fields (added in migration 050)
+          delete basicData.pluggy_client_id;
+          delete basicData.pluggy_client_secret;
+          delete basicData.pluggy_enabled;
 
           const { error: retryError } = await supabase
             .from('global_settings')
@@ -299,7 +320,7 @@ export async function updateGlobalSettings(updates: Partial<GlobalSettings>): Pr
             console.error('Retry error:', retryError);
             throw retryError;
           }
-          console.log('Successfully updated without new fields');
+          console.log('Successfully updated without new fields. Note: Pluggy settings require migration 050_add_pluggy_settings.sql');
         } else {
           throw error;
         }
@@ -314,18 +335,25 @@ export async function updateGlobalSettings(updates: Partial<GlobalSettings>): Pr
       if (error) {
         // If columns don't exist, try without the new fields
         if (error.code === '42703' || error.message?.includes('column')) {
+          console.log('Column error on insert, retrying without new fields. Error:', error.message);
           const basicData = { ...updateData };
           delete basicData.tips_prompt;
           delete basicData.tips_enabled;
           delete basicData.chat_max_tokens;
           delete basicData.session_ttl_minutes;
           delete basicData.smtp_secure;
+          delete basicData.categorization_prompt;
+          // Pluggy fields (added in migration 050)
+          delete basicData.pluggy_client_id;
+          delete basicData.pluggy_client_secret;
+          delete basicData.pluggy_enabled;
 
           const { error: retryError } = await supabase
             .from('global_settings')
             .insert(basicData);
 
           if (retryError) throw retryError;
+          console.log('Successfully inserted without new fields. Note: Pluggy settings require migration 050_add_pluggy_settings.sql');
         } else {
           throw error;
         }

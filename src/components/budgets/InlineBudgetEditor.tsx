@@ -68,7 +68,8 @@ export function InlineBudgetEditor({
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
-      inputRef.current.focus();
+      // Usar preventScroll para evitar que o focus cause scroll na página
+      inputRef.current.focus({ preventScroll: true });
       inputRef.current.select();
     }
   }, [isEditing]);

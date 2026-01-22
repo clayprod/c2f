@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useLayoutEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -33,7 +33,7 @@ interface Category {
   name: string;
   type: string;
   color?: string;
-  source_type?: 'general' | 'credit_card' | 'investment' | 'goal' | 'debt' | 'asset' | null;
+  source_type?: 'general' | 'credit_card' | 'investment' | 'goal' | 'debt' | 'asset' | 'receivable' | null;
 }
 
 interface Budget {
@@ -47,7 +47,7 @@ interface Budget {
   minimum_amount_planned_cents?: number;
   auto_contributions_cents?: number;
   categories?: Category;
-  source_type?: 'manual' | 'credit_card' | 'goal' | 'debt' | 'installment' | 'investment';
+  source_type?: 'manual' | 'credit_card' | 'goal' | 'debt' | 'installment' | 'investment' | 'receivable';
   source_id?: string;
   is_projected?: boolean;
   description?: string;
@@ -61,7 +61,6 @@ export default function BudgetsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [categoryMinimums, setCategoryMinimums] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
-  const [includeProjections, setIncludeProjections] = useState(false);
   const [replicateModalOpen, setReplicateModalOpen] = useState(false);
   const [selectedBudgetForReplicate, setSelectedBudgetForReplicate] = useState<Budget | null>(null);
   const [replicateAllModalOpen, setReplicateAllModalOpen] = useState(false);
@@ -83,112 +82,34 @@ export default function BudgetsPage() {
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const missingAlertSessionKey = 'budgets_missing_alert_shown_session';
 
-  // Scroll to top immediately when component mounts and prevent scroll during initial render
-  useLayoutEffect(() => {
+  // Reset scroll imediatamente no mount e quando loading terminar
+  useEffect(() => {
     const resetScroll = () => {
-      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
       const mainElement = document.querySelector('main');
       if (mainElement) {
-        mainElement.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        mainElement.scrollTop = 0;
       }
+      window.scrollTo(0, 0);
     };
 
-    // Reset immediately
+    // Reset imediato
     resetScroll();
 
-    // Prevent scroll during initial render by intercepting scroll events
-    let isInitialLoad = true;
-    const preventScroll = (e: Event) => {
-      if (isInitialLoad) {
-        e.preventDefault();
-        e.stopPropagation();
-        resetScroll();
-        return false;
-      }
-    };
-
-    // Add scroll prevention listeners
-    window.addEventListener('scroll', preventScroll, { passive: false, capture: true });
-    const mainElement = document.querySelector('main');
-    if (mainElement) {
-      mainElement.addEventListener('scroll', preventScroll, { passive: false, capture: true });
-    }
-
-    // Use MutationObserver to watch for DOM changes and reset scroll
-    const observer = new MutationObserver(() => {
-      if (isInitialLoad) {
-        resetScroll();
-      }
-    });
-
-    // Observe the main content area
-    if (mainElement) {
-      observer.observe(mainElement, {
-        childList: true,
-        subtree: true,
-      });
-    }
-
-    // Also observe the document body for any changes
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
-
-    // Reset scroll periodically during initial load
-    const intervals: NodeJS.Timeout[] = [];
-    for (let i = 0; i < 30; i++) {
-      intervals.push(setTimeout(resetScroll, i * 100));
-    }
-
-    // Monitor scroll position continuously and reset if it moves away from top
-    let scrollCheckCount = 0;
-    const MAX_SCROLL_CHECKS = 60; // Monitor for ~6 seconds (60 * 100ms)
-    
-    const checkAndResetScroll = () => {
-      const currentMainElement = document.querySelector('main');
-      const mainScrollTop = currentMainElement?.scrollTop || 0;
-      const windowScrollTop = window.scrollY || window.pageYOffset || 0;
-      
-      // If scroll moved away from top (more than 10px), reset it
-      if (mainScrollTop > 10 || windowScrollTop > 10) {
-        resetScroll();
-        scrollCheckCount = 0; // Reset counter when we detect unwanted scroll
-      }
-      
-      scrollCheckCount++;
-      
-      // Continue monitoring
-      if (scrollCheckCount < MAX_SCROLL_CHECKS) {
-        setTimeout(checkAndResetScroll, 100);
-      }
-    };
-
-    // Start continuous monitoring
-    setTimeout(checkAndResetScroll, 100);
-
-    // Clean up after 6 seconds
-    const cleanupTimeout = setTimeout(() => {
-      isInitialLoad = false;
-      observer.disconnect();
-      intervals.forEach(clearTimeout);
-      window.removeEventListener('scroll', preventScroll, { capture: true });
-      if (mainElement) {
-        mainElement.removeEventListener('scroll', preventScroll, { capture: true });
-      }
-    }, 6000);
-
-    return () => {
-      isInitialLoad = false;
-      observer.disconnect();
-      intervals.forEach(clearTimeout);
-      clearTimeout(cleanupTimeout);
-      window.removeEventListener('scroll', preventScroll, { capture: true });
-      if (mainElement) {
-        mainElement.removeEventListener('scroll', preventScroll, { capture: true });
-      }
-    };
+    // Reset após pequeno delay para pegar qualquer scroll restoration do navegador
+    const timer = setTimeout(resetScroll, 100);
+    return () => clearTimeout(timer);
   }, []);
+
+  // Reset scroll adicional quando o loading terminar
+  useEffect(() => {
+    if (!loading) {
+      const mainElement = document.querySelector('main');
+      if (mainElement) {
+        mainElement.scrollTop = 0;
+      }
+      window.scrollTo(0, 0);
+    }
+  }, [loading]);
 
   useEffect(() => {
     fetchCategories();
@@ -196,7 +117,7 @@ export default function BudgetsPage() {
 
   useEffect(() => {
     fetchBudgets();
-  }, [selectedMonth, includeProjections]);
+  }, [selectedMonth]);
 
   // Check for missing budgets alert on mount and when budgets/categories change
   useEffect(() => {
@@ -214,129 +135,7 @@ export default function BudgetsPage() {
     }
   }, [loading, budgets, categories, selectedMonth]);
 
-  // Scroll to top when loading finishes and keep it there
-  useEffect(() => {
-    if (!loading) {
-      const scrollToTop = () => {
-        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-        const mainElement = document.querySelector('main');
-        if (mainElement) {
-          mainElement.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-        }
-      };
 
-      // Immediate scroll
-      scrollToTop();
-      
-      // Multiple delayed scrolls to catch any late DOM updates
-      const timeouts: NodeJS.Timeout[] = [];
-      [0, 50, 100, 200, 300, 500, 800, 1000, 1500, 2000].forEach((delay) => {
-        timeouts.push(setTimeout(scrollToTop, delay));
-      });
-      
-      // Also use requestAnimationFrame
-      requestAnimationFrame(() => {
-        scrollToTop();
-        requestAnimationFrame(() => {
-          scrollToTop();
-          requestAnimationFrame(() => {
-            scrollToTop();
-          });
-        });
-      });
-
-      // Monitor scroll position after loading finishes
-      let monitorCount = 0;
-      const MAX_MONITOR_CHECKS = 40; // Monitor for ~4 seconds after loading
-      
-      const monitorScroll = () => {
-        const mainElement = document.querySelector('main');
-        const mainScrollTop = mainElement?.scrollTop || 0;
-        const windowScrollTop = window.scrollY || window.pageYOffset || 0;
-        
-        // If scroll moved away from top, reset it
-        if (mainScrollTop > 10 || windowScrollTop > 10) {
-          scrollToTop();
-          monitorCount = 0; // Reset counter when we detect unwanted scroll
-        }
-        
-        monitorCount++;
-        
-        // Continue monitoring
-        if (monitorCount < MAX_MONITOR_CHECKS) {
-          setTimeout(monitorScroll, 100);
-        }
-      };
-
-      // Start monitoring after a short delay
-      setTimeout(monitorScroll, 200);
-
-      return () => {
-        timeouts.forEach(clearTimeout);
-      };
-    }
-  }, [loading]);
-
-  // Keep scroll at top when alert dialog opens
-  useEffect(() => {
-    if (showMissingBudgetAlert) {
-      const resetScroll = () => {
-        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-        const mainElement = document.querySelector('main');
-        if (mainElement) {
-          mainElement.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-        }
-      };
-
-      // Reset immediately and multiple times
-      resetScroll();
-      const timeouts: NodeJS.Timeout[] = [];
-      [50, 100, 200, 300, 500, 800, 1000, 1500].forEach((delay) => {
-        timeouts.push(setTimeout(resetScroll, delay));
-      });
-      
-      // Also use requestAnimationFrame
-      requestAnimationFrame(() => {
-        resetScroll();
-        requestAnimationFrame(() => {
-          resetScroll();
-          requestAnimationFrame(() => {
-            resetScroll();
-          });
-        });
-      });
-
-      // Monitor scroll while dialog is open
-      let monitorCount = 0;
-      const MAX_MONITOR_CHECKS = 30; // Monitor while dialog is open
-      
-      const monitorScroll = () => {
-        const mainElement = document.querySelector('main');
-        const mainScrollTop = mainElement?.scrollTop || 0;
-        const windowScrollTop = window.scrollY || window.pageYOffset || 0;
-        
-        // If scroll moved away from top, reset it
-        if (mainScrollTop > 10 || windowScrollTop > 10) {
-          resetScroll();
-          monitorCount = 0; // Reset counter when we detect unwanted scroll
-        }
-        
-        monitorCount++;
-        
-        // Continue monitoring while dialog is open
-        if (monitorCount < MAX_MONITOR_CHECKS && showMissingBudgetAlert) {
-          setTimeout(monitorScroll, 100);
-        }
-      };
-
-      // Start monitoring
-      setTimeout(monitorScroll, 200);
-      
-      return () => {
-        timeouts.forEach(clearTimeout);
-      };
-    }
-  }, [showMissingBudgetAlert]);
 
   // Fetch minimum amounts for categories without budget
   useEffect(() => {
@@ -381,14 +180,13 @@ export default function BudgetsPage() {
   const fetchBudgets = async () => {
     try {
       setLoading(true);
-      let url = `/api/budgets?month=${selectedMonth}`;
-      if (includeProjections) {
-        url += `&include_projections=true&start_month=${selectedMonth}&end_month=${selectedMonth}`;
-      }
+      // Always include projections to get automatic budgets (goals, debts, investments, credit cards, receivables)
+      const url = `/api/budgets?month=${selectedMonth}&include_projections=true&start_month=${selectedMonth}&end_month=${selectedMonth}`;
       const res = await fetch(url);
       const data = await res.json();
 
-      if (includeProjections && data.data?.budgets) {
+      // The API returns { budgets: [...], monthly_totals: {...} } when include_projections=true
+      if (data.data?.budgets) {
         setBudgets(data.data.budgets || []);
       } else {
         setBudgets(data.data || []);
@@ -672,52 +470,95 @@ export default function BudgetsPage() {
     setDontShowAgain(false);
   };
 
-  // Separate budgets and categories by type (income/expense)
+  // Separate budgets: manual vs automatic (from projections)
   const allManualBudgets = budgets.filter(b => (!b.source_type || b.source_type === 'manual') && !b.is_projected);
 
-  // Filter budgets based on search term and source type
-  const manualBudgets = allManualBudgets.filter(b => {
-    const cat = categories.find(c => c.id === b.category_id);
-    if (!cat) return false;
+  // Deduplicate budgets by category_id - prioritize manual budgets over projections
+  // This prevents showing both a manual budget and a projection for the same category
+  const deduplicatedBudgets = (() => {
+    const budgetsByCategory = new Map<string, Budget>();
+    
+    // First pass: add all budgets, but prefer manual over projected
+    for (const budget of budgets) {
+      const categoryId = budget.category_id;
+      if (!categoryId) {
+        // Budgets without category_id (some projections) - use id as key
+        budgetsByCategory.set(budget.id, budget);
+        continue;
+      }
+      
+      const existing = budgetsByCategory.get(categoryId);
+      const isManual = (!budget.source_type || budget.source_type === 'manual') && !budget.is_projected;
+      const existingIsManual = existing && (!existing.source_type || existing.source_type === 'manual') && !existing.is_projected;
+      
+      // Add if no existing, or if current is manual and existing is not
+      if (!existing || (isManual && !existingIsManual)) {
+        budgetsByCategory.set(categoryId, budget);
+      }
+    }
+    
+    return Array.from(budgetsByCategory.values());
+  })();
 
+  // ALL budgets (manual + auto) for category mapping
+  const allBudgetsMap = new Map(deduplicatedBudgets.map(b => [b.category_id, b]));
+
+  // Filter ALL budgets based on search term and source type (includes both manual and auto)
+  const filteredBudgets = deduplicatedBudgets.filter(b => {
+    const cat = categories.find(c => c.id === b.category_id);
+    // For projected budgets without category_id, use description for matching
+    const categoryName = cat?.name || b.description || '';
+    
     // Check search term
-    const matchesSearch = cat.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = categoryName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (b.description || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     // Check source type filter
-    const categorySource = cat.source_type || 'general';
+    const categorySource = cat?.source_type || b.source_type || 'general';
     const matchesSource = filterSource === 'all' || categorySource === filterSource;
 
     return matchesSearch && matchesSource;
   });
 
-  // Separate by income and expense (default to expense if type is not defined)
-  const incomeBudgets = manualBudgets.filter(b => {
+  // Separate filtered budgets by income and expense
+  const incomeBudgets = filteredBudgets.filter(b => {
     const cat = categories.find(c => c.id === b.category_id);
-    return cat?.type === 'income';
+    // For projections, check if the budget categories object has type
+    const budgetCatType = (b.categories as any)?.type;
+    return cat?.type === 'income' || budgetCatType === 'income';
   });
 
-  const expenseBudgets = manualBudgets.filter(b => {
+  const expenseBudgets = filteredBudgets.filter(b => {
     const cat = categories.find(c => c.id === b.category_id);
-    return !cat?.type || cat.type === 'expense';
+    const budgetCatType = (b.categories as any)?.type;
+    return (!cat?.type && budgetCatType !== 'income') || cat?.type === 'expense' || budgetCatType === 'expense';
   });
 
   // Calculate totals separately for income and expense
-    const incomePlanned = incomeBudgets.reduce(
-      (sum, b) => sum + Math.abs((b.limit_cents || b.amount_planned_cents || 0) / 100),
-      0
-    );
+  const incomePlanned = incomeBudgets.reduce(
+    (sum, b) => sum + Math.abs((b.limit_cents || b.amount_planned_cents || 0) / 100),
+    0
+  );
   const incomeActual = incomeBudgets.reduce((sum, b) => sum + Math.abs(b.amount_actual || 0), 0);
 
-    const expensePlanned = expenseBudgets.reduce(
-      (sum, b) => sum + Math.abs((b.limit_cents || b.amount_planned_cents || 0) / 100),
-      0
-    );
+  const expensePlanned = expenseBudgets.reduce(
+    (sum, b) => sum + Math.abs((b.limit_cents || b.amount_planned_cents || 0) / 100),
+    0
+  );
   const expenseActual = expenseBudgets.reduce((sum, b) => sum + Math.abs(b.amount_actual || 0), 0);
 
-  const budgetsByCategoryId = new Map(manualBudgets.map(b => [b.category_id, b]));
+  // For manual budgets reference (used in replicate functions)
+  const manualBudgets = allManualBudgets.filter(b => {
+    const cat = categories.find(c => c.id === b.category_id);
+    if (!cat) return false;
+    const matchesSearch = cat.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (b.description || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const categorySource = cat.source_type || 'general';
+    const matchesSource = filterSource === 'all' || categorySource === filterSource;
+    return matchesSearch && matchesSource;
+  });
 
-  // Filter categories
+  // Filter categories - only show categories without ANY budget (manual or auto)
   const filteredCategories = categories.filter(cat => {
     const matchesSearch = cat.name.toLowerCase().includes(searchTerm.toLowerCase());
     const categorySource = cat.source_type || 'general';
@@ -725,14 +566,12 @@ export default function BudgetsPage() {
     return matchesSearch && matchesSource;
   });
 
-  const categoriesWithoutBudget = filteredCategories.filter(cat => !budgetsByCategoryId.has(cat.id));
+  // Categories without budget = categories not in allBudgetsMap (no manual OR auto budget)
+  const categoriesWithoutBudget = filteredCategories.filter(cat => !allBudgetsMap.has(cat.id));
 
   // Separate categories by type (default to expense if type is not defined)
   const incomeCategories = categoriesWithoutBudget.filter(c => c.type === 'income');
   const expenseCategories = categoriesWithoutBudget.filter(c => !c.type || c.type === 'expense');
-
-  // Projected budgets are shown separately
-  const projectedBudgets = budgets.filter(b => b.is_projected || (b.source_type && b.source_type !== 'manual'));
 
   const gradientColors = [
     'from-orange-500 to-red-500',
@@ -751,6 +590,8 @@ export default function BudgetsPage() {
       case 'goal': return '🎯';
       case 'debt': return '📋';
       case 'asset': return '🏠';
+      case 'receivable': return '💰';
+      case 'installment': return '📅';
       default: return null;
     }
   };
@@ -763,10 +604,14 @@ export default function BudgetsPage() {
     const isOver = spent > limit;
     const colorClass = gradientColors[index % gradientColors.length];
     const category = categories.find(c => c.id === budget.category_id);
-    const isIncome = category?.type === 'income';
-    const isReadOnly = ['credit_card', 'investment', 'goal', 'debt'].includes(category?.source_type || '') ||
-      ['credit_card', 'goal', 'debt'].includes(budget.source_type || '');
-    const sourceIcon = getSourceTypeIcon(category?.source_type);
+    const budgetCatType = (budget.categories as any)?.type;
+    const isIncome = category?.type === 'income' || budgetCatType === 'income';
+    // Auto budgets: from special category types, from special budget source types, or projected
+    const autoSourceTypes = ['credit_card', 'investment', 'goal', 'debt', 'receivable'];
+    const isReadOnly = autoSourceTypes.includes(category?.source_type || '') ||
+      autoSourceTypes.includes(budget.source_type || '') ||
+      budget.is_projected === true;
+    const sourceIcon = getSourceTypeIcon(category?.source_type || budget.source_type);
     const breakdownCount = Array.isArray((budget.metadata as any)?.budget_breakdown?.items)
       ? (budget.metadata as any).budget_breakdown.items.length
       : 0;
@@ -845,7 +690,7 @@ export default function BudgetsPage() {
             <span className={`font-medium ${isOver ? 'text-red-500' : ''}`}>{formatCurrency(spent)}</span>
           </div>
           <div className="flex items-center gap-1">
-            <span className="text-muted-foreground hidden sm:inline">{isIncome ? 'Plan:' : 'Limite:'}</span>
+            <span className="text-muted-foreground hidden sm:inline">{isIncome ? 'Plan:' : (isReadOnly ? 'Pendente:' : 'Limite:')}</span>
             <InlineBudgetEditor
               budgetId={budget.id}
               categoryId={budget.category_id}
@@ -885,7 +730,8 @@ export default function BudgetsPage() {
   // Helper function to render category card without budget - COMPACT ROW VERSION
   const renderCategoryCard = (category: Category) => {
     const sourceIcon = getSourceTypeIcon(category.source_type);
-    const isReadOnly = ['credit_card', 'investment', 'goal', 'debt'].includes(category.source_type || '');
+    const autoSourceTypes = ['credit_card', 'investment', 'goal', 'debt', 'receivable'];
+    const isReadOnly = autoSourceTypes.includes(category.source_type || '');
     
     // Get auto-generated label based on source type
     const getAutoLabel = () => {
@@ -894,6 +740,7 @@ export default function BudgetsPage() {
         case 'investment': return 'Investimento';
         case 'goal': return 'Objetivo';
         case 'debt': return 'Dívida';
+        case 'receivable': return 'Recebível';
         default: return 'Automático';
       }
     };
@@ -1101,66 +948,6 @@ export default function BudgetsPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 md:gap-3">
               {expenseBudgets.map((budget, index) => renderBudgetCard(budget, index))}
-            </div>
-          </div>
-        )}
-
-        {/* Projected Budgets - COMPACT */}
-        {includeProjections && projectedBudgets.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <h2 className="font-display text-sm md:text-lg font-semibold flex items-center gap-2">
-                <i className='bx bx-time text-blue-500'></i>
-                Projeções Automáticas
-              </h2>
-              <span className="text-xs text-muted-foreground bg-blue-500/20 px-2 py-0.5 rounded-full">
-                {projectedBudgets.length}
-              </span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 md:gap-3">
-              {projectedBudgets.map((budget, index) => {
-                const spent = Math.abs(budget.amount_actual || 0);
-                const limit = Math.abs((budget.limit_cents || budget.amount_planned_cents || 0) / 100);
-                const percentage = limit > 0 ? (spent / limit) * 100 : 0;
-                const isOver = spent > limit;
-                const colorClass = gradientColors[index % gradientColors.length];
-                const sourceTypeLabels: Record<string, string> = {
-                  credit_card: '💳',
-                  goal: '🎯',
-                  debt: '📋',
-                  recurring: '🔄',
-                  installment: '📅',
-                  investment: '📊',
-                };
-
-                return (
-                  <div key={budget.id} className="glass-card p-3 md:p-4 opacity-80 hover:opacity-100 transition-opacity">
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        {budget.source_type && (
-                          <span className="text-sm flex-shrink-0">{sourceTypeLabels[budget.source_type] || '📊'}</span>
-                        )}
-                        <h3 className="font-medium text-sm truncate">
-                          {budget.categories?.name || budget.description || 'Categoria'}
-                        </h3>
-                      </div>
-                      <span className={`text-xs font-semibold ${isOver ? 'text-red-500' : 'text-muted-foreground'}`}>
-                        {percentage.toFixed(0)}%
-                      </span>
-                    </div>
-                    <div className="h-1.5 bg-muted rounded-full overflow-hidden mb-2">
-                      <div
-                        className={`h-full bg-gradient-to-r ${isOver ? 'from-red-500 to-red-600' : colorClass} transition-all`}
-                        style={{ width: `${Math.min(percentage, 100)}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{formatCurrency(spent)}</span>
-                      <span>{formatCurrency(limit)}</span>
-                    </div>
-                  </div>
-                );
-              })}
             </div>
           </div>
         )}

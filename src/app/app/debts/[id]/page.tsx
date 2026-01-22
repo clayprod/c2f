@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import { useMembers } from '@/hooks/useMembers';
 
 interface Debt {
@@ -25,9 +24,10 @@ interface Debt {
   status: string;
   priority: string;
   notes?: string;
-  payment_frequency?: string;
-  payment_amount_cents?: number;
-  installment_count?: number;
+  contribution_frequency?: string;
+  monthly_payment_cents?: number;
+  contribution_count?: number;
+  include_in_plan?: boolean;
   debt_payments?: Array<{
     id: string;
     amount_cents: number;
@@ -41,7 +41,6 @@ export default function DebtDetailPage() {
   const params = useParams();
   const debtId = params?.id as string;
   const { toast } = useToast();
-  const { confirm, ConfirmDialog } = useConfirmDialog();
   const { members, loading: loadingMembers } = useMembers();
 
   const [loading, setLoading] = useState(true);
@@ -60,9 +59,6 @@ export default function DebtDetailPage() {
     status: 'pendente',
     priority: 'medium',
     notes: '',
-    payment_frequency: '',
-    payment_amount_cents: '',
-    installment_count: '',
     include_in_plan: true,
     contribution_frequency: 'monthly',
     monthly_payment_cents: '',
@@ -106,9 +102,6 @@ export default function DebtDetailPage() {
         status: debtData.status || 'pendente',
         priority: debtData.priority || 'medium',
         notes: debtData.notes || '',
-        payment_frequency: debtData.payment_frequency || '',
-        payment_amount_cents: debtData.payment_amount_cents ? (debtData.payment_amount_cents / 100).toFixed(2) : '',
-        installment_count: debtData.installment_count?.toString() || '',
         include_in_plan: debtData.include_in_plan ?? false,
         contribution_frequency: debtData.contribution_frequency || 'monthly',
         monthly_payment_cents: debtData.monthly_payment_cents ? (debtData.monthly_payment_cents / 100).toFixed(2) : '',
@@ -175,37 +168,6 @@ export default function DebtDetailPage() {
         }
       }
 
-      // Validate installment calculation if status is 'negociada'
-      if (formData.status === 'negociada') {
-        const paymentAmount = parseFloat(formData.payment_amount_cents) * 100;
-        const installmentCount = parseInt(formData.installment_count || '0');
-        const totalAmount = parseFloat(formData.total_amount_cents) * 100;
-        const totalFromInstallments = paymentAmount * installmentCount;
-
-        if (totalFromInstallments > totalAmount) {
-          const confirmed = await confirm({
-            title: 'Ajustar Valor da Dívida',
-            description: `O valor total das parcelas (${(totalFromInstallments / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}) é maior que o valor da dívida (${(totalAmount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}). Deseja ajustar o valor total da dívida para ${(totalFromInstallments / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}?`,
-            confirmText: 'Ajustar',
-            cancelText: 'Cancelar',
-          });
-
-          if (confirmed) {
-            setFormData({
-              ...formData,
-              total_amount_cents: (totalFromInstallments / 100).toFixed(2),
-            });
-            // Update the form data and continue
-            const updatedFormData = {
-              ...formData,
-              total_amount_cents: (totalFromInstallments / 100).toFixed(2),
-            };
-            await saveDebt(updatedFormData, cleanedPlanEntries);
-            return;
-          }
-        }
-      }
-
       await saveDebt(formData, cleanedPlanEntries);
     } catch (error: any) {
       toast({
@@ -237,13 +199,6 @@ export default function DebtDetailPage() {
         priority: data.priority,
         notes: data.notes || undefined,
         include_in_plan: data.include_in_plan || useCustomPlan,
-        payment_frequency: data.status === 'negociada' ? data.payment_frequency : undefined,
-        payment_amount_cents: data.status === 'negociada' && data.payment_amount_cents
-          ? Math.round(parseFloat(data.payment_amount_cents) * 100)
-          : undefined,
-        installment_count: data.status === 'negociada' && data.installment_count
-          ? parseInt(data.installment_count)
-          : undefined,
         contribution_frequency: !useCustomPlan && data.include_in_plan && data.contribution_frequency
           ? data.contribution_frequency
           : undefined,
@@ -433,62 +388,10 @@ export default function DebtDetailPage() {
           </div>
 
           <div className="border-t pt-6 space-y-4">
-            <h3 className="font-semibold mb-4">Informações de Negociação</h3>
+            <h3 className="font-semibold mb-4">Orçamento e Projeções</h3>
             <p className="text-sm text-muted-foreground">
-              As informações ficam visíveis e são aplicadas quando o status for &quot;Negociada&quot;.
+              Configure como esta dívida será incluída no orçamento e projeções.
             </p>
-            <div className="grid md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Frequência de Pagamento *</label>
-                <Select
-                  value={formData.payment_frequency}
-                  onValueChange={(value) => setFormData({ ...formData, payment_frequency: value })}
-                  required={formData.status === 'negociada'}
-                  disabled={formData.status !== 'negociada'}
-                >
-                  <SelectTrigger className="w-full bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
-                    <SelectValue placeholder="Selecione a frequência" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="daily">Diário</SelectItem>
-                    <SelectItem value="weekly">Semanal</SelectItem>
-                    <SelectItem value="biweekly">Quinzenal</SelectItem>
-                    <SelectItem value="monthly">Mensal</SelectItem>
-                    <SelectItem value="quarterly">Trimestral</SelectItem>
-                    <SelectItem value="yearly">Anual</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Valor de Pagamento Periódico (R$) *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.payment_amount_cents}
-                  onChange={(e) => setFormData({ ...formData, payment_amount_cents: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  placeholder="0.00"
-                  required={formData.status === 'negociada'}
-                  disabled={formData.status !== 'negociada'}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Número de Parcelas *</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={formData.installment_count}
-                  onChange={(e) => setFormData({ ...formData, installment_count: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  placeholder="0"
-                  required={formData.status === 'negociada'}
-                  disabled={formData.status !== 'negociada'}
-                />
-              </div>
-            </div>
 
             <div className="grid md:grid-cols-2 gap-4">
               <div className="flex items-center gap-3">
@@ -772,33 +675,33 @@ export default function DebtDetailPage() {
               </div>
             </div>
 
-            {debt.status === 'negociada' && (debt.payment_frequency || debt.payment_amount_cents || debt.installment_count) && (
+            {debt.include_in_plan && (debt.contribution_frequency || debt.monthly_payment_cents || debt.contribution_count) && (
               <div className="border-t pt-6">
-                <h3 className="font-semibold mb-4">Informações de Negociação</h3>
+                <h3 className="font-semibold mb-4">Orçamento e Projeções</h3>
                 <div className="grid md:grid-cols-3 gap-6">
-                  {debt.payment_frequency && (
+                  {debt.contribution_frequency && (
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">Frequência</p>
                       <p className="font-semibold">
-                        {debt.payment_frequency === 'daily' ? 'Diário' :
-                         debt.payment_frequency === 'weekly' ? 'Semanal' :
-                         debt.payment_frequency === 'biweekly' ? 'Quinzenal' :
-                         debt.payment_frequency === 'monthly' ? 'Mensal' :
-                         debt.payment_frequency === 'quarterly' ? 'Trimestral' :
-                         debt.payment_frequency === 'yearly' ? 'Anual' : debt.payment_frequency}
+                        {debt.contribution_frequency === 'daily' ? 'Diário' :
+                         debt.contribution_frequency === 'weekly' ? 'Semanal' :
+                         debt.contribution_frequency === 'biweekly' ? 'Quinzenal' :
+                         debt.contribution_frequency === 'monthly' ? 'Mensal' :
+                         debt.contribution_frequency === 'quarterly' ? 'Trimestral' :
+                         debt.contribution_frequency === 'yearly' ? 'Anual' : debt.contribution_frequency}
                       </p>
                     </div>
                   )}
-                  {debt.payment_amount_cents && (
+                  {debt.monthly_payment_cents && (
                     <div>
-                      <p className="text-sm text-muted-foreground mb-1">Valor por Parcela</p>
-                      <p className="font-semibold">{formatCurrency(debt.payment_amount_cents)}</p>
+                      <p className="text-sm text-muted-foreground mb-1">Valor Mensal</p>
+                      <p className="font-semibold">{formatCurrency(debt.monthly_payment_cents)}</p>
                     </div>
                   )}
-                  {debt.installment_count && (
+                  {debt.contribution_count && (
                     <div>
-                      <p className="text-sm text-muted-foreground mb-1">Número de Parcelas</p>
-                      <p className="font-semibold">{debt.installment_count}</p>
+                      <p className="text-sm text-muted-foreground mb-1">Número de Pagamentos</p>
+                      <p className="font-semibold">{debt.contribution_count}</p>
                     </div>
                   )}
                 </div>
@@ -842,9 +745,6 @@ export default function DebtDetailPage() {
           )}
         </>
       )}
-
-      {/* Adjust Value Confirmation Dialog */}
-      {ConfirmDialog}
     </div>
   );
 }

@@ -5,6 +5,30 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Label } from 'rechar
 import { InfoIcon } from '@/components/ui/InfoIcon';
 import { MonthYearPicker } from '@/components/ui/month-year-picker';
 
+// Hook para detectar tamanho da tela
+function useWindowSize() {
+  const [windowSize, setWindowSize] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1024,
+    height: typeof window !== 'undefined' ? window.innerHeight : 768,
+  });
+
+  useEffect(() => {
+    function handleResize() {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    }
+
+    window.addEventListener('resize', handleResize);
+    handleResize();
+
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return windowSize;
+}
+
 interface CategoryExpense {
   category: string;
   categoryId: string;
@@ -46,6 +70,7 @@ const COLORS = [
 ];
 
 export function ExpensesByCategoryChart() {
+  const windowSize = useWindowSize();
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -53,6 +78,18 @@ export function ExpensesByCategoryChart() {
   const [loading, setLoading] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [projections, setProjections] = useState<Budget[]>([]);
+
+  // Calcular raios do gráfico baseado no tamanho da tela
+  const { innerRadius, outerRadius } = useMemo(() => {
+    const width = windowSize.width;
+    if (width >= 1280) { // xl
+      return { innerRadius: 60, outerRadius: 85 };
+    } else if (width >= 1024) { // lg
+      return { innerRadius: 50, outerRadius: 70 };
+    } else {
+      return { innerRadius: 40, outerRadius: 55 };
+    }
+  }, [windowSize.width]);
 
   const [year, month] = useMemo(() => {
     const parts = selectedMonth.split('-');
@@ -218,8 +255,8 @@ export function ExpensesByCategoryChart() {
   };
 
   return (
-    <div className="glass-card p-4 md:p-6 h-full flex flex-col">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 md:mb-6">
+    <div className="glass-card px-3 md:px-4 py-1.5 md:py-2 h-full flex flex-col">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 mb-1.5 md:mb-2">
         <div className="flex items-center gap-2">
           <h2 className="font-display font-semibold text-sm md:text-lg leading-none">Gastos por Categoria</h2>
           <InfoIcon
@@ -245,14 +282,14 @@ export function ExpensesByCategoryChart() {
       </div>
 
       {loading ? (
-        <div className="flex-1 flex items-center justify-center py-12">
+        <div className="flex-1 flex items-center justify-center py-4">
           <div className="flex flex-col items-center gap-2">
             <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             <span className="text-sm text-muted-foreground">Carregando...</span>
           </div>
         </div>
       ) : categoryExpenses.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center py-12">
+        <div className="flex-1 flex items-center justify-center py-4">
           <div className="text-center">
             <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
               <span className="text-xl">📊</span>
@@ -262,8 +299,8 @@ export function ExpensesByCategoryChart() {
         </div>
       ) : (
         <div className="flex-1 flex flex-col">
-          <div className="flex flex-col lg:flex-row lg:items-center gap-4 md:gap-8">
-            <div className="h-[200px] md:h-[280px] relative flex-shrink-0 lg:flex-1">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-2 md:gap-3 lg:gap-4">
+            <div className="h-[160px] md:h-[200px] lg:h-[240px] xl:h-[280px] relative flex-shrink-0 lg:flex-1">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -272,8 +309,8 @@ export function ExpensesByCategoryChart() {
                     nameKey="category"
                     cx="50%"
                     cy="50%"
-                    innerRadius={50}
-                    outerRadius={75}
+                    innerRadius={innerRadius}
+                    outerRadius={outerRadius}
                     paddingAngle={2}
                     stroke="none"
                   >

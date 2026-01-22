@@ -18,6 +18,14 @@ export async function GET(request: NextRequest) {
     const { getGlobalSettings } = await import('@/services/admin/globalSettings');
     const settings = await getGlobalSettings();
 
+    // Get plan features from settings
+    const { getPlanFeatures } = await import('@/services/admin/globalSettings');
+    const planFeaturesConfig = {
+      free: await getPlanFeatures('free'),
+      pro: await getPlanFeatures('pro'),
+      premium: await getPlanFeatures('premium'),
+    };
+
     // Define limits based on plan
     const limits = {
       free: {
@@ -27,6 +35,7 @@ export async function GET(request: NextRequest) {
         categories: 20,
         budgets: 0,
         pluggy_integration: false,
+        whatsapp_integration: planFeaturesConfig.free?.whatsapp_integration?.enabled ?? false,
         reports: false,
       },
       pro: {
@@ -36,6 +45,7 @@ export async function GET(request: NextRequest) {
         categories: -1, // unlimited
         budgets: -1, // unlimited
         pluggy_integration: false,
+        whatsapp_integration: planFeaturesConfig.pro?.whatsapp_integration?.enabled ?? true,
         reports: true,
       },
       premium: {
@@ -45,6 +55,7 @@ export async function GET(request: NextRequest) {
         categories: -1, // unlimited
         budgets: -1, // unlimited
         pluggy_integration: true,
+        whatsapp_integration: planFeaturesConfig.premium?.whatsapp_integration?.enabled ?? true,
         reports: true,
       },
     };

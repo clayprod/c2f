@@ -1029,7 +1029,7 @@ export default function ReportsPage() {
 
           {/* Goals Tab */}
           <TabsContent value="goals" className="space-y-6">
-            {goalsData && (
+            {goalsData && goalsData.summary ? (
               <>
                 {/* Summary */}
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
@@ -1040,9 +1040,9 @@ export default function ReportsPage() {
                       </div>
                       <span className="text-sm text-muted-foreground">Total Objetivos</span>
                     </div>
-                    <p className="font-display text-2xl font-bold">{goalsData.summary.total_goals}</p>
+                    <p className="font-display text-2xl font-bold">{goalsData.summary.total_goals || 0}</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {goalsData.summary.active_goals} ativos, {goalsData.summary.completed_goals} concluidos
+                      {goalsData.summary.active_goals || 0} ativos, {goalsData.summary.completed_goals || 0} concluidos
                     </p>
                   </div>
 
@@ -1054,7 +1054,7 @@ export default function ReportsPage() {
                       <span className="text-sm text-muted-foreground">Meta Total</span>
                     </div>
                     <p className="font-display text-2xl font-bold">
-                      {formatCurrency(goalsData.summary.total_target_cents)}
+                      {formatCurrency(goalsData.summary.total_target_cents || 0)}
                     </p>
                   </div>
 
@@ -1066,7 +1066,7 @@ export default function ReportsPage() {
                       <span className="text-sm text-muted-foreground">Acumulado</span>
                     </div>
                     <p className="font-display text-2xl font-bold text-green-500">
-                      {formatCurrency(goalsData.summary.total_current_cents)}
+                      {formatCurrency(goalsData.summary.total_current_cents || 0)}
                     </p>
                   </div>
 
@@ -1078,7 +1078,7 @@ export default function ReportsPage() {
                       <span className="text-sm text-muted-foreground">Progresso Geral</span>
                     </div>
                     <p className="font-display text-2xl font-bold">
-                      {goalsData.summary.overall_progress.toFixed(1)}%
+                      {(goalsData.summary.overall_progress || 0).toFixed(1)}%
                     </p>
                   </div>
                 </div>
@@ -1135,7 +1135,7 @@ export default function ReportsPage() {
                   )}
                 </div>
               </>
-            )}
+            ) : null}
           </TabsContent>
 
           {/* Debts Tab */}
@@ -1160,7 +1160,7 @@ export default function ReportsPage() {
                   <div className="glass-card p-5">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center">
-                        <i className='bx bx-money text-xl text-orange-500'></i>
+                        <i className='bx bx-dollar-circle text-xl text-orange-500'></i>
                       </div>
                       <span className="text-sm text-muted-foreground">Total Dívidas</span>
                     </div>
@@ -1184,7 +1184,7 @@ export default function ReportsPage() {
                   <div className="glass-card p-5">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center">
-                        <i className='bx bx-time text-xl text-yellow-500'></i>
+                        <i className='bx bx-timer text-xl text-yellow-500'></i>
                       </div>
                       <span className="text-sm text-muted-foreground">Restante</span>
                     </div>
@@ -1268,7 +1268,7 @@ export default function ReportsPage() {
                   <div className="glass-card p-5">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                        <i className='bx bx-bar-chart-alt text-xl text-primary'></i>
+                        <i className='bx bx-bar-chart text-xl text-primary'></i>
                       </div>
                       <span className="text-sm text-muted-foreground">Total Investido</span>
                     </div>
@@ -1308,7 +1308,7 @@ export default function ReportsPage() {
                     <div className="flex items-center gap-3 mb-2">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${investmentsData.summary.total_return_percentage >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'
                         }`}>
-                        <i className='bx bx-percent text-xl text-green-500'></i>
+                        <i className={`bx bx-percentage text-xl ${investmentsData.summary.total_return_percentage >= 0 ? 'text-green-500' : 'text-red-500'}`}></i>
                       </div>
                       <span className="text-sm text-muted-foreground">% Retorno</span>
                     </div>

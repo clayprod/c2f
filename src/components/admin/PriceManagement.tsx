@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 
@@ -24,6 +25,8 @@ export default function PriceManagement() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<Record<string, boolean>>({});
+  const [descriptions, setDescriptions] = useState<Record<string, string>>({});
+  const [updatingDescription, setUpdatingDescription] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     fetchPrices();
@@ -35,6 +38,13 @@ export default function PriceManagement() {
       if (!res.ok) throw new Error('Failed to fetch prices');
       const data = await res.json();
       setProducts(data.products || []);
+      
+      // Initialize descriptions state
+      const initialDescriptions: Record<string, string> = {};
+      (data.products || []).forEach((product: Product) => {
+        initialDescriptions[product.id] = product.description || '';
+      });
+      setDescriptions(initialDescriptions);
     } catch (error) {
       console.error('Error fetching prices:', error);
       toast({
@@ -103,6 +113,45 @@ export default function PriceManagement() {
     }
   };
 
+  const handleUpdateDescription = async (productId: string) => {
+    const newDescription = descriptions[productId] || '';
+
+    setUpdatingDescription({ ...updatingDescription, [productId]: true });
+
+    try {
+      const res = await fetch('/api/admin/prices', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          product_id: productId,
+          description: newDescription,
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to update description');
+      }
+
+      toast({
+        title: 'Sucesso',
+        description: 'Descrição atualizada com sucesso',
+      });
+
+      // Refresh prices
+      await fetchPrices();
+    } catch (error: any) {
+      console.error('Error updating description:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: error.message || 'Não foi possível atualizar a descrição',
+      });
+    } finally {
+      setUpdatingDescription({ ...updatingDescription, [productId]: false });
+    }
+  };
+
   const formatPrice = (cents: number) => {
     return (cents / 100).toLocaleString('pt-BR', {
       style: 'currency',
@@ -136,7 +185,7 @@ export default function PriceManagement() {
                 <CardDescription>{product.description}</CardDescription>
               )}
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               <div>
                 <Label>Preço Atual</Label>
                 <div className="text-2xl font-bold mt-1">
@@ -168,6 +217,29 @@ export default function PriceManagement() {
                 <p className="text-sm text-muted-foreground mt-2">
                   O novo preço será criado no Stripe. O preço antigo será arquivado automaticamente.
                 </p>
+              </div>
+
+              <div className="border-t pt-4">
+                <Label htmlFor={`description-${product.id}`}>Descrição do Produto</Label>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Esta descrição aparece na landing page e pode ser editada diretamente no Stripe.
+                </p>
+                <div className="space-y-2">
+                  <Textarea
+                    id={`description-${product.id}`}
+                    value={descriptions[product.id] || ''}
+                    onChange={(e) => setDescriptions({ ...descriptions, [product.id]: e.target.value })}
+                    placeholder="Descrição do plano (ex: Plano Premium do c2Finance - Todas as funcionalidades + Suporte prioritário)"
+                    rows={3}
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => handleUpdateDescription(product.id)}
+                    disabled={updatingDescription[product.id]}
+                  >
+                    {updatingDescription[product.id] ? 'Salvando...' : 'Salvar Descrição'}
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>

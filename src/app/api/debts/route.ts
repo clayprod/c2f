@@ -206,12 +206,10 @@ export async function POST(request: NextRequest) {
     if (validated.status === 'negociada') {
       debtData.is_negotiated = true;
       debtData.include_in_plan = includeInPlan ?? true;
-      debtData.contribution_frequency = hasCustomPlan
-        ? null
-        : (validated.contribution_frequency || validated.payment_frequency || null);
+      debtData.contribution_frequency = hasCustomPlan ? null : (validated.contribution_frequency || null);
       debtData.contribution_count = hasCustomPlan ? null : (validated.contribution_count || null);
-      debtData.monthly_payment_cents = validated.monthly_payment_cents || validated.payment_amount_cents || null;
-      debtData.installment_amount_cents = validated.installment_amount_cents || validated.payment_amount_cents || null;
+      debtData.monthly_payment_cents = validated.monthly_payment_cents || null;
+      debtData.installment_amount_cents = validated.installment_amount_cents || null;
       debtData.installment_day = validated.installment_day || null;
     } else {
       debtData.is_negotiated = false;

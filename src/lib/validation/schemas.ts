@@ -192,19 +192,6 @@ export const debtSchema = z.object({
   ]).optional().transform(val => val === '' || val === null ? undefined : val),
 }).refine(
   (data) => {
-    if (data.status === 'negociada') {
-      return data.payment_frequency !== undefined &&
-             data.payment_amount_cents !== undefined &&
-             data.installment_count !== undefined;
-    }
-    return true;
-  },
-  {
-    message: 'Para dívidas negociadas, informe frequência, valor e parcelas',
-    path: ['payment_frequency'],
-  }
-).refine(
-  (data) => {
     if (data.include_in_plan) {
       return data.contribution_frequency !== undefined || (data.plan_entries && data.plan_entries.length > 0);
     }

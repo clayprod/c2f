@@ -5,24 +5,31 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getUserId } from '@/lib/auth';
+import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 import { validateVerificationCode } from '@/services/whatsapp/verification';
+import { getPlanFeatures } from '@/services/admin/globalSettings';
+import { getUserPlanAdmin } from '@/services/stripe/subscription';
 
-async function getUserId(request: NextRequest): Promise<string | null> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  return user?.id || null;
-}
+async function checkWhatsAppAccess(userId: string): Promise<{ allowed: boolean; plan: string }> {
+  const userPlan = await getUserPlanAdmin(userId);
+  const plan = userPlan.plan;
 
-async function requirePremium(userId: string): Promise<boolean> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from('billing_subscriptions')
-    .select('plan_id, status')
-    .eq('user_id', userId)
-    .single();
+  // Check if WhatsApp is enabled for this plan from settings
+  const planFeatures = await getPlanFeatures(plan);
+  
+  // Default: WhatsApp is enabled for Pro and Premium plans
+  // Only check settings if explicitly configured
+  let whatsappEnabled: boolean;
+  if (planFeatures?.whatsapp_integration?.enabled !== undefined) {
+    // Use explicit configuration if set
+    whatsappEnabled = planFeatures.whatsapp_integration.enabled;
+  } else {
+    // Default: enabled for Pro and Premium, disabled for Free
+    whatsappEnabled = plan === 'pro' || plan === 'premium';
+  }
 
-  return data?.plan_id === 'premium' && data?.status === 'active';
+  return { allowed: whatsappEnabled, plan };
 }
 
 // Simple rate limiting
@@ -46,28 +53,31 @@ function checkRateLimit(userId: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
-  const userId = await getUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  // Check premium plan
-  const isPremium = await requirePremium(userId);
-  if (!isPremium) {
-    return NextResponse.json({
-      error: 'Esta funcionalidade requer o plano Premium',
-      requiresUpgrade: true,
-    }, { status: 403 });
-  }
-
-  // Check rate limit
-  if (!checkRateLimit(userId)) {
-    return NextResponse.json({
-      error: 'Limite de tentativas excedido. Tente novamente em 1 hora.',
-    }, { status: 429 });
-  }
-
   try {
+    const userId = await getUserId(request);
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const ownerId = await getEffectiveOwnerId(request, userId);
+
+    // Check if user's plan has WhatsApp access
+    const { allowed, plan } = await checkWhatsAppAccess(ownerId);
+    if (!allowed) {
+      return NextResponse.json({
+        error: 'A integração WhatsApp não está disponível no seu plano atual',
+        requiresUpgrade: true,
+        currentPlan: plan,
+      }, { status: 403 });
+    }
+
+    // Check rate limit
+    if (!checkRateLimit(ownerId)) {
+      return NextResponse.json({
+        error: 'Limite de tentativas excedido. Tente novamente em 1 hora.',
+      }, { status: 429 });
+    }
+
     const body = await request.json();
     const { code } = body;
 
@@ -85,7 +95,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate verification code
-    const result = await validateVerificationCode(userId, code);
+    const result = await validateVerificationCode(ownerId, code);
 
     if (!result.success) {
       return NextResponse.json({
