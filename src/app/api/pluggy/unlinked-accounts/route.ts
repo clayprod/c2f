@@ -27,8 +27,8 @@ export async function GET(request: NextRequest) {
         number,
         item_id,
         pluggy_items!inner (
-          institution_name,
-          institution_logo,
+          connector_name,
+          connector_id,
           status
         )
       `)
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
 
     if (pluggyError) {
       console.error('Error fetching pluggy accounts:', pluggyError);
-      return NextResponse.json({ error: 'Failed to fetch accounts' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to fetch accounts', details: pluggyError.message }, { status: 500 });
     }
 
     // Get existing links
@@ -64,8 +64,8 @@ export async function GET(request: NextRequest) {
         balance_cents: acc.balance_cents,
         currency: acc.currency,
         number: acc.number,
-        institution_name: acc.pluggy_items?.institution_name,
-        institution_logo: acc.pluggy_items?.institution_logo,
+        institution_name: acc.pluggy_items?.connector_name || 'Open Finance',
+        institution_logo: null, // Not stored in pluggy_items
         status: acc.pluggy_items?.status,
       }));
 

@@ -12,6 +12,7 @@ import {
 import TransactionForm from '@/components/transactions/TransactionForm';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { formatCurrency } from '@/lib/utils';
 
 interface Asset {
   id: string;
@@ -138,13 +139,6 @@ export default function AssetCard({ asset }: AssetCardProps) {
     } finally {
       setLoading(false);
     }
-  };
-
-  const formatCurrency = (cents: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(cents / 100);
   };
 
   const appreciation = asset.current_value_cents - asset.purchase_price_cents;

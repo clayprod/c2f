@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useMembers } from '@/hooks/useMembers';
+import { formatCurrency } from '@/lib/utils';
 
 interface Debt {
   id: string;
@@ -229,13 +230,6 @@ export default function DebtDetailPage() {
 
     setIsEditing(false);
     fetchDebt();
-  };
-
-  const formatCurrency = (cents: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(cents / 100);
   };
 
   const getStatusLabel = (status: string) => {

@@ -13,6 +13,8 @@ import TransactionForm from '@/components/transactions/TransactionForm';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { PlanGuard } from '@/components/app/PlanGuard';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
+import { formatCurrency } from '@/lib/utils';
 
 interface Investment {
   id: string;
@@ -42,6 +44,7 @@ export default function InvestmentsPage() {
   const [categories, setCategories] = useState<any[]>([]);
   const [sellLoading, setSellLoading] = useState(false);
   const { toast } = useToast();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   useEffect(() => {
     fetchInvestments();
@@ -119,6 +122,44 @@ export default function InvestmentsPage() {
     }
   };
 
+  const handleDeleteInvestment = async (investment: Investment) => {
+    const confirmed = await confirm({
+      title: 'Excluir investimento',
+      description: `Tem certeza que deseja excluir "${investment.name}"?`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/investments/${investment.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erro ao excluir investimento');
+      }
+
+      toast({
+        title: 'Investimento excluido',
+        description: 'O investimento foi removido com sucesso.',
+      });
+
+      fetchInvestments();
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Falha ao excluir investimento',
+        description: error.message || 'Nao foi possivel excluir o investimento. Tente novamente.',
+      });
+    }
+  };
+
   const fetchInvestments = async () => {
     try {
       const response = await fetch('/api/investments');
@@ -131,13 +172,6 @@ export default function InvestmentsPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const formatCurrency = (cents: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(cents / 100);
   };
 
   const getTypeLabel = (type: string) => {
@@ -283,12 +317,22 @@ export default function InvestmentsPage() {
                         Comprado em: {new Date(investment.purchase_date).toLocaleDateString('pt-BR')}
                       </p>
                     </div>
-                    <Link
-                      href={`/app/investments/${investment.id}`}
-                      className="text-primary hover:underline text-sm"
-                    >
-                      Ver detalhes
-                    </Link>
+                    <div className="flex items-center gap-3">
+                      <Link
+                        href={`/app/investments/${investment.id}`}
+                        className="text-primary hover:underline text-sm"
+                      >
+                        Ver detalhes
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteInvestment(investment)}
+                        className="text-red-500 hover:text-red-400 text-sm"
+                        title="Excluir investimento"
+                      >
+                        <i className='bx bx-trash'></i>
+                      </button>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-4 text-sm mb-4">
@@ -353,8 +397,8 @@ export default function InvestmentsPage() {
             </DialogContent>
           </Dialog>
         )}
+        {ConfirmDialog}
       </div>
     </PlanGuard>
   );
 }
-

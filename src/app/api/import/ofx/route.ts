@@ -3,6 +3,7 @@ import { getUserId } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { parseOFX } from '@/services/import/ofxParser';
 import { createErrorResponse } from '@/lib/errors';
+import { projectionCache } from '@/services/projections/cache';
 
 interface ImportOptions {
   categories?: Record<string, string>; // transaction id -> category id
@@ -219,6 +220,8 @@ export async function POST(request: NextRequest) {
         error_message: errors.length > 0 ? errors.slice(0, 5).join('; ') : null,
       })
       .eq('id', importRecord.id);
+
+    projectionCache.invalidateUser(userId);
 
     return NextResponse.json({
       success: status === 'completed',

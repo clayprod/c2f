@@ -213,10 +213,12 @@ export function AdvisorTips() {
       {(tip.insights.length > 3 || tip.actions.length > 0) && (
         <button
           onClick={() => setExpanded(!expanded)}
-          className="mt-4 text-sm text-primary hover:underline flex items-center gap-1"
+          className="group mt-4 text-sm text-primary flex items-center gap-1"
         >
           <i className={cn('bx', expanded ? 'bx-chevron-up' : 'bx-chevron-down')}></i>
-          {expanded ? 'Ver menos' : 'Ver mais detalhes'}
+          <span className="group-hover:underline decoration-skip-ink-none">
+            {expanded ? 'Ver menos' : 'Ver mais detalhes'}
+          </span>
         </button>
       )}
     </div>

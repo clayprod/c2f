@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
 import { PlanGuard } from '@/components/app/PlanGuard';
+import { formatCurrency } from '@/lib/utils';
 
 interface Goal {
   id: string;
@@ -50,13 +51,6 @@ export default function GoalsPage() {
     }
   };
 
-  const formatCurrency = (cents: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(cents / 100);
-  };
-
   const handleMarkAsCompleted = async (goalId: string) => {
     try {
       const response = await fetch(`/api/goals/${goalId}`, {
@@ -73,6 +67,24 @@ export default function GoalsPage() {
       }
     } catch (error) {
       console.error('Error marking goal as completed:', error);
+    }
+  };
+
+  const handleReactivateGoal = async (goalId: string) => {
+    try {
+      const response = await fetch(`/api/goals/${goalId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'active' }),
+      });
+
+      if (response.ok) {
+        fetchGoals();
+      } else {
+        console.error('Error reactivating goal');
+      }
+    } catch (error) {
+      console.error('Error reactivating goal:', error);
     }
   };
 
@@ -239,6 +251,16 @@ export default function GoalsPage() {
                                     Concluir
                                   </button>
                                 )}
+                                {goal.status === 'completed' && (
+                                  <button
+                                    onClick={() => handleReactivateGoal(goal.id)}
+                                    className="text-blue-600 hover:text-blue-700 text-sm bg-background/80 px-3 py-1 rounded backdrop-blur-sm flex items-center gap-1"
+                                    title="Reativar objetivo"
+                                  >
+                                    <i className='bx bx-refresh'></i>
+                                    Reativar
+                                  </button>
+                                )}
                                 <Link
                                   href={`/app/goals/${goal.id}`}
                                   className="text-primary hover:underline text-sm bg-background/80 px-3 py-1 rounded backdrop-blur-sm"
@@ -304,6 +326,16 @@ export default function GoalsPage() {
                                 >
                                   <i className='bx bx-check-circle'></i>
                                   Concluir
+                                </button>
+                              )}
+                              {goal.status === 'completed' && (
+                                <button
+                                  onClick={() => handleReactivateGoal(goal.id)}
+                                  className="text-blue-600 hover:text-blue-700 text-sm flex items-center gap-1"
+                                  title="Reativar objetivo"
+                                >
+                                  <i className='bx bx-refresh'></i>
+                                  Reativar
                                 </button>
                               )}
                               <Link

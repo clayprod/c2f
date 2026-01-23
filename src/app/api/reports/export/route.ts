@@ -74,8 +74,19 @@ export async function POST(request: NextRequest) {
     const ownerId = await getEffectiveOwnerId(request, userId);
 
     const body = await request.json();
-    const params = exportReportSchema.parse(body);
+    const rawParams = exportReportSchema.parse(body);
     const supabase = await createClient();
+    const resolvedRange = await resolveExportDateRange(
+      supabase,
+      ownerId,
+      rawParams.startDate,
+      rawParams.endDate
+    );
+    const params: ExportParams = {
+      ...rawParams,
+      startDate: resolvedRange.startDate,
+      endDate: resolvedRange.endDate,
+    };
 
     let csvContent = '';
     let filename = '';
@@ -133,6 +144,7 @@ export async function POST(request: NextRequest) {
 }
 
 type ExportParams = {
+  reportType: 'transactions' | 'categories' | 'budgets' | 'goals' | 'debts' | 'investments' | 'summary';
   startDate: string;
   endDate: string;
   accountIds?: string[];
@@ -141,8 +153,83 @@ type ExportParams = {
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
-function formatCurrency(cents: number): string {
-  return (cents / 100).toFixed(2).replace('.', ',');
+async function resolveExportDateRange(
+  supabase: SupabaseClient,
+  userId: string,
+  startDate?: string,
+  endDate?: string
+): Promise<{ startDate: string; endDate: string }> {
+  if (startDate && endDate) {
+    return { startDate, endDate };
+  }
+
+  const [minTxResult, maxTxResult, minBudgetResult, maxBudgetResult] = await Promise.all([
+    supabase
+      .from('transactions')
+      .select('posted_at')
+      .eq('user_id', userId)
+      .order('posted_at', { ascending: true })
+      .limit(1),
+    supabase
+      .from('transactions')
+      .select('posted_at')
+      .eq('user_id', userId)
+      .order('posted_at', { ascending: false })
+      .limit(1),
+    supabase
+      .from('budgets')
+      .select('year, month')
+      .eq('user_id', userId)
+      .order('year', { ascending: true })
+      .order('month', { ascending: true })
+      .limit(1),
+    supabase
+      .from('budgets')
+      .select('year, month')
+      .eq('user_id', userId)
+      .order('year', { ascending: false })
+      .order('month', { ascending: false })
+      .limit(1),
+  ]);
+
+  const minTxDate = minTxResult.data?.[0]?.posted_at;
+  const maxTxDate = maxTxResult.data?.[0]?.posted_at;
+
+  const minBudget = minBudgetResult.data?.[0];
+  const maxBudget = maxBudgetResult.data?.[0];
+
+  const minBudgetDate = minBudget
+    ? formatISODate(new Date(minBudget.year, minBudget.month - 1, 1))
+    : undefined;
+  const maxBudgetDate = maxBudget
+    ? formatISODate(new Date(maxBudget.year, maxBudget.month, 0))
+    : undefined;
+
+  const startCandidates = [minTxDate, minBudgetDate].filter(Boolean) as string[];
+  const endCandidates = [maxTxDate, maxBudgetDate].filter(Boolean) as string[];
+  const today = formatISODate(new Date());
+
+  return {
+    startDate: startDate || (startCandidates.length ? startCandidates.sort()[0] : today),
+    endDate: endDate || (endCandidates.length ? endCandidates.sort()[endCandidates.length - 1] : today),
+  };
+}
+
+function formatISODate(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
+
+/**
+ * Formata centavos para CSV no formato brasileiro (vírgula como separador decimal)
+ * Usado especificamente para exportação CSV onde Excel espera vírgula
+ */
+function formatCurrencyForCSV(cents: number): string {
+  const reais = cents / 100;
+  return reais.toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    useGrouping: false, // Sem separador de milhares para CSV
+  });
 }
 
 function formatDate(dateStr: string): string {
@@ -197,7 +284,7 @@ async function exportTransactions(
     tx.categories?.name || 'Sem Categoria',
     tx.categories?.type === 'income' ? 'Receita' : 'Despesa',
     tx.accounts?.name || '',
-    formatCurrency(Math.round((tx.amount || 0) * 100)),
+    formatCurrencyForCSV(Math.round((tx.amount || 0) * 100)),
     tx.currency,
     tx.notes || '',
   ]);
@@ -261,9 +348,9 @@ async function exportCategories(
     rows.push([
       cat.name,
       cat.type === 'income' ? 'Receita' : 'Despesa',
-      formatCurrency(t.income),
-      formatCurrency(t.expense),
-      formatCurrency(t.income - t.expense),
+      formatCurrencyForCSV(t.income),
+      formatCurrencyForCSV(t.expense),
+      formatCurrencyForCSV(t.income - t.expense),
       t.count,
     ]);
   }
@@ -274,9 +361,9 @@ async function exportCategories(
     rows.push([
       'Sem Categoria',
       '-',
-      formatCurrency(semCategoria.income),
-      formatCurrency(semCategoria.expense),
-      formatCurrency(semCategoria.income - semCategoria.expense),
+      formatCurrencyForCSV(semCategoria.income),
+      formatCurrencyForCSV(semCategoria.expense),
+      formatCurrencyForCSV(semCategoria.income - semCategoria.expense),
       semCategoria.count,
     ]);
   }
@@ -350,9 +437,9 @@ async function exportBudgets(
     return [
       formatDate(b.month),
       b.categories?.name || 'Categoria',
-      formatCurrency(budgetedCents),
-      formatCurrency(spent),
-      formatCurrency(remaining),
+      formatCurrencyForCSV(budgetedCents),
+      formatCurrencyForCSV(spent),
+      formatCurrencyForCSV(remaining),
       percentage.toFixed(1) + '%',
       status,
     ];
@@ -393,9 +480,9 @@ async function exportGoals(
 
     return [
       g.name,
-      formatCurrency(g.target_amount_cents),
-      formatCurrency(g.current_amount_cents),
-      formatCurrency(remaining),
+      formatCurrencyForCSV(g.target_amount_cents),
+      formatCurrencyForCSV(g.current_amount_cents),
+      formatCurrencyForCSV(remaining),
       progress.toFixed(1) + '%',
       g.start_date ? formatDate(g.start_date) : '',
       g.target_date ? formatDate(g.target_date) : '',
@@ -442,9 +529,9 @@ async function exportDebts(
     return [
       d.name,
       d.creditor_name || '',
-      formatCurrency(d.total_amount_cents),
-      formatCurrency(d.paid_amount_cents),
-      formatCurrency(remaining),
+      formatCurrencyForCSV(d.total_amount_cents),
+      formatCurrencyForCSV(d.paid_amount_cents),
+      formatCurrencyForCSV(remaining),
       progress.toFixed(1) + '%',
       d.interest_rate.toString().replace('.', ','),
       d.due_date ? formatDate(d.due_date) : '',
@@ -495,9 +582,9 @@ async function exportInvestments(
       i.name,
       typeMap[i.type] || i.type,
       i.institution || '',
-      formatCurrency(i.initial_investment_cents),
-      formatCurrency(currentValue),
-      formatCurrency(returnAmount),
+      formatCurrencyForCSV(i.initial_investment_cents),
+      formatCurrencyForCSV(currentValue),
+      formatCurrencyForCSV(returnAmount),
       returnPct.toFixed(2) + '%',
       formatDate(i.purchase_date),
       statusMap[i.status] || i.status,
@@ -598,35 +685,35 @@ async function exportSummary(
     ['Período', `${formatDate(params.startDate)} a ${formatDate(params.endDate)}`],
     ['', ''],
     ['=== TRANSAÇÕES ===', ''],
-    ['Total Receitas', `R$ ${formatCurrency(totalIncome)}`],
-    ['Total Despesas', `R$ ${formatCurrency(totalExpense)}`],
-    ['Saldo do Período', `R$ ${formatCurrency(totalIncome - totalExpense)}`],
+    ['Total Receitas', `R$ ${formatCurrencyForCSV(totalIncome)}`],
+    ['Total Despesas', `R$ ${formatCurrencyForCSV(totalExpense)}`],
+    ['Saldo do Período', `R$ ${formatCurrencyForCSV(totalIncome - totalExpense)}`],
     ['Taxa de Poupança', totalIncome > 0 ? `${(((totalIncome - totalExpense) / totalIncome) * 100).toFixed(1)}%` : '0%'],
     ['', ''],
     ['=== CONTAS ===', ''],
-    ['Saldo Total das Contas', `R$ ${formatCurrency(totalBalance)}`],
+    ['Saldo Total das Contas', `R$ ${formatCurrencyForCSV(totalBalance)}`],
     ['', ''],
     ['=== OBJETIVOS ===', ''],
     ['Objetivos Ativos', activeGoals.length.toString()],
-    ['Meta Total', `R$ ${formatCurrency(totalGoalTarget)}`],
-    ['Acumulado', `R$ ${formatCurrency(totalGoalCurrent)}`],
+    ['Meta Total', `R$ ${formatCurrencyForCSV(totalGoalTarget)}`],
+    ['Acumulado', `R$ ${formatCurrencyForCSV(totalGoalCurrent)}`],
     ['Progresso Geral', totalGoalTarget > 0 ? `${((totalGoalCurrent / totalGoalTarget) * 100).toFixed(1)}%` : '0%'],
     ['', ''],
     ['=== DÍVIDAS ===', ''],
     ['Dívidas Ativas', activeDebts.length.toString()],
-    ['Total Dívidas', `R$ ${formatCurrency(totalDebt)}`],
-    ['Total Pago', `R$ ${formatCurrency(totalPaidDebt)}`],
-    ['Restante', `R$ ${formatCurrency(totalDebt - totalPaidDebt)}`],
+    ['Total Dívidas', `R$ ${formatCurrencyForCSV(totalDebt)}`],
+    ['Total Pago', `R$ ${formatCurrencyForCSV(totalPaidDebt)}`],
+    ['Restante', `R$ ${formatCurrencyForCSV(totalDebt - totalPaidDebt)}`],
     ['', ''],
     ['=== INVESTIMENTOS ===', ''],
     ['Investimentos Ativos', activeInvestments.length.toString()],
-    ['Total Investido', `R$ ${formatCurrency(totalInvested)}`],
-    ['Valor Atual', `R$ ${formatCurrency(totalInvestmentValue)}`],
-    ['Retorno', `R$ ${formatCurrency(totalInvestmentValue - totalInvested)}`],
+    ['Total Investido', `R$ ${formatCurrencyForCSV(totalInvested)}`],
+    ['Valor Atual', `R$ ${formatCurrencyForCSV(totalInvestmentValue)}`],
+    ['Retorno', `R$ ${formatCurrencyForCSV(totalInvestmentValue - totalInvested)}`],
     ['% Retorno', totalInvested > 0 ? `${(((totalInvestmentValue - totalInvested) / totalInvested) * 100).toFixed(2)}%` : '0%'],
     ['', ''],
     ['=== PATRIMÔNIO LÍQUIDO ===', ''],
-    ['Patrimônio Líquido', `R$ ${formatCurrency(totalBalance + totalInvestmentValue - (totalDebt - totalPaidDebt))}`],
+    ['Patrimônio Líquido', `R$ ${formatCurrencyForCSV(totalBalance + totalInvestmentValue - (totalDebt - totalPaidDebt))}`],
   ];
 
   const filename = `resumo_financeiro_${params.startDate}_${params.endDate}.csv`;

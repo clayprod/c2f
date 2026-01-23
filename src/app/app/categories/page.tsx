@@ -508,7 +508,7 @@ export default function CategoriesPage() {
                 <span className="w-3 h-3 rounded-full bg-green-500"></span>
                 Receitas ({generalIncome.length})
               </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-6 gap-3 max-w-full">
+              <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-6 gap-3 max-w-full">
                 {generalIncome.map((category) => (
                   <CategoryCard
                     key={category.id}
@@ -534,7 +534,7 @@ export default function CategoriesPage() {
                 <span className="w-3 h-3 rounded-full bg-red-500"></span>
                 Despesas ({generalExpense.length})
               </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-6 gap-3 max-w-full">
+              <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-6 gap-3 max-w-full">
                 {generalExpense.map((category) => (
                   <CategoryCard
                     key={category.id}
@@ -586,7 +586,7 @@ export default function CategoriesPage() {
                 <span className="w-3 h-3 rounded-full bg-cyan-500"></span>
                 Investimentos ({investmentCategories.length})
               </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-6 gap-3 max-w-full">
+              <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-6 gap-3 max-w-full">
                 {investmentCategories.map((category) => (
                   <CategoryCard
                     key={category.id}
@@ -612,7 +612,7 @@ export default function CategoriesPage() {
                 <span className="w-3 h-3 rounded-full bg-green-600"></span>
                 Objetivos ({goalCategories.length})
               </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-6 gap-3 max-w-full">
+              <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-6 gap-3 max-w-full">
                 {goalCategories.map((category) => (
                   <CategoryCard
                     key={category.id}
@@ -638,7 +638,7 @@ export default function CategoriesPage() {
                 <span className="w-3 h-3 rounded-full bg-red-600"></span>
                 Dívidas ({debtCategories.length})
               </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-6 gap-3 max-w-full">
+              <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-6 gap-3 max-w-full">
                 {debtCategories.map((category) => (
                   <CategoryCard
                     key={category.id}
@@ -850,23 +850,23 @@ function CategoryCard({
 
   return (
     <div className={`glass-card relative p-3 hover:shadow-lg transition-all group overflow-hidden ${isInactive ? 'opacity-60' : ''}`}>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
         <div
-          className="w-10 h-10 rounded-lg flex items-center justify-center text-xl flex-shrink-0 transition-transform group-hover:scale-110"
+          className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center text-lg sm:text-xl flex-shrink-0 transition-transform group-hover:scale-110"
           style={{ backgroundColor: (category.color || '#3b82f6') + '20' }}
         >
           {category.icon || '📁'}
         </div>
         <div className="flex-1 min-w-0 overflow-hidden">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-medium truncate text-base flex-1 min-w-0" title={category.name}>{category.name}</h3>
+          <div className="flex items-start gap-1.5 sm:gap-2">
+            <h3 className="font-medium text-sm sm:text-base flex-1 min-w-0 leading-tight line-clamp-2" title={category.name}>{category.name}</h3>
             {transactionCount > 0 && (
-              <span className="px-1.5 py-0.5 text-xs font-medium bg-blue-500/10 text-blue-500 rounded flex-shrink-0">
+              <span className="px-1.5 py-0.5 text-[10px] sm:text-xs font-medium bg-blue-500/10 text-blue-500 rounded flex-shrink-0 mt-0.5">
                 {transactionCount}
               </span>
             )}
           </div>
-          <span className={`text-xs block mt-0.5 font-medium ${category.type === 'income'
+          <span className={`text-[10px] sm:text-xs block mt-0.5 font-medium ${category.type === 'income'
             ? 'text-green-500'
             : category.source_type === 'goal'
               ? 'text-blue-500'

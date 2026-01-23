@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatCurrency } from '@/lib/utils';
 
 interface Stats {
   total_users: number;
@@ -44,13 +45,6 @@ export default function AdminDashboard() {
   if (!stats) {
     return <div className="text-center py-8 text-destructive">Erro ao carregar estatísticas</div>;
   }
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value / 100);
-  };
 
   return (
     <div className="space-y-6">

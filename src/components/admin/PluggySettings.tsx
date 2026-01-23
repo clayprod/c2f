@@ -57,6 +57,15 @@ export default function PluggySettings() {
       const res = await fetch('/api/admin/pluggy/settings');
       if (!res.ok) throw new Error('Failed to fetch settings');
       const data = await res.json();
+      
+      // DEBUG: Log API response
+      console.log('[PluggySettings] API Response:', {
+        pluggy_client_id_set: data.pluggy_client_id_set,
+        pluggy_client_secret_set: data.pluggy_client_secret_set,
+        pluggy_enabled: data.pluggy_enabled,
+        hasCategorizationPrompt: !!data.categorization_prompt,
+      });
+      
       setSettings({
         ...data,
         categorization_prompt: data.categorization_prompt || DEFAULT_CATEGORIZATION_PROMPT,
@@ -96,6 +105,16 @@ export default function PluggySettings() {
 
   const handleSave = async () => {
     setSaving(true);
+    
+    // DEBUG: Log what we're sending
+    console.log('[PluggySettings] Saving settings:', {
+      hasClientId: !!settings.pluggy_client_id,
+      clientIdLength: settings.pluggy_client_id?.length,
+      hasClientSecret: !!settings.pluggy_client_secret,
+      clientSecretLength: settings.pluggy_client_secret?.length,
+      pluggyEnabled: settings.pluggy_enabled,
+    });
+    
     try {
       const res = await fetch('/api/admin/pluggy/settings', {
         method: 'PUT',
@@ -103,15 +122,19 @@ export default function PluggySettings() {
         body: JSON.stringify(settings),
       });
 
-      if (!res.ok) throw new Error('Failed to save settings');
+      const responseData = await res.json();
+      console.log('[PluggySettings] Save response:', responseData);
+
+      if (!res.ok) throw new Error(responseData.error || 'Failed to save settings');
 
       toast({
         title: 'Sucesso',
         description: 'Configuracoes salvas com sucesso',
       });
 
-      // Refresh status after save
+      // Refresh status and settings after save
       fetchStatus();
+      fetchSettings();
     } catch (error) {
       console.error('Error saving Pluggy settings:', error);
       toast({

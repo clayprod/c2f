@@ -5,6 +5,7 @@ import { transactionSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
 import { z } from 'zod';
 import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
+import { projectionCache } from '@/services/projections/cache';
 
 export async function GET(
   request: NextRequest,
@@ -37,6 +38,8 @@ export async function GET(
       ...data,
       amount_cents: Math.round((data.amount || 0) * 100),
     };
+
+    projectionCache.invalidateUser(ownerId);
 
     return NextResponse.json({ data: transformedData });
   } catch (error) {
@@ -184,6 +187,8 @@ export async function DELETE(
 
     if (error) throw error;
 
+    projectionCache.invalidateUser(ownerId);
+
     return NextResponse.json({ success: true });
   } catch (error) {
     const errorResponse = createErrorResponse(error);
@@ -193,7 +198,6 @@ export async function DELETE(
     );
   }
 }
-
 
 
 

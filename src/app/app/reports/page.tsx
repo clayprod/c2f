@@ -30,7 +30,7 @@ import {
   ReferenceArea,
 } from 'recharts';
 import DateRangeFilter from '@/components/ui/DateRangeFilter';
-import { formatMonthYear } from '@/lib/utils';
+import { formatMonthYear, formatCurrency } from '@/lib/utils';
 import { InfoIcon } from '@/components/ui/InfoIcon';
 import { PlanGuard } from '@/components/app/PlanGuard';
 import { useMembers } from '@/hooks/useMembers';
@@ -140,15 +140,8 @@ export default function ReportsPage() {
   const [groupBy, setGroupBy] = useState<'day' | 'week' | 'month' | 'year'>('month');
 
   // Date filters
-  const [startDate, setStartDate] = useState(() => {
-    const date = new Date();
-    date.setMonth(date.getMonth() - 2); // Default to last 3 months
-    date.setDate(1);
-    return date.toISOString().split('T')[0];
-  });
-  const [endDate, setEndDate] = useState(() => {
-    return new Date().toISOString().split('T')[0];
-  });
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   // Filter options
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -257,11 +250,15 @@ export default function ReportsPage() {
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        startDate,
-        endDate,
         reportType: activeTab,
         groupBy,
       });
+      if (startDate) {
+        params.set('startDate', startDate);
+      }
+      if (endDate) {
+        params.set('endDate', endDate);
+      }
       if (selectedAccountIds.length) {
         params.set('accountIds', selectedAccountIds.join(','));
       }
@@ -320,10 +317,10 @@ export default function ReportsPage() {
       const res = await fetch('/api/reports/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+         body: JSON.stringify({
           reportType,
-          startDate,
-          endDate,
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
           accountIds: selectedAccountIds.length ? selectedAccountIds : undefined,
           categoryIds: selectedCategoryIds.length ? selectedCategoryIds : undefined,
         }),
@@ -361,13 +358,6 @@ export default function ReportsPage() {
     } finally {
       setExporting(false);
     }
-  };
-
-  const formatCurrency = (cents: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(cents / 100);
   };
 
   const formatPeriodLabel = (period: string, index?: number, data?: any[]) => {

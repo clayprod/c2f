@@ -16,6 +16,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { formatCurrency } from '@/lib/utils';
 
 interface Transaction {
   id: string;
@@ -210,13 +211,6 @@ export default function BillDetailModal({
     } finally {
       setPaymentLoading(false);
     }
-  };
-
-  const formatCurrency = (cents: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(cents / 100);
   };
 
   const formatDate = (dateStr: string) => {
@@ -503,7 +497,7 @@ export default function BillDetailModal({
                             )}
                           </div>
                         </div>
-                        <p className={`font-semibold ${tx.amount_cents < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                        <p className={`font-semibold ${tx.amount_cents >= 0 ? 'text-red-500' : 'text-green-500'}`}>
                           {formatCurrency(Math.abs(tx.amount_cents))}
                         </p>
                       </div>

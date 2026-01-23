@@ -296,7 +296,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       >
         <div className="flex flex-col h-full">
           <div className="h-16 border-b border-border flex items-center px-6">
-            <Link href="/app" className="flex items-center">
+            <Link href="/app" onClick={() => setSidebarOpen(false)} className="flex items-center">
               <Image
                 src={getLogo(theme)}
                 alt="c2Finance"
@@ -342,6 +342,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   <li key={item.path}>
                     <Link
                       href={item.path}
+                      onClick={() => setSidebarOpen(false)}
                       className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${isActive
                         ? 'bg-primary/10 text-primary'
                         : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -358,6 +359,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <li>
                   <Link
                     href="/app/admin"
+                    onClick={() => setSidebarOpen(false)}
                     className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${pathname === '/app/admin'
                       ? 'bg-amber-500/10 text-amber-500'
                       : 'text-amber-500/70 hover:bg-amber-500/10 hover:text-amber-500'
@@ -375,6 +377,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <div className="flex items-center gap-3 px-4 py-3">
               <Link
                 href="/app/settings"
+                onClick={() => setSidebarOpen(false)}
                 className="flex items-center gap-3 flex-1 min-w-0 rounded-xl hover:bg-muted transition-colors cursor-pointer group"
               >
                 <div className="flex flex-col items-center gap-1 flex-shrink-0">
@@ -416,10 +419,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
             {/* Links to legal pages */}
             <div className="flex flex-col gap-1 mt-3 px-4 text-xs text-muted-foreground">
-              <Link href="/app/terms-of-service" className="hover:text-foreground transition-colors">
+              <Link href="/app/terms-of-service" onClick={() => setSidebarOpen(false)} className="hover:text-foreground transition-colors">
                 Termos de Uso
               </Link>
-              <Link href="/app/privacy-policy" className="hover:text-foreground transition-colors">
+              <Link href="/app/privacy-policy" onClick={() => setSidebarOpen(false)} className="hover:text-foreground transition-colors">
                 Política de Privacidade
               </Link>
             </div>

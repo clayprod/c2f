@@ -38,18 +38,80 @@ interface AdvisorContentProps {
   inDialog?: boolean;
 }
 
+// Keys for localStorage persistence
+const STORAGE_KEYS = {
+  MESSAGES: 'c2f_advisor_messages',
+  SESSION_ID: 'c2f_advisor_session_id',
+};
+
+// Default welcome message
+const WELCOME_MESSAGE: Message = {
+  role: 'assistant',
+  content: 'Olá! Sou seu AI Advisor financeiro. Posso ajudar você a entender seus gastos, criar orçamentos, acompanhar objetivos, analisar investimentos e tomar decisões mais inteligentes com seu dinheiro. Como posso ajudar?',
+};
+
 export default function AdvisorContent({ inDialog = false }: AdvisorContentProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: 'Olá! Sou seu AI Advisor financeiro. Posso ajudar você a entender seus gastos, criar orçamentos e tomar decisões mais inteligentes com seu dinheiro. Como posso ajudar?',
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  // Load persisted chat from localStorage on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      const savedMessages = localStorage.getItem(STORAGE_KEYS.MESSAGES);
+      const savedSessionId = localStorage.getItem(STORAGE_KEYS.SESSION_ID);
+      
+      if (savedMessages) {
+        const parsedMessages = JSON.parse(savedMessages) as Message[];
+        if (Array.isArray(parsedMessages) && parsedMessages.length > 0) {
+          setMessages(parsedMessages);
+        }
+      }
+      
+      if (savedSessionId) {
+        setSessionId(savedSessionId);
+      }
+    } catch (error) {
+      console.error('Error loading persisted chat:', error);
+      // If there's an error, clear corrupted data
+      localStorage.removeItem(STORAGE_KEYS.MESSAGES);
+      localStorage.removeItem(STORAGE_KEYS.SESSION_ID);
+    }
+    
+    setIsInitialized(true);
+  }, []);
+
+  // Persist messages to localStorage whenever they change
+  useEffect(() => {
+    if (!isInitialized || typeof window === 'undefined') return;
+    
+    try {
+      localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(messages));
+    } catch (error) {
+      console.error('Error persisting messages:', error);
+    }
+  }, [messages, isInitialized]);
+
+  // Persist sessionId to localStorage whenever it changes
+  useEffect(() => {
+    if (!isInitialized || typeof window === 'undefined') return;
+    
+    try {
+      if (sessionId) {
+        localStorage.setItem(STORAGE_KEYS.SESSION_ID, sessionId);
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.SESSION_ID);
+      }
+    } catch (error) {
+      console.error('Error persisting sessionId:', error);
+    }
+  }, [sessionId, isInitialized]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -114,10 +176,12 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
   };
 
   const suggestedQuestions = [
-    'Como estão meus gastos este mês?',
-    'Quais categorias estão acima do orçamento?',
+    'Como está minha situação financeira atual?',
+    'Quais orçamentos estão acima do limite?',
+    'Como estão meus objetivos e metas?',
+    'Quais dívidas devo priorizar?',
     'Como posso economizar mais?',
-    'Qual é minha situação financeira atual?',
+    'Qual o progresso dos meus investimentos?',
   ];
 
   const handleSuggestedQuestion = (question: string) => {
@@ -138,12 +202,17 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
       }
     }
 
+    // Clear localStorage
+    try {
+      localStorage.removeItem(STORAGE_KEYS.MESSAGES);
+      localStorage.removeItem(STORAGE_KEYS.SESSION_ID);
+    } catch (error) {
+      console.error('Error clearing localStorage:', error);
+    }
+
     // Reset local state
     setSessionId(null);
-    setMessages([{
-      role: 'assistant',
-      content: 'Olá! Sou seu AI Advisor financeiro. Posso ajudar você a entender seus gastos, criar orçamentos e tomar decisões mais inteligentes com seu dinheiro. Como posso ajudar?',
-    }]);
+    setMessages([WELCOME_MESSAGE]);
     setInput('');
   };
 

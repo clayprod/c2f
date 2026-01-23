@@ -125,8 +125,8 @@ export default function NewReceivablePage() {
           installment_count: formData.status === 'negociada' && formData.installment_count
             ? parseInt(formData.installment_count)
             : undefined,
-          contribution_frequency: !useCustomPlan && formData.include_in_plan && formData.contribution_frequency
-            ? formData.contribution_frequency
+          contribution_frequency: !useCustomPlan && formData.include_in_plan
+            ? (formData.contribution_frequency || 'monthly')
             : undefined,
           monthly_payment_cents: !useCustomPlan && formData.include_in_plan && formData.monthly_payment_cents
             ? Math.round(parseFloat(formData.monthly_payment_cents) * 100)

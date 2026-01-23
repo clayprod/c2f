@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatCurrencyValue } from '@/lib/utils';
 import PluggyImportDialog from './PluggyImportDialog';
 
 interface PluggyAccount {
@@ -186,18 +186,20 @@ export default function AccountLinking({ onLinkChange }: Props) {
   };
 
   const getBalanceDifference = (link: AccountLink) => {
-    const pluggyBalance = link.pluggy_account.balance_cents / 100;
+    // pluggy_account.balance_cents está em centavos, internal_account.current_balance está em reais
+    const pluggyBalanceReais = link.pluggy_account.balance_cents / 100;
     const internalBalance = link.internal_account.current_balance;
-    return pluggyBalance - internalBalance;
+    return pluggyBalanceReais - internalBalance;
   };
 
   const formatAccountType = (type: string) => {
     const types: Record<string, string> = {
       BANK: 'Conta Bancaria',
-      CREDIT: 'Credito',
+      CREDIT: 'Cartão de crédito',
       checking: 'Conta Corrente',
       savings: 'Poupanca',
-      credit_card: 'Cartao de Credito',
+      credit_card: 'Cartão de crédito',
+      credit: 'Cartão de crédito',
       investment: 'Investimento',
     };
     return types[type] || type;
@@ -230,42 +232,54 @@ export default function AccountLinking({ onLinkChange }: Props) {
           <CardContent className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="text-sm font-medium mb-2 block">Conta Open Finance</label>
+                <label className="text-sm font-medium mb-2 block">Conta/Cartão Open Finance</label>
                 <Select value={selectedPluggyAccount} onValueChange={setSelectedPluggyAccount}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma conta" />
+                    <SelectValue placeholder="Selecione uma conta ou cartão" />
                   </SelectTrigger>
                   <SelectContent>
-                    {unlinkedPluggyAccounts.map((acc) => (
-                      <SelectItem key={acc.id} value={acc.id}>
-                        <div className="flex items-center gap-2">
-                          <span>{acc.institution_name} - {acc.name}</span>
-                          <span className="text-muted-foreground text-xs">
-                            ({formatCurrency(acc.balance_cents / 100)})
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
+                    {unlinkedPluggyAccounts.map((acc) => {
+                      const isCreditCard = acc.type === 'CREDIT' || acc.subtype === 'credit_card';
+                      return (
+                        <SelectItem key={acc.id} value={acc.id}>
+                          <div className="flex items-center gap-2">
+                            <span>
+                              {isCreditCard ? 'Cartão de crédito: ' : ''}
+                              {acc.institution_name} - {acc.name}
+                            </span>
+                            <span className="text-muted-foreground text-xs">
+                              ({formatCurrency(acc.balance_cents)})
+                            </span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <label className="text-sm font-medium mb-2 block">Conta c2Finance</label>
+                <label className="text-sm font-medium mb-2 block">Conta/Cartão c2Finance</label>
                 <Select value={selectedInternalAccount} onValueChange={setSelectedInternalAccount}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma conta" />
+                    <SelectValue placeholder="Selecione uma conta ou cartão" />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableInternalAccounts.map((acc) => (
-                      <SelectItem key={acc.id} value={acc.id}>
-                        <div className="flex items-center gap-2">
-                          <span>{acc.name}</span>
-                          <span className="text-muted-foreground text-xs">
-                            ({formatCurrency(acc.current_balance)})
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
+                    {availableInternalAccounts.map((acc) => {
+                      const isCreditCard = acc.type === 'credit' || acc.type === 'credit_card';
+                      return (
+                        <SelectItem key={acc.id} value={acc.id}>
+                          <div className="flex items-center gap-2">
+                            <span>
+                              {isCreditCard ? 'Cartão de crédito: ' : ''}
+                              {acc.name}
+                            </span>
+                            <span className="text-muted-foreground text-xs">
+                              ({formatCurrencyValue(acc.current_balance)})
+                            </span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -334,12 +348,16 @@ export default function AccountLinking({ onLinkChange }: Props) {
                             )}
                           </div>
                           <div>
-                            <p className="font-medium text-sm">{link.pluggy_account.name}</p>
+                            <p className="font-medium text-sm">
+                              {(link.pluggy_account.type === 'CREDIT' || link.pluggy_account.subtype === 'credit_card') 
+                                ? `Cartão de crédito: ${link.pluggy_account.name}` 
+                                : link.pluggy_account.name}
+                            </p>
                             <p className="text-xs text-muted-foreground">
                               {link.pluggy_account.institution_name}
                             </p>
                             <p className="text-sm font-semibold">
-                              {formatCurrency(link.pluggy_account.balance_cents / 100)}
+                              {formatCurrency(link.pluggy_account.balance_cents)}
                             </p>
                           </div>
                         </div>
@@ -355,12 +373,16 @@ export default function AccountLinking({ onLinkChange }: Props) {
                             <i className="bx bx-wallet text-xl text-primary"></i>
                           </div>
                           <div>
-                            <p className="font-medium text-sm">{link.internal_account.name}</p>
+                            <p className="font-medium text-sm">
+                              {(link.internal_account.type === 'credit' || link.internal_account.type === 'credit_card')
+                                ? `Cartão de crédito: ${link.internal_account.name}` 
+                                : link.internal_account.name}
+                            </p>
                             <p className="text-xs text-muted-foreground">
                               {formatAccountType(link.internal_account.type)}
                             </p>
                             <p className="text-sm font-semibold">
-                              {formatCurrency(link.internal_account.current_balance)}
+                              {formatCurrencyValue(link.internal_account.current_balance)}
                             </p>
                           </div>
                         </div>
@@ -388,7 +410,7 @@ export default function AccountLinking({ onLinkChange }: Props) {
                           <div className="text-right">
                             <p className="text-xs text-yellow-600 font-medium">Divergencia</p>
                             <p className={`text-sm font-bold ${diff > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {diff > 0 ? '+' : ''}{formatCurrency(diff)}
+                              {diff > 0 ? '+' : ''}{formatCurrencyValue(diff)}
                             </p>
                           </div>
                         )}

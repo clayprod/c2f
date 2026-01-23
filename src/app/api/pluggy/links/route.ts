@@ -29,8 +29,8 @@ export async function GET(request: NextRequest) {
           pluggy_account_id,
           item_id,
           pluggy_items!inner (
-            institution_name,
-            institution_logo
+            connector_name,
+            connector_id
           )
         ),
         accounts!inner (
@@ -63,8 +63,8 @@ export async function GET(request: NextRequest) {
         balance_cents: link.pluggy_accounts.balance_cents,
         currency: link.pluggy_accounts.currency,
         number: link.pluggy_accounts.number,
-        institution_name: link.pluggy_accounts.pluggy_items?.institution_name,
-        institution_logo: link.pluggy_accounts.pluggy_items?.institution_logo,
+        institution_name: link.pluggy_accounts.pluggy_items?.connector_name || 'Open Finance',
+        institution_logo: null,
       },
       internal_account: {
         id: link.accounts.id,

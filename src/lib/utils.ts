@@ -226,3 +226,22 @@ export function processCurrencyInput(inputValue: string): string {
     maximumFractionDigits: 2,
   });
 }
+
+/**
+ * Converte valor decimal (reais) para centavos com precisão
+ * Evita erros de floating-point (ex: 1234.56 * 100 = 123455.99999)
+ * @param value - Valor em reais
+ * @returns Valor em centavos (inteiro)
+ */
+export function toCents(value: number): number {
+  return Math.round(value * 100);
+}
+
+/**
+ * Converte centavos para valor decimal (reais)
+ * @param cents - Valor em centavos
+ * @returns Valor em reais
+ */
+export function toReais(cents: number): number {
+  return cents / 100;
+}

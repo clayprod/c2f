@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useMembers } from '@/hooks/useMembers';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
+import { formatCurrency } from '@/lib/utils';
 
 interface Investment {
   id: string;
@@ -42,6 +44,7 @@ export default function InvestmentDetailPage() {
   const investmentId = params?.id as string;
   const { toast } = useToast();
   const { members, loading: loadingMembers } = useMembers();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   const [loading, setLoading] = useState(true);
   const [assignedTo, setAssignedTo] = useState<string>('');
@@ -230,11 +233,44 @@ export default function InvestmentDetailPage() {
     });
   };
 
-  const formatCurrency = (cents: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(cents / 100);
+  const handleDeleteInvestment = async () => {
+    if (!investment) return;
+
+    const confirmed = await confirm({
+      title: 'Excluir investimento',
+      description: `Tem certeza que deseja excluir "${investment.name}"?`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/investments/${investment.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erro ao excluir investimento');
+      }
+
+      toast({
+        title: 'Investimento excluido',
+        description: 'O investimento foi removido com sucesso.',
+      });
+
+      router.push('/app/investments');
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Falha ao excluir investimento',
+        description: error.message || 'Nao foi possivel excluir o investimento. Tente novamente.',
+      });
+    }
   };
 
   const getTypeLabel = (type: string) => {
@@ -288,10 +324,20 @@ export default function InvestmentDetailPage() {
           <p className="text-muted-foreground">Detalhes e edição do investimento</p>
         </div>
         {!isEditing && (
-          <button onClick={() => setIsEditing(true)} className="btn-primary">
-            <i className='bx bx-edit'></i>
-            Editar
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setIsEditing(true)} className="btn-primary">
+              <i className='bx bx-edit'></i>
+              Editar
+            </button>
+            <button
+              onClick={handleDeleteInvestment}
+              className="btn-secondary text-red-500 hover:text-red-500"
+              type="button"
+            >
+              <i className='bx bx-trash'></i>
+              Excluir
+            </button>
+          </div>
         )}
       </div>
 
@@ -804,6 +850,7 @@ export default function InvestmentDetailPage() {
           )}
         </>
       )}
+      {ConfirmDialog}
     </div>
   );
 }

@@ -216,8 +216,8 @@ export const receivableSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
   description: z.string().optional(),
   debtor_name: z.string().optional(),
-  // Principal is the original amount (present value)
-  principal_amount_cents: z.number().int().positive('Valor principal deve ser positivo'),
+  // Principal is the original amount (present value). Optional; defaults to total_amount_cents when not sent.
+  principal_amount_cents: z.number().int().positive('Valor principal deve ser positivo').optional(),
   // Total amount is the full receivable with interest (future value)
   total_amount_cents: z.number().int().positive('Valor total deve ser positivo'),
   received_amount_cents: z.number().int().min(0).default(0),
@@ -406,8 +406,8 @@ export const goalContributionSchema = z.object({
 
 // Reports schemas
 export const reportFiltersSchema = z.object({
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inicial inválida'),
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data final inválida'),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inicial inválida').optional(),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data final inválida').optional(),
   accountIds: z.array(z.string().uuid()).optional(),
   categoryIds: z.array(z.string().uuid()).optional(),
   assignedTo: z.string().uuid().optional().or(z.literal('')).transform(val => val || undefined),
@@ -433,8 +433,8 @@ export const exportReportSchema = z.object({
     'investments',
     'summary',
   ]),
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inicial inválida'),
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data final inválida'),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inicial inválida').optional(),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data final inválida').optional(),
   accountIds: z.array(z.string().uuid()).optional(),
   categoryIds: z.array(z.string().uuid()).optional(),
   format: z.enum(['csv']).default('csv'),

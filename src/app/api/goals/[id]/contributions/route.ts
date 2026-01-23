@@ -3,6 +3,7 @@ import { createClientFromRequest } from '@/lib/supabase/server';
 import { getUserId } from '@/lib/auth';
 import { goalContributionSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
+import { projectionCache } from '@/services/projections/cache';
 
 export async function GET(
   request: NextRequest,
@@ -99,6 +100,8 @@ export async function POST(
         .eq('id', id)
         .eq('user_id', userId);
     }
+
+    projectionCache.invalidateUser(userId);
 
     return NextResponse.json({ data: contribution }, { status: 201 });
   } catch (error) {

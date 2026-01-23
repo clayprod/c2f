@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Label } from 'recharts';
 import { InfoIcon } from '@/components/ui/InfoIcon';
 import { MonthYearPicker } from '@/components/ui/month-year-picker';
+import { formatCurrencyValue } from '@/lib/utils';
 
 // Hook para detectar tamanho da tela
 function useWindowSize() {
@@ -224,12 +225,8 @@ export function ExpensesByCategoryChart() {
       .sort((a, b) => b.total - a.total);
   }, [transactions, projections, isFutureMonth]);
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
-  };
+  // Alias para manter compatibilidade
+  const formatCurrency = formatCurrencyValue;
 
   const totalExpenses = categoryExpenses.reduce((sum, item) => sum + item.total, 0);
 

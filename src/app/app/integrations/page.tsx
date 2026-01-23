@@ -10,11 +10,12 @@ import AccountLinking from '@/components/integrations/AccountLinking';
 interface PluggyItem {
   id: string;
   item_id: string;
-  institution_name: string;
-  institution_logo: string | null;
+  connector_name: string;
+  connector_id: string;
   status: string;
-  last_sync_at: string | null;
+  execution_status: string;
   created_at: string;
+  updated_at: string;
   pluggy_sync_logs?: {
     status: string;
     finished_at: string | null;
@@ -37,11 +38,18 @@ interface UserProfile {
   role: string;
 }
 
+interface PluggyStatus {
+  configured: boolean;
+  connected: boolean;
+  enabled: boolean;
+}
+
 export default function IntegrationsPage() {
   const [items, setItems] = useState<PluggyItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [userPlan, setUserPlan] = useState<UserPlan | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [pluggyStatus, setPluggyStatus] = useState<PluggyStatus | null>(null);
   const [syncing, setSyncing] = useState<string | null>(null);
   const { toast } = useToast();
   const { confirm, ConfirmDialog } = useConfirmDialog();
@@ -51,15 +59,31 @@ export default function IntegrationsPage() {
     fetchUserProfile();
   }, []);
 
-  // Fetch Pluggy items only when user is admin
+  // Fetch Pluggy status and items only when user is admin
   useEffect(() => {
     if (userProfile?.role === 'admin') {
+      fetchPluggyStatus();
       fetchItems();
     } else if (userProfile !== null) {
       // Non-admin users don't see Pluggy items
       setLoading(false);
     }
   }, [userProfile]);
+
+  const fetchPluggyStatus = async () => {
+    try {
+      const res = await fetch('/api/admin/pluggy/status');
+      if (res.ok) {
+        const data = await res.json();
+        console.log('[Integrations] Pluggy status:', data);
+        setPluggyStatus(data);
+      } else {
+        console.log('[Integrations] Pluggy status fetch failed:', res.status);
+      }
+    } catch (error) {
+      console.error('Error fetching Pluggy status:', error);
+    }
+  };
 
   const fetchItems = async () => {
     try {
@@ -104,6 +128,7 @@ export default function IntegrationsPage() {
     try {
       const res = await fetch('/api/user/profile');
       const data = await res.json();
+      console.log('[Integrations] User profile:', { role: data.role, email: data.email });
       setUserProfile({ role: data.role || 'user' });
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -128,7 +153,7 @@ export default function IntegrationsPage() {
       if (typeof window !== 'undefined' && !(window as any).PluggyConnect) {
         await new Promise<void>((resolve, reject) => {
           const script = document.createElement('script');
-          script.src = 'https://cdn.pluggy.ai/pluggy-connect/v2.13.0/pluggy-connect.js';
+          script.src = 'https://cdn.pluggy.ai/pluggy-connect/latest/pluggy-connect.js';
           script.onload = () => resolve();
           script.onerror = () => reject(new Error('Failed to load Pluggy Connect SDK'));
           document.head.appendChild(script);
@@ -143,12 +168,36 @@ export default function IntegrationsPage() {
       // Initialize Pluggy Connect widget
       new PluggyConnect({
         connectToken,
-        onSuccess: (data: { item: { id: string; institutionName?: string; institution?: string } }) => {
-          toast({
-            title: 'Conta conectada!',
-            description: `${data.item.institutionName || data.item.institution || 'Instituição'} foi conectada com sucesso.`,
-          });
-          fetchItems();
+        onSuccess: async (data: { item: { id: string; institutionName?: string; institution?: string } }) => {
+          try {
+            // Register the item in our database
+            const registerRes = await fetch('/api/pluggy/items', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ itemId: data.item.id }),
+            });
+
+            if (!registerRes.ok) {
+              const errorData = await registerRes.json();
+              console.error('[Pluggy] Failed to register item:', errorData);
+            }
+
+            toast({
+              title: 'Conta conectada!',
+              description: `${data.item.institutionName || data.item.institution || 'Instituição'} foi conectada com sucesso. Sincronizando dados...`,
+            });
+            
+            // Delay to allow background sync to start
+            setTimeout(fetchItems, 2000);
+          } catch (err) {
+            console.error('[Pluggy] Error in onSuccess:', err);
+            toast({
+              title: 'Conta conectada',
+              description: 'Conexão realizada, mas houve um erro ao registrar. Tente sincronizar manualmente.',
+              variant: 'destructive',
+            });
+            fetchItems();
+          }
         },
         onError: (error: { message?: string }) => {
           toast({
@@ -262,11 +311,21 @@ export default function IntegrationsPage() {
     return new Date(date).toLocaleString('pt-BR');
   };
 
-  // Open Finance (Pluggy) is only available for admin users
+  // Open Finance (Pluggy) is only available for admin users when enabled and configured
   const isAdmin = userProfile?.role === 'admin';
-  const canConnectPluggy = isAdmin;
+  const isPluggyConfigured = pluggyStatus?.configured && pluggyStatus?.enabled;
+  const canConnectPluggy = isAdmin && isPluggyConfigured;
   // WhatsApp is available for premium users OR based on plan features
   const canConnectWhatsApp = userPlan?.plan === 'premium' || userPlan?.plan === 'pro' || userPlan?.limits?.whatsapp_integration === true;
+
+  // Debug log
+  console.log('[Integrations] Render state:', {
+    isAdmin,
+    isPluggyConfigured,
+    canConnectPluggy,
+    pluggyStatus,
+    userProfileRole: userProfile?.role,
+  });
 
   return (
     <div className="space-y-6">
@@ -278,7 +337,37 @@ export default function IntegrationsPage() {
       </div>
 
       {/* Open Finance Section - Admin Only */}
-      {canConnectPluggy ? (
+      {isAdmin && !isPluggyConfigured && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <h2 className="font-display text-xl font-semibold">Open Finance</h2>
+            <span className="text-xs bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded">Admin</span>
+          </div>
+          <div className="glass-card p-6 border-yellow-500/20 bg-yellow-500/5">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center flex-shrink-0">
+                <i className='bx bx-cog text-xl text-yellow-500'></i>
+              </div>
+              <div>
+                <h3 className="font-semibold mb-1">Configuração Necessária</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  {!pluggyStatus?.configured 
+                    ? 'Configure as credenciais da API Pluggy para habilitar a integração Open Finance.'
+                    : 'A integração Open Finance está desabilitada. Habilite nas configurações do admin.'}
+                </p>
+                <Button variant="outline" asChild>
+                  <a href="/app/admin">
+                    <i className='bx bx-cog mr-2'></i>
+                    Ir para Configurações
+                  </a>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {canConnectPluggy && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -318,22 +407,14 @@ export default function IntegrationsPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center overflow-hidden">
-                          {item.institution_logo ? (
-                            <img
-                              src={item.institution_logo}
-                              alt={item.institution_name}
-                              className="w-8 h-8 object-contain"
-                            />
-                          ) : (
-                            <i className='bx bx-bank text-2xl text-muted-foreground'></i>
-                          )}
+                          <i className='bx bx-bank text-2xl text-muted-foreground'></i>
                         </div>
                         <div>
-                          <h3 className="font-semibold">{item.institution_name}</h3>
+                          <h3 className="font-semibold">{item.connector_name || 'Instituição'}</h3>
                           <div className="flex items-center gap-2 mt-1">
-                            {getStatusBadge(item.status)}
+                            {getStatusBadge(item.execution_status || item.status)}
                             <span className="text-xs text-muted-foreground">
-                              Ultima sync: {formatDate(item.last_sync_at)}
+                              Última atualização: {formatDate(item.updated_at)}
                             </span>
                           </div>
                         </div>
@@ -393,7 +474,7 @@ export default function IntegrationsPage() {
             </div>
           )}
         </div>
-      ) : null}
+      )}
 
       {/* Info section - show for admin users with Open Finance access */}
       {canConnectPluggy && (

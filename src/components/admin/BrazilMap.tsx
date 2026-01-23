@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { formatCurrencyValue } from '@/lib/utils';
 
 // Tipos para os componentes do react-simple-maps
 type MapsModule = {
@@ -80,12 +81,8 @@ export default function BrazilMap() {
     }
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
-  };
+  // Alias para manter compatibilidade
+  const formatCurrency = formatCurrencyValue;
 
   // Calcular valores máximos para escala de cores
   const maxExpenses = useMemo(() => {

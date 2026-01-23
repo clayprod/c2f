@@ -4,6 +4,7 @@ import { getUserId } from '@/lib/auth';
 import { creditCardUpdateSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
 import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
+import { projectionCache } from '@/services/projections/cache';
 
 export async function GET(
   request: NextRequest,
@@ -206,7 +207,25 @@ export async function DELETE(
       );
     }
 
-    // Delete associated bills first
+    // Get bill IDs before deleting them
+    const { data: bills } = await supabase
+      .from('credit_card_bills')
+      .select('id')
+      .eq('account_id', id)
+      .eq('user_id', ownerId);
+
+    // Delete budgets related to bills
+    if (bills && bills.length > 0) {
+      const billIds = bills.map(b => b.id);
+      await supabase
+        .from('budgets')
+        .delete()
+        .eq('user_id', ownerId)
+        .eq('source_type', 'credit_card')
+        .in('source_id', billIds);
+    }
+
+    // Delete associated bills
     await supabase
       .from('credit_card_bills')
       .delete()
@@ -222,6 +241,9 @@ export async function DELETE(
       .eq('type', 'credit_card');
 
     if (error) throw error;
+
+    // Invalidate projection cache
+    projectionCache.invalidateUser(ownerId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

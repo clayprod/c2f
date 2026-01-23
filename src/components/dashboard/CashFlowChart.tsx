@@ -16,7 +16,7 @@ import {
   Cell,
   ReferenceArea,
 } from 'recharts';
-import { formatMonthYear } from '@/lib/utils';
+import { formatMonthYear, formatCurrencyValue } from '@/lib/utils';
 
 // Hook to detect mobile screen
 function useIsMobile(breakpoint: number = 768) {
@@ -193,6 +193,7 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
     };
   }, [data, periodMonths]);
 
+  // Formatação compacta para gráficos (sem centavos)
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -201,6 +202,9 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
       maximumFractionDigits: 0,
     }).format(value);
   };
+
+  // Formatação completa para valores exatos
+  const formatCurrencyFull = formatCurrencyValue;
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {

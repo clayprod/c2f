@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { PlanGuard } from '@/components/app/PlanGuard';
+import { formatCurrency } from '@/lib/utils';
 
 interface Receivable {
   id: string;
@@ -65,13 +66,6 @@ export default function ReceivablesPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const formatCurrency = (cents: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(cents / 100);
   };
 
   const getStatusColor = (status: string) => {

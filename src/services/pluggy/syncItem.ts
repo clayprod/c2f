@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { getAccountsByItem } from './accounts';
+import { getAccountsByItem, getAccountBalance } from './accounts';
 import { getAllTransactionsByAccount } from './transactions';
 import { generateTransactionHash, transactionExists } from './dedupe';
 import { getItem } from './items';
@@ -40,7 +40,10 @@ export async function syncItem(
     let transactionsSynced = 0;
 
     for (const pluggyAccount of pluggyAccounts) {
-      // Upsert account
+      // Upsert account - balance can be number or object depending on API version
+      const balanceValue = getAccountBalance(pluggyAccount.balance);
+      console.log(`[Pluggy Sync] Account ${pluggyAccount.name}: raw balance =`, pluggyAccount.balance, 'extracted =', balanceValue);
+      
       const { data: account, error: accountError } = await supabase
         .from('pluggy_accounts')
         .upsert({
@@ -50,7 +53,7 @@ export async function syncItem(
           name: pluggyAccount.name,
           type: pluggyAccount.type,
           subtype: pluggyAccount.subtype,
-          balance_cents: Math.round((pluggyAccount.balance?.current || 0) * 100),
+          balance_cents: Math.round(balanceValue * 100),
           currency: pluggyAccount.currencyCode || 'BRL',
           number: pluggyAccount.number || '',
         }, {

@@ -531,6 +531,7 @@ export default function EditGoalPage({ params }: { params: { id: string } }) {
               className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             >
               <option value="active">Ativo</option>
+              <option value="completed">Concluído</option>
               <option value="paused">Pausado</option>
               <option value="cancelled">Cancelado</option>
             </select>

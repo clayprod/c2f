@@ -4,6 +4,7 @@ import { getUserId } from '@/lib/auth';
 import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 import { receivablePaymentSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
+import { projectionCache } from '@/services/projections/cache';
 
 export async function GET(
   request: NextRequest,
@@ -151,6 +152,8 @@ export async function POST(
         .eq('id', params.id)
         .eq('user_id', ownerId);
     }
+
+    projectionCache.invalidateUser(ownerId);
 
     return NextResponse.json({ data: payment }, { status: 201 });
   } catch (error) {

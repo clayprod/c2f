@@ -107,8 +107,8 @@ export async function getGlobalSettings(forceRefresh = false): Promise<GlobalSet
 
     // Define columns - some may not exist in older databases
     const allColumns = 'support_email, support_whatsapp, smtp_host, smtp_port, smtp_user, smtp_password, smtp_from_email, smtp_secure, groq_api_key, openai_api_key, ai_model, ai_model_name, advisor_prompt, tips_prompt, categorization_prompt, tips_enabled, chat_max_tokens, session_ttl_minutes, stripe_price_id_pro, stripe_price_id_business, advisor_limit_pro, advisor_limit_premium, evolution_api_url, evolution_api_key, evolution_instance_name, evolution_webhook_secret, n8n_api_key, whatsapp_enabled, pluggy_client_id, pluggy_client_secret, pluggy_enabled, plan_features_free, plan_features_pro, plan_features_premium, plan_display_config';
-    // Minimal columns that should exist in all database versions
-    const minimalColumns = 'support_email, support_whatsapp, smtp_host, smtp_port, smtp_user, smtp_password, smtp_from_email, groq_api_key, openai_api_key, ai_model, ai_model_name, advisor_prompt, stripe_price_id_pro, stripe_price_id_business, evolution_api_url, evolution_api_key, evolution_instance_name, evolution_webhook_secret, n8n_api_key, whatsapp_enabled';
+    // Columns that exist in current database (including Pluggy settings)
+    const minimalColumns = 'support_email, support_whatsapp, smtp_host, smtp_port, smtp_user, smtp_password, smtp_from_email, groq_api_key, openai_api_key, ai_model, ai_model_name, advisor_prompt, tips_prompt, categorization_prompt, tips_enabled, chat_max_tokens, session_ttl_minutes, stripe_price_id_pro, stripe_price_id_business, evolution_api_url, evolution_api_key, evolution_instance_name, evolution_webhook_secret, n8n_api_key, whatsapp_enabled, pluggy_client_id, pluggy_client_secret, pluggy_enabled';
 
     let { data, error } = await supabase
       .from('global_settings')
@@ -180,6 +180,10 @@ export async function getGlobalSettings(forceRefresh = false): Promise<GlobalSet
         hasSupportWhatsapp: !!data.support_whatsapp,
         supportEmail: data.support_email,
         supportWhatsapp: data.support_whatsapp,
+        // Pluggy debug
+        hasPluggyClientId: !!data.pluggy_client_id,
+        hasPluggyClientSecret: !!data.pluggy_client_secret,
+        pluggyEnabled: data.pluggy_enabled,
       });
     }
 
@@ -297,6 +301,17 @@ export async function updateGlobalSettings(updates: Partial<GlobalSettings>): Pr
         
         // If columns don't exist, try without the new fields
         if (error.code === '42703' || error.message?.includes('column')) {
+          // Check if Pluggy fields are being updated - if so, throw a specific error
+          const hasPluggyFields = updateData.pluggy_client_id !== undefined || 
+                                  updateData.pluggy_client_secret !== undefined || 
+                                  updateData.pluggy_enabled !== undefined;
+          
+          if (hasPluggyFields && (error.message?.includes('pluggy') || error.message?.includes('categorization'))) {
+            const pluggyError = new Error('Colunas Pluggy nao encontradas no banco de dados. Execute a migration 050_add_pluggy_settings.sql no Supabase.');
+            (pluggyError as any).code = 'PLUGGY_MIGRATION_REQUIRED';
+            throw pluggyError;
+          }
+          
           console.log('Column error detected, retrying without new fields. Error:', error.message);
           const basicData = { ...updateData };
           // Remove fields that may not exist in older database schemas
@@ -335,6 +350,17 @@ export async function updateGlobalSettings(updates: Partial<GlobalSettings>): Pr
       if (error) {
         // If columns don't exist, try without the new fields
         if (error.code === '42703' || error.message?.includes('column')) {
+          // Check if Pluggy fields are being inserted - if so, throw a specific error
+          const hasPluggyFields = updateData.pluggy_client_id !== undefined || 
+                                  updateData.pluggy_client_secret !== undefined || 
+                                  updateData.pluggy_enabled !== undefined;
+          
+          if (hasPluggyFields && (error.message?.includes('pluggy') || error.message?.includes('categorization'))) {
+            const pluggyError = new Error('Colunas Pluggy nao encontradas no banco de dados. Execute a migration 050_add_pluggy_settings.sql no Supabase.');
+            (pluggyError as any).code = 'PLUGGY_MIGRATION_REQUIRED';
+            throw pluggyError;
+          }
+          
           console.log('Column error on insert, retrying without new fields. Error:', error.message);
           const basicData = { ...updateData };
           delete basicData.tips_prompt;

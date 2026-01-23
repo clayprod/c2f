@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { projectionCache } from '@/services/projections/cache';
 
 interface TransactionToImport {
   id: string;
@@ -153,6 +154,8 @@ export async function POST(request: NextRequest) {
         results.errors.push(`Erro ao importar: ${pluggyTx.description}`);
       }
     }
+
+    projectionCache.invalidateUser(user.id);
 
     return NextResponse.json({
       success: true,

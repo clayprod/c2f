@@ -7,6 +7,7 @@ import { createErrorResponse } from '@/lib/errors';
 import { isCreditCardExpired } from '@/lib/utils';
 import { getUserPlan } from '@/services/stripe/subscription';
 import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
+import { projectionCache } from '@/services/projections/cache';
 
 export async function GET(request: NextRequest) {
   try {
@@ -154,28 +155,6 @@ export async function POST(request: NextRequest) {
 
     const { supabase } = createClientFromRequest(request);
 
-    // Check plan limits for Free users
-    const userPlan = await getUserPlan(ownerId);
-    if (userPlan.plan === 'free') {
-      const now = new Date();
-      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
-
-      const { count } = await supabase
-        .from('transactions')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', ownerId)
-        .gte('created_at', firstDayOfMonth)
-        .lte('created_at', lastDayOfMonth);
-
-      if (count && count >= 100) {
-        return NextResponse.json(
-          { error: 'Limite de 100 transações mensais atingido no plano Free. Faça upgrade para o plano Pro ou Premium para transações ilimitadas.' },
-          { status: 403 }
-        );
-      }
-    }
-
     const body = await request.json();
     const validated = transactionSchema.parse(body);
 
@@ -207,6 +186,32 @@ export async function POST(request: NextRequest) {
     }
 
     const isCreditCard = account?.type === 'credit_card';
+    const isCreditCardPurchase = isCreditCard && (validated.type === 'expense' || validated.type === 'income');
+    const shouldCountAsTransaction = !isCreditCardPurchase;
+
+    // Check plan limits for Free users (only for real transactions)
+    if (shouldCountAsTransaction) {
+      const userPlan = await getUserPlan(ownerId);
+      if (userPlan.plan === 'free') {
+        const now = new Date();
+        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
+
+        const { count } = await supabase
+          .from('transactions')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', ownerId)
+          .gte('created_at', firstDayOfMonth)
+          .lte('created_at', lastDayOfMonth);
+
+        if (count && count >= 100) {
+          return NextResponse.json(
+            { error: 'Limite de 100 transações mensais atingido no plano Free. Faça upgrade para o plano Pro ou Premium para transações ilimitadas.' },
+            { status: 403 }
+          );
+        }
+      }
+    }
     let creditCardBillId: string | null = null;
 
     // Check if transaction is using a credit card category (payment of bill)
@@ -279,75 +284,137 @@ export async function POST(request: NextRequest) {
     const isInstallment = installmentTotal > 1;
 
     if (isInstallment && (validated.type === 'expense' || validated.type === 'income')) {
-      // Create all installments
       const installmentAmount = Math.round(validated.amount_cents / installmentTotal);
-      const transactions = [];
-      let parentId: string | null = null;
 
-      for (let i = 1; i <= installmentTotal; i++) {
-        // Calculate the date for each installment
-        const installmentDate = new Date(validated.posted_at);
-        installmentDate.setMonth(installmentDate.getMonth() + (i - 1));
+      if (isCreditCardPurchase) {
+        const billItems: any[] = [];
+        let parentId: string | null = null;
 
-        // Get the bill for this installment (only for credit card expenses)
-        let installmentBillId: string | null = null;
-        if (isCreditCard && account?.closing_day && validated.type === 'expense') {
-          const closingDay = account.closing_day;
-          const dueDay = account.due_day || closingDay + 10;
-          const day = installmentDate.getDate();
+        for (let i = 1; i <= installmentTotal; i++) {
+          const installmentDate = new Date(validated.posted_at);
+          installmentDate.setMonth(installmentDate.getMonth() + (i - 1));
 
-          let referenceMonth: Date;
-          if (day > closingDay) {
-            referenceMonth = new Date(installmentDate.getFullYear(), installmentDate.getMonth() + 1, 1);
-          } else {
-            referenceMonth = new Date(installmentDate.getFullYear(), installmentDate.getMonth(), 1);
-          }
+          let installmentBillId: string | null = null;
+          if (account?.closing_day) {
+            const closingDay = account.closing_day;
+            const dueDay = account.due_day || closingDay + 10;
+            const day = installmentDate.getDate();
 
-          const referenceMonthStr = referenceMonth.toISOString().split('T')[0];
-
-          const { data: bill } = await supabase
-            .from('credit_card_bills')
-            .select('id')
-            .eq('account_id', validated.account_id)
-            .eq('reference_month', referenceMonthStr)
-            .single();
-
-          if (bill) {
-            installmentBillId = bill.id;
-          } else {
-            // Calculate closing date (ensure it's valid for the month)
-            const closingDate = new Date(referenceMonth.getFullYear(), referenceMonth.getMonth(), closingDay);
-            if (closingDate.getDate() !== closingDay) {
-              closingDate.setDate(0); // Last day of previous month
+            let referenceMonth: Date;
+            if (day > closingDay) {
+              referenceMonth = new Date(installmentDate.getFullYear(), installmentDate.getMonth() + 1, 1);
+            } else {
+              referenceMonth = new Date(installmentDate.getFullYear(), installmentDate.getMonth(), 1);
             }
 
-            // Calculate due date (ensure it's valid for the month)
-            const dueDateObj = new Date(referenceMonth.getFullYear(), referenceMonth.getMonth(), dueDay);
-            if (dueDateObj.getDate() !== dueDay) {
-              dueDateObj.setDate(0); // Last day of previous month
-            }
+            const referenceMonthStr = referenceMonth.toISOString().split('T')[0];
 
-            const { data: newBill } = await supabase
+            const { data: bill } = await supabase
               .from('credit_card_bills')
-              .insert({
-                user_id: userId,
-                account_id: validated.account_id,
-                reference_month: referenceMonthStr,
-                closing_date: closingDate.toISOString().split('T')[0],
-                due_date: dueDateObj.toISOString().split('T')[0],
-                status: 'open',
-              })
               .select('id')
+              .eq('account_id', validated.account_id)
+              .eq('reference_month', referenceMonthStr)
               .single();
 
-            installmentBillId = newBill?.id || null;
+            if (bill) {
+              installmentBillId = bill.id;
+            } else {
+              const closingDate = new Date(referenceMonth.getFullYear(), referenceMonth.getMonth(), closingDay);
+              if (closingDate.getDate() !== closingDay) {
+                closingDate.setDate(0);
+              }
+
+              const dueDateObj = new Date(referenceMonth.getFullYear(), referenceMonth.getMonth(), dueDay);
+              if (dueDateObj.getDate() !== dueDay) {
+                dueDateObj.setDate(0);
+              }
+
+              const { data: newBill } = await supabase
+                .from('credit_card_bills')
+                .insert({
+                  user_id: ownerId,
+                  account_id: validated.account_id,
+                  reference_month: referenceMonthStr,
+                  closing_date: closingDate.toISOString().split('T')[0],
+                  due_date: dueDateObj.toISOString().split('T')[0],
+                  status: 'open',
+                })
+                .select('id')
+                .single();
+
+              installmentBillId = newBill?.id || null;
+            }
+          }
+
+          if (!installmentBillId) {
+            throw new Error('Fatura do cartão não encontrada para a parcela');
+          }
+
+          const installmentAmountCents = validated.type === 'income'
+            ? -Math.abs(installmentAmount)
+            : Math.abs(installmentAmount);
+
+          const itemData: Record<string, unknown> = {
+            user_id: ownerId,
+            account_id: validated.account_id,
+            bill_id: installmentBillId,
+            category_id: validated.category_id || null,
+            posted_at: installmentDate.toISOString().split('T')[0],
+            description: `${validated.description} (${i}/${validated.installment_total})`,
+            amount_cents: installmentAmountCents,
+            currency: validated.currency,
+            notes: validated.notes || null,
+            source: validated.source || 'manual',
+            provider_tx_id: validated.provider_tx_id || null,
+            installment_number: i,
+            installment_total: validated.installment_total,
+            assigned_to: validated.assigned_to || null,
+          };
+
+          if (i === 1) {
+            const { data: firstItem, error: firstError } = await supabase
+              .from('credit_card_bill_items')
+              .insert(itemData)
+              .select('*')
+              .single();
+
+            if (firstError) throw firstError;
+            parentId = firstItem.id;
+            billItems.push(firstItem);
+          } else {
+            itemData.installment_parent_id = parentId;
+            billItems.push(itemData);
           }
         }
 
-        // Determine amount sign based on type
+        if (billItems.length > 1) {
+          const remainingItems = billItems.slice(1);
+          const { error: bulkError } = await supabase
+            .from('credit_card_bill_items')
+            .insert(remainingItems);
+
+          if (bulkError) throw bulkError;
+        }
+
+        await updateCreditCardBillTotals(supabase, validated.account_id);
+        projectionCache.invalidateUser(ownerId);
+
+        return NextResponse.json({
+          data: { ...billItems[0], is_bill_item: true },
+          installments_created: validated.installment_total,
+        }, { status: 201 });
+      }
+
+      const transactions: any[] = [];
+      let parentId: string | null = null;
+
+      for (let i = 1; i <= installmentTotal; i++) {
+        const installmentDate = new Date(validated.posted_at);
+        installmentDate.setMonth(installmentDate.getMonth() + (i - 1));
+
         const installmentAmountReais = validated.type === 'income'
-          ? Math.abs(installmentAmount / 100) // Positive for income
-          : -Math.abs(installmentAmount / 100); // Negative for expense
+          ? Math.abs(installmentAmount / 100)
+          : -Math.abs(installmentAmount / 100);
 
         const txData: Record<string, unknown> = {
           account_id: validated.account_id,
@@ -364,13 +431,7 @@ export async function POST(request: NextRequest) {
           assigned_to: validated.assigned_to || null,
         };
 
-        // Only include credit_card_bill_id if it exists and is not null AND it's an expense
-        if (installmentBillId && validated.type === 'expense') {
-          txData.credit_card_bill_id = installmentBillId;
-        }
-
         if (i === 1) {
-          // Create first installment and get its ID
           const { data: firstTx, error: firstError } = await supabase
             .from('transactions')
             .insert(txData)
@@ -386,7 +447,6 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Insert remaining installments
       if (transactions.length > 1) {
         const remainingTxs = transactions.slice(1);
         const { error: bulkError } = await supabase
@@ -396,12 +456,6 @@ export async function POST(request: NextRequest) {
         if (bulkError) throw bulkError;
       }
 
-      // Update bill totals
-      if (isCreditCard && validated.type === 'expense') {
-        await updateCreditCardBillTotals(supabase, validated.account_id);
-      }
-
-      // Create budgets for future installments
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
@@ -410,7 +464,6 @@ export async function POST(request: NextRequest) {
         installmentDate.setMonth(installmentDate.getMonth() + (i - 1));
         installmentDate.setHours(0, 0, 0, 0);
 
-        // Only create budget for future installments
         if (installmentDate > today && validated.category_id) {
           const year = installmentDate.getFullYear();
           const month = installmentDate.getMonth() + 1;
@@ -418,7 +471,6 @@ export async function POST(request: NextRequest) {
             ? Math.abs(installmentAmount)
             : -Math.abs(installmentAmount);
 
-          // Check if budget exists
           const { data: existingBudget } = await supabase
             .from('budgets')
             .select('id, amount_planned_cents')
@@ -429,7 +481,6 @@ export async function POST(request: NextRequest) {
             .single();
 
           if (existingBudget) {
-            // Update existing budget
             await supabase
               .from('budgets')
               .update({
@@ -438,7 +489,6 @@ export async function POST(request: NextRequest) {
               })
               .eq('id', existingBudget.id);
           } else {
-            // Create new budget
             await supabase
               .from('budgets')
               .insert({
@@ -453,16 +503,53 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Convert amount (NUMERIC) to amount_cents (BIGINT) for API response
       const transformedTransactions = transactions.map((tx: any) => ({
         ...tx,
         amount_cents: Math.round((tx.amount || 0) * 100),
       }));
 
+      projectionCache.invalidateUser(ownerId);
+
       return NextResponse.json({
         data: transformedTransactions[0],
         installments_created: validated.installment_total,
       }, { status: 201 });
+    }
+
+    if (isCreditCardPurchase) {
+      if (!creditCardBillId) {
+        return NextResponse.json({ error: 'Fatura do cartão não encontrada' }, { status: 400 });
+      }
+
+      const billItemAmountCents = validated.type === 'income'
+        ? -Math.abs(validated.amount_cents)
+        : Math.abs(validated.amount_cents);
+
+      const { data: billItem, error: billItemError } = await supabase
+        .from('credit_card_bill_items')
+        .insert({
+          user_id: ownerId,
+          account_id: validated.account_id,
+          bill_id: creditCardBillId,
+          category_id: validated.category_id || null,
+          posted_at: validated.posted_at,
+          description: validated.description,
+          amount_cents: billItemAmountCents,
+          currency: validated.currency,
+          notes: validated.notes || null,
+          source: validated.source || 'manual',
+          provider_tx_id: validated.provider_tx_id || null,
+          assigned_to: validated.assigned_to || null,
+        })
+        .select('*')
+        .single();
+
+      if (billItemError) throw billItemError;
+
+      await updateCreditCardBillTotals(supabase, validated.account_id);
+      projectionCache.invalidateUser(ownerId);
+
+      return NextResponse.json({ data: { ...billItem, is_bill_item: true } }, { status: 201 });
     }
 
     // Regular transaction (no installments)
@@ -500,18 +587,6 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) throw error;
-
-    // IMPORTANT: Credit card transaction balance logic
-    // When a transaction is made with a credit card:
-    // - It should appear in the category's budget (amount_actual) in the transaction month
-    // - It should NOT affect the account's current_balance immediately
-    // - The balance will only be affected when the bill is paid (payment transaction)
-    // This is because credit card expenses are "advance expenses" that will be paid later
-
-    // Update bill totals if credit card
-    if (isCreditCard) {
-      await updateCreditCardBillTotals(supabase, validated.account_id);
-    }
 
     // If this is a payment transaction (using credit card category), process it
     // Check if category_id matches a credit card's category_id (bill payment)
@@ -594,6 +669,8 @@ export async function POST(request: NextRequest) {
       amount_cents: Math.round((data.amount || 0) * 100),
     };
 
+    projectionCache.invalidateUser(ownerId);
+
     return NextResponse.json({ data: transformedData }, { status: 201 });
   } catch (error) {
     console.error('Transactions POST error:', error);
@@ -623,22 +700,22 @@ async function updateCreditCardBillTotals(supabase: any, accountId: string) {
   if (!bills) return;
 
   for (const bill of bills) {
-    // Sum transactions for this bill
-    const { data: transactions } = await supabase
-      .from('transactions')
-      .select('amount')
-      .eq('credit_card_bill_id', bill.id);
+    // Sum bill items for this bill
+    const { data: billItems } = await supabase
+      .from('credit_card_bill_items')
+      .select('amount_cents')
+      .eq('bill_id', bill.id);
 
-    const total = (transactions || [])
-      .filter((t: { amount: number }) => t.amount < 0)
-      .reduce((sum: number, t: { amount: number }) => sum + Math.abs(t.amount * 100), 0); // Convert to cents
+    const total = (billItems || [])
+      .reduce((sum: number, item: { amount_cents: number }) => sum + (item.amount_cents || 0), 0);
+    const totalForBill = Math.max(total, 0);
 
     // Update bill total
     await supabase
       .from('credit_card_bills')
       .update({
-        total_cents: total,
-        minimum_payment_cents: Math.max(Math.round(total * 0.15), 5000),
+        total_cents: totalForBill,
+        minimum_payment_cents: totalForBill > 0 ? Math.max(Math.round(totalForBill * 0.15), 5000) : 0,
       })
       .eq('id', bill.id);
   }
@@ -873,4 +950,3 @@ async function processInvestmentGoalDebtTransactions(
     return;
   }
 }
-

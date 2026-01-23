@@ -52,56 +52,50 @@ export async function GET(
 
     if (error) throw error;
 
-    // Get all bill IDs to fetch transactions
+    // Get all bill IDs to fetch bill items
     const billIds = (bills || []).map((b: any) => b.id);
 
-    // Fetch transactions for all bills in one query
+    // Fetch bill items for all bills in one query
     let transactionsMap = new Map<string, any[]>();
     if (billIds.length > 0) {
-      const { data: transactions, error: txError } = await supabase
-        .from('transactions')
+      const { data: billItems, error: itemsError } = await supabase
+        .from('credit_card_bill_items')
         .select(`
           id,
           description,
-          amount,
+          amount_cents,
           posted_at,
-          credit_card_bill_id,
+          bill_id,
           category:categories(id, name, icon, color),
           installment_number,
           installment_total
         `)
-        .in('credit_card_bill_id', billIds)
+        .in('bill_id', billIds)
         .eq('user_id', ownerId);
 
-      if (txError) throw txError;
+      if (itemsError) throw itemsError;
 
-      // Group transactions by bill_id
-      (transactions || []).forEach((tx: any) => {
-        const billId = tx.credit_card_bill_id;
+      // Group items by bill_id
+      (billItems || []).forEach((item: any) => {
+        const billId = item.bill_id;
         if (!transactionsMap.has(billId)) {
           transactionsMap.set(billId, []);
         }
-        transactionsMap.get(billId)!.push(tx);
+        transactionsMap.get(billId)!.push(item);
       });
     }
 
     // Calculate summary for each bill
     const billsWithSummary = (bills || []).map((bill: any) => {
       const transactions = transactionsMap.get(bill.id) || [];
-      // Convert NUMERIC amount to cents and filter expenses (negative amounts)
       const totalExpenses = transactions
-        .filter((t: any) => (t.amount || 0) < 0)
-        .reduce((sum: number, t: any) => sum + Math.abs(Math.round((t.amount || 0) * 100)), 0);
+        .reduce((sum: number, t: any) => sum + (t.amount_cents || 0), 0);
 
       return {
         ...bill,
         transaction_count: transactions.length,
         calculated_total: totalExpenses,
-        // Transform transactions to include amount_cents for consistency
-        transactions: transactions.map((t: any) => ({
-          ...t,
-          amount_cents: Math.round((t.amount || 0) * 100),
-        })),
+        transactions,
       };
     });
 

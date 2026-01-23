@@ -21,6 +21,7 @@ import {
   deleteTransaction,
 } from '@/services/whatsapp/transactions';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { projectionCache } from '@/services/projections/cache';
 
 async function validateN8nApiKey(request: NextRequest): Promise<boolean> {
   const apiKey = request.headers.get('x-n8n-api-key');
@@ -114,6 +115,8 @@ export async function POST(request: NextRequest) {
             }, { status: 400 });
           }
 
+          projectionCache.invalidateUser(user.userId);
+
           return NextResponse.json({
             success: true,
             transaction_id: result.parentTransactionId,
@@ -148,6 +151,8 @@ export async function POST(request: NextRequest) {
             error: result.error,
           }, { status: 400 });
         }
+
+        projectionCache.invalidateUser(user.userId);
 
         return NextResponse.json({
           success: true,
@@ -210,6 +215,8 @@ export async function POST(request: NextRequest) {
           }, { status: 500 });
         }
 
+        projectionCache.invalidateUser(user.userId);
+
         return NextResponse.json({
           success: true,
           transaction_id: transaction.id,
@@ -241,6 +248,8 @@ export async function POST(request: NextRequest) {
             error: result.error,
           }, { status: result.error?.includes('nao encontrada') ? 404 : 400 });
         }
+
+        projectionCache.invalidateUser(user.userId);
 
         return NextResponse.json({
           success: true,

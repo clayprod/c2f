@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { formatCurrencyValue, formatCurrencyInput } from '@/lib/utils';
 
 interface Account {
   id: string;
@@ -256,11 +257,13 @@ export default function AccountsPage() {
       color: account.color || '#3b82f6',
       icon: account.icon || '🏦',
       has_overdraft: (account.overdraft_limit_cents || 0) > 0,
-      overdraft_limit: account.overdraft_limit_cents ? (account.overdraft_limit_cents / 100).toFixed(2) : '',
+      overdraft_limit: account.overdraft_limit_cents ? formatCurrencyInput(account.overdraft_limit_cents / 100) : '',
       overdraft_interest_rate: account.overdraft_interest_rate_monthly ? account.overdraft_interest_rate_monthly.toString() : '',
       has_yield: hasYield,
       yield_type: account.yield_type || 'fixed',
-      yield_rate: account.yield_rate_monthly ? account.yield_rate_monthly.toString().replace('.', ',') : '',
+      yield_rate: account.yield_rate_monthly 
+        ? account.yield_rate_monthly.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 6 }) 
+        : '',
       cdi_percentage: account.cdi_percentage ? account.cdi_percentage.toString() : '',
     });
     setDialogOpen(true);
@@ -298,12 +301,8 @@ export default function AccountsPage() {
     return matchesSearch && matchesType;
   });
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
-  };
+  // Alias para manter compatibilidade
+  const formatCurrency = formatCurrencyValue;
 
   return (
     <div className="space-y-6 max-w-full overflow-x-hidden">

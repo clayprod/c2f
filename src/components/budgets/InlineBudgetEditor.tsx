@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { BudgetBreakdownModal, type BudgetBreakdownItem } from '@/components/budgets/BudgetBreakdownModal';
+import { formatCurrency, formatCurrencyValue } from '@/lib/utils';
 
 interface InlineBudgetEditorProps {
   budgetId?: string;
@@ -33,9 +34,8 @@ function getBreakdownItemsFromMetadata(metadata: any): BudgetBreakdownItem[] {
     .filter((it: BudgetBreakdownItem) => it.label.trim().length > 0 && it.amount_cents > 0);
 }
 
-function formatCurrencyFromCents(cents: number) {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((cents || 0) / 100);
-}
+// Usa formatCurrency de @/lib/utils como alias para manter compatibilidade
+const formatCurrencyFromCents = formatCurrency;
 
 export function InlineBudgetEditor({
   budgetId,
@@ -106,7 +106,7 @@ export function InlineBudgetEditor({
 
     // Validate minimum value
     if (minimumValue > 0 && numValue < minimumValue) {
-      setError(`Valor mínimo é ${formatCurrency(minimumValue)} devido a contribuições automáticas`);
+      setError(`Valor mínimo é ${formatCurrencyValue(minimumValue)} devido a contribuições automáticas`);
       return;
     }
 
@@ -118,7 +118,7 @@ export function InlineBudgetEditor({
     } catch (err: any) {
       // Check if error contains minimum information
       if (err.minimum_amount) {
-        setError(`Valor mínimo é ${formatCurrency(err.minimum_amount)}. ${err.suggestion || ''}`);
+        setError(`Valor mínimo é ${formatCurrencyValue(err.minimum_amount)}. ${err.suggestion || ''}`);
       } else {
         setError(err.message || 'Erro ao salvar');
       }
@@ -183,13 +183,6 @@ export function InlineBudgetEditor({
     }
   };
 
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(val);
-  };
-
   const minimumCents = Math.round((minimumValue || 0) * 100);
   const breakdownTotalCents = (hasExistingBreakdown ? existingBreakdownItems : draftBreakdownItems).reduce(
     (sum, it) => sum + (it.amount_cents || 0),
@@ -228,18 +221,29 @@ export function InlineBudgetEditor({
               onDoubleClick={!isReadOnly ? handleStartEdit : undefined}
               title={isReadOnly ? readOnlyMessage : 'Clique duplo para editar'}
             >
-              {formatCurrency(currentValue)}
+              {formatCurrencyValue(currentValue)}
             </span>
             {!isReadOnly ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleStartEdit}
-                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                title="Editar valor"
-              >
-                <i className="bx bx-edit text-xs"></i>
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleStartEdit}
+                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Editar valor"
+                >
+                  <i className="bx bx-edit text-xs"></i>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setBreakdownOpen(true)}
+                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Adicionar subs"
+                >
+                  <i className="bx bx-list-ul text-xs"></i>
+                </Button>
+              </>
             ) : (
               <i
                 className="bx bx-lock text-xs text-muted-foreground opacity-40 group-hover:opacity-100 transition-opacity"
@@ -427,10 +431,9 @@ export function InlineBudgetEditor({
       )}
       {minimumValue > 0 && (
         <p className="text-[10px] text-muted-foreground">
-          Mín: {formatCurrency(minimumValue)}
+          Mín: {formatCurrencyValue(minimumValue)}
         </p>
       )}
     </div>
   );
 }
-

@@ -20,7 +20,7 @@ interface DateRangeFilterProps {
   className?: string;
 }
 
-type PresetType = 1 | 3 | 6 | 12 | 'custom';
+type PresetType = 1 | 3 | 6 | 12 | 'custom' | 'all';
 
 export default function DateRangeFilter({
   startDate,
@@ -28,7 +28,7 @@ export default function DateRangeFilter({
   onDateChange,
   className = ''
 }: DateRangeFilterProps) {
-  const [activePreset, setActivePreset] = useState<PresetType>(1);
+  const [activePreset, setActivePreset] = useState<PresetType>('all');
   const [fromOpen, setFromOpen] = useState(false);
   const [toOpen, setToOpen] = useState(false);
   const [localFrom, setLocalFrom] = useState<Date | undefined>(undefined);
@@ -44,7 +44,7 @@ export default function DateRangeFilter({
 
   // Check if the current dates match a preset
   const detectPreset = useCallback((start: string, end: string): PresetType => {
-    if (!start || !end) return 1;
+    if (!start || !end) return 'all';
 
     try {
       const [startYear, startMonth, startDayVal] = start.split('-').map(Number);
@@ -73,7 +73,7 @@ export default function DateRangeFilter({
 
       return 'custom';
     } catch {
-      return 1;
+      return 'all';
     }
   }, [getDateRangeForMonths]);
 
@@ -84,14 +84,12 @@ export default function DateRangeFilter({
       setLocalTo(new Date(endDate));
       const detected = detectPreset(startDate, endDate);
       setActivePreset(detected);
-    } else {
-      // Default to 1 month if no dates provided
-      const { start, end } = getDateRangeForMonths(1);
-      setLocalFrom(start);
-      setLocalTo(end);
-      setActivePreset(1);
-      onDateChange(format(start, 'yyyy-MM-dd'), format(end, 'yyyy-MM-dd'));
+      return;
     }
+
+    setLocalFrom(undefined);
+    setLocalTo(undefined);
+    setActivePreset('all');
   }, [startDate, endDate, detectPreset, getDateRangeForMonths]);
 
   // Handle preset button click
@@ -106,6 +104,13 @@ export default function DateRangeFilter({
   // Handle custom mode
   const handleCustomClick = () => {
     setActivePreset('custom');
+  };
+
+  const handleClearClick = () => {
+    setActivePreset('all');
+    setLocalFrom(undefined);
+    setLocalTo(undefined);
+    onDateChange('', '');
   };
 
   // Handle from date change
@@ -144,6 +149,17 @@ export default function DateRangeFilter({
   return (
     <div className={cn('flex items-center gap-2 flex-wrap', className)}>
       {/* Preset buttons */}
+      <Button
+        variant={activePreset === 'all' ? 'default' : 'outline'}
+        size="sm"
+        onClick={handleClearClick}
+        className={cn(
+          'text-xs h-8 px-3',
+          activePreset === 'all' && 'shadow-sm'
+        )}
+      >
+        Sem filtro
+      </Button>
       {presets.map(({ months, label }) => (
         <Button
           key={months}

@@ -411,10 +411,43 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Filter out projections with zero or invalid amounts
-    const validProjectionBudgets = projectionBudgets.filter(
-      (proj) => proj.amount_planned_cents > 0
+    const toBudgetKey = (entry: {
+      year: number;
+      month: number;
+      category_id?: string | null;
+      source_type?: string | null;
+      source_id?: string | null;
+    }) => {
+      const categoryId = entry.category_id || 'none';
+      const sourceType = entry.source_type || 'manual';
+      const sourceId = entry.source_id || 'none';
+      return `${entry.year}-${entry.month}-${categoryId}-${sourceType}-${sourceId}`;
+    };
+
+    const existingBudgetKeys = new Set(
+      transformedBudgets.map((budget: any) =>
+        toBudgetKey({
+          year: budget.year,
+          month: budget.month,
+          category_id: budget.category_id,
+          source_type: budget.source_type,
+          source_id: budget.source_id,
+        })
+      )
     );
+
+    // Filter out projections with zero/invalid amounts or already persisted budgets
+    const validProjectionBudgets = projectionBudgets.filter((proj) => {
+      if (proj.amount_planned_cents <= 0) return false;
+      const key = toBudgetKey({
+        year: proj.year,
+        month: proj.month,
+        category_id: proj.category_id,
+        source_type: proj.source_type,
+        source_id: proj.source_id,
+      });
+      return !existingBudgetKeys.has(key);
+    });
 
     // Combine budgets and projections
     const allBudgets = [...transformedBudgets, ...validProjectionBudgets];
@@ -897,4 +930,3 @@ export async function DELETE(request: NextRequest) {
     );
   }
 }
-

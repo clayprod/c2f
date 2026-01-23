@@ -23,8 +23,15 @@ export interface ConnectTokenResponse {
 }
 
 export async function createConnectToken(): Promise<string> {
-  const response = await pluggyClient.post<ConnectTokenResponse>('/connect_token');
-  return response.connectToken;
+  const response = await pluggyClient.post<any>('/connect_token');
+  console.log('[Pluggy] Connect token response:', response);
+  
+  // The API returns accessToken, not connectToken
+  const token = response.accessToken || response.connectToken;
+  if (!token) {
+    throw new Error('Connect token not found in response');
+  }
+  return token;
 }
 
 export async function getItem(itemId: string): Promise<PluggyItem> {

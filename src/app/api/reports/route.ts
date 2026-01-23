@@ -80,10 +80,11 @@ export async function GET(request: NextRequest) {
     const ownerId = await getEffectiveOwnerId(request, userId);
 
     const { searchParams } = new URL(request.url);
+    const supabase = await createClient();
 
-    const filters = reportFiltersSchema.parse({
-      startDate: searchParams.get('startDate') || getDefaultStartDate(),
-      endDate: searchParams.get('endDate') || getDefaultEndDate(),
+    const parsedFilters = reportFiltersSchema.parse({
+      startDate: searchParams.get('startDate') || undefined,
+      endDate: searchParams.get('endDate') || undefined,
       accountIds: searchParams.get('accountIds')?.split(',').filter(Boolean) || undefined,
       categoryIds: searchParams.get('categoryIds')?.split(',').filter(Boolean) || undefined,
       assignedTo: searchParams.get('assignedTo') || undefined,
@@ -91,7 +92,18 @@ export async function GET(request: NextRequest) {
       groupBy: searchParams.get('groupBy') || 'month',
     });
 
-    const supabase = await createClient();
+    const resolvedRange = await resolveReportDateRange(
+      supabase,
+      ownerId,
+      parsedFilters.startDate,
+      parsedFilters.endDate
+    );
+
+    const filters = {
+      ...parsedFilters,
+      startDate: resolvedRange.startDate,
+      endDate: resolvedRange.endDate,
+    };
 
     switch (filters.reportType) {
       case 'overview':
@@ -126,15 +138,70 @@ export async function GET(request: NextRequest) {
   }
 }
 
-function getDefaultStartDate(): string {
-  const date = new Date();
-  date.setMonth(date.getMonth() - 11);
-  date.setDate(1);
-  return date.toISOString().split('T')[0];
+async function resolveReportDateRange(
+  supabase: SupabaseClient,
+  userId: string,
+  startDate?: string,
+  endDate?: string
+): Promise<{ startDate: string; endDate: string }> {
+  if (startDate && endDate) {
+    return { startDate, endDate };
+  }
+
+  const [minTxResult, maxTxResult, minBudgetResult, maxBudgetResult] = await Promise.all([
+    supabase
+      .from('transactions')
+      .select('posted_at')
+      .eq('user_id', userId)
+      .order('posted_at', { ascending: true })
+      .limit(1),
+    supabase
+      .from('transactions')
+      .select('posted_at')
+      .eq('user_id', userId)
+      .order('posted_at', { ascending: false })
+      .limit(1),
+    supabase
+      .from('budgets')
+      .select('year, month')
+      .eq('user_id', userId)
+      .order('year', { ascending: true })
+      .order('month', { ascending: true })
+      .limit(1),
+    supabase
+      .from('budgets')
+      .select('year, month')
+      .eq('user_id', userId)
+      .order('year', { ascending: false })
+      .order('month', { ascending: false })
+      .limit(1),
+  ]);
+
+  const minTxDate = minTxResult.data?.[0]?.posted_at;
+  const maxTxDate = maxTxResult.data?.[0]?.posted_at;
+
+  const minBudget = minBudgetResult.data?.[0];
+  const maxBudget = maxBudgetResult.data?.[0];
+
+  const minBudgetDate = minBudget
+    ? formatDate(new Date(minBudget.year, minBudget.month - 1, 1))
+    : undefined;
+  const maxBudgetDate = maxBudget
+    ? formatDate(new Date(maxBudget.year, maxBudget.month, 0))
+    : undefined;
+
+  const startCandidates = [minTxDate, minBudgetDate].filter(Boolean) as string[];
+  const endCandidates = [maxTxDate, maxBudgetDate].filter(Boolean) as string[];
+  const today = formatDate(new Date());
+
+  return {
+    startDate: startDate || (startCandidates.length ? startCandidates.sort()[0] : today),
+    endDate: endDate || (endCandidates.length ? endCandidates.sort()[endCandidates.length - 1] : today),
+  };
 }
 
-function getDefaultEndDate(): string {
-  return new Date().toISOString().split('T')[0];
+function formatDate(date: Date): string {
+  return date.toISOString().split('T')[0];
 }
 
 type ReportFilters = {

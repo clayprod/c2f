@@ -1,5 +1,7 @@
 'use client';
 
+import { formatCurrencyValue } from '@/lib/utils';
+
 export interface Transaction {
   id: string;
   description: string;
@@ -131,12 +133,10 @@ export default function TransactionTable({
   sorting = { sortBy: 'posted_at', sortOrder: 'desc' },
   onSortChange
 }: TransactionTableProps) {
+  // Helper para lidar com valores string ou number
   const formatCurrency = (value: number | string) => {
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(numValue);
+    return formatCurrencyValue(numValue);
   };
 
   const formatDate = (date: string) => {

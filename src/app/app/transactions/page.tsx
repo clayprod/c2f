@@ -33,28 +33,13 @@ export default function TransactionsPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const { members } = useMembers();
-  // Initialize with default date range (last 3 months)
-  const getDefaultDateRange = () => {
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
-    const startDate = new Date(today);
-    startDate.setMonth(startDate.getMonth() - 3 + 1);
-    startDate.setDate(1);
-    startDate.setHours(0, 0, 0, 0);
-    return {
-      fromDate: startDate.toISOString().split('T')[0],
-      toDate: today.toISOString().split('T')[0],
-    };
-  };
-
-  const defaultDates = getDefaultDateRange();
   const [filters, setFilters] = useState<FilterState>({
     search: '',
     accountId: '',
     categoryId: '',
     type: '',
-    fromDate: defaultDates.fromDate,
-    toDate: defaultDates.toDate,
+    fromDate: '',
+    toDate: '',
     isInstallment: 'all',
     assignedTo: '',
   });
@@ -320,7 +305,10 @@ export default function TransactionsPage() {
 
       <TransactionFilters
         onFiltersChange={setFilters}
-        accounts={accounts}
+        accounts={[
+          ...accounts,
+          ...creditCards.map(card => ({ ...card, type: 'credit_card' as const }))
+        ]}
         categories={categories}
         members={members}
       />

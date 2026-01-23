@@ -12,7 +12,7 @@ interface Member {
 
 interface TransactionFiltersProps {
   onFiltersChange: (filters: FilterState) => void;
-  accounts: Array<{ id: string; name: string }>;
+  accounts: Array<{ id: string; name: string; type?: string }>;
   categories: Array<{ id: string; name: string; type: string; source_type?: string | null }>;
   members?: Member[];
 }
@@ -127,11 +127,14 @@ export default function TransactionFilters({
             className="px-3 md:px-4 py-2 md:py-2.5 text-sm md:text-base rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none transition-colors"
           >
             <option value="">Todas contas</option>
-            {accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name}
-              </option>
-            ))}
+            {accounts.map((account) => {
+              const isCreditCard = account.type === 'credit' || account.type === 'credit_card';
+              return (
+                <option key={account.id} value={account.id}>
+                  {isCreditCard ? `Cartão de crédito: ${account.name}` : account.name}
+                </option>
+              );
+            })}
           </select>
 
           <select

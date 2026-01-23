@@ -313,8 +313,16 @@ export default function TransactionForm({
                   <SelectContent>
                     {allAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
-                        {account.isCreditCard ? '💳' : account.icon || '🏦'} {account.name}
-                        {account.isCreditCard && account.last_four_digits ? ` **** ${account.last_four_digits}` : ''}
+                        {account.isCreditCard ? (
+                          <>
+                            💳 Cartão de crédito: {account.name}
+                            {account.last_four_digits ? ` **** ${account.last_four_digits}` : ''}
+                          </>
+                        ) : (
+                          <>
+                            {account.icon || '🏦'} {account.name}
+                          </>
+                        )}
                       </SelectItem>
                     ))}
                   </SelectContent>

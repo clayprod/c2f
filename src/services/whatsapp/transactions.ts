@@ -498,6 +498,7 @@ export async function createInstallmentTransactionsFromWhatsApp(
     : null;
 
   let parentId: string | null = null;
+  const affectedBillIds = new Set<string>();
   const startDate = new Date(input.postedAt);
 
   for (let i = 1; i <= input.installmentTotal; i++) {
@@ -518,52 +519,100 @@ export async function createInstallmentTransactionsFromWhatsApp(
       );
     }
 
-    const txData: Record<string, any> = {
-      user_id: input.userId,
-      account_id: accountId,
-      category_id: categoryId,
-      description: `${input.description} (${i}/${input.installmentTotal})`,
-      amount: -installmentAmountCents, // Negative for expense (stored in cents in DB? Let me check)
-      type: 'expense',
-      posted_at: installmentDate.toISOString().split('T')[0],
-      notes: input.notes
-        ? `${input.notes}\n\n[Via WhatsApp - Parcelado ${i}/${input.installmentTotal}]`
-        : `[Via WhatsApp - Parcelado ${i}/${input.installmentTotal}]`,
-      installment_number: i,
-      installment_total: input.installmentTotal,
-      source: 'manual',
-    };
+    let insertResult: { id: string } | null = null;
 
-    if (creditCardBillId) {
-      txData.credit_card_bill_id = creditCardBillId;
+    if (isCreditCard) {
+      if (!creditCardBillId) {
+        return { success: false, error: 'Fatura do cartão não encontrada' };
+      }
+
+      const itemData: Record<string, any> = {
+        user_id: input.userId,
+        account_id: accountId,
+        bill_id: creditCardBillId,
+        category_id: categoryId,
+        description: `${input.description} (${i}/${input.installmentTotal})`,
+        amount_cents: Math.abs(installmentAmountCents),
+        currency: 'BRL',
+        posted_at: installmentDate.toISOString().split('T')[0],
+        notes: input.notes
+          ? `${input.notes}\n\n[Via WhatsApp - Parcelado ${i}/${input.installmentTotal}]`
+          : `[Via WhatsApp - Parcelado ${i}/${input.installmentTotal}]`,
+        installment_number: i,
+        installment_total: input.installmentTotal,
+        source: 'manual',
+      };
+
+      if (i > 1 && parentId) {
+        itemData.installment_parent_id = parentId;
+      }
+
+      const { data: item, error } = await supabase
+        .from('credit_card_bill_items')
+        .insert(itemData)
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('[WhatsApp] Error creating installment bill item:', error);
+        return { success: false, error: 'Erro ao criar parcelas' };
+      }
+
+      insertResult = item;
+      affectedBillIds.add(creditCardBillId);
+    } else {
+      const txData: Record<string, any> = {
+        user_id: input.userId,
+        account_id: accountId,
+        category_id: categoryId,
+        description: `${input.description} (${i}/${input.installmentTotal})`,
+        amount: -installmentAmountCents,
+        type: 'expense',
+        posted_at: installmentDate.toISOString().split('T')[0],
+        notes: input.notes
+          ? `${input.notes}\n\n[Via WhatsApp - Parcelado ${i}/${input.installmentTotal}]`
+          : `[Via WhatsApp - Parcelado ${i}/${input.installmentTotal}]`,
+        installment_number: i,
+        installment_total: input.installmentTotal,
+        source: 'manual',
+      };
+
+      if (i > 1 && parentId) {
+        txData.installment_parent_id = parentId;
+      }
+
+      const { data: tx, error } = await supabase
+        .from('transactions')
+        .insert(txData)
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('[WhatsApp] Error creating installment:', error);
+        return { success: false, error: 'Erro ao criar parcelas' };
+      }
+
+      insertResult = tx;
     }
 
-    if (i > 1 && parentId) {
-      txData.installment_parent_id = parentId;
-    }
-
-    const { data: tx, error } = await supabase
-      .from('transactions')
-      .insert(txData)
-      .select('id')
-      .single();
-
-    if (error) {
-      console.error('[WhatsApp] Error creating installment:', error);
-      return { success: false, error: 'Erro ao criar parcelas' };
-    }
-
-    if (i === 1) {
-      parentId = tx.id;
+    if (i === 1 && insertResult?.id) {
+      parentId = insertResult.id;
     }
   }
 
-  // Update account balance for first installment only (others are future)
-  const balanceChange = -installmentAmountCents;
-  await supabase.rpc('update_account_balance', {
-    account_id: accountId,
-    amount_change: balanceChange,
-  });
+  if (isCreditCard) {
+    for (const billId of affectedBillIds) {
+      await supabase.rpc('recalculate_credit_card_bill', {
+        p_bill_id: billId,
+      });
+    }
+  } else {
+    const balanceChange = -installmentAmountCents;
+    await supabase.rpc('update_account_balance', {
+      account_id: accountId,
+      amount_change: balanceChange,
+    });
+  }
 
   return {
     success: true,

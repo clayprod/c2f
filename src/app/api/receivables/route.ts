@@ -378,8 +378,13 @@ export async function POST(request: NextRequest) {
     }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.name === 'ZodError') {
+      const zodError = error as { issues?: Array<{ path: (string | number)[]; message: string }> };
+      const first = zodError.issues?.[0];
+      const msg = first
+        ? `Erro de validação: ${first.path.length ? `${String(first.path.join('.'))} — ` : ''}${first.message}`
+        : 'Erro de validação';
       return NextResponse.json(
-        { error: 'Validation error', details: error },
+        { error: msg, details: zodError.issues },
         { status: 400 }
       );
     }

@@ -4,6 +4,7 @@ import { getUserId } from '@/lib/auth';
 import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 import { creditCardBillPaymentSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
+import { projectionCache } from '@/services/projections/cache';
 
 export async function GET(
   request: NextRequest,
@@ -41,23 +42,23 @@ export async function GET(
       return NextResponse.json({ error: 'Fatura não encontrada' }, { status: 404 });
     }
 
-    // Get transactions for this bill separately
-    const { data: billTransactions, error: transactionsError } = await supabase
-      .from('transactions')
+    // Get bill items for this bill separately
+    const { data: billTransactions, error: itemsError } = await supabase
+      .from('credit_card_bill_items')
       .select(`
         id,
         description,
-        amount,
+        amount_cents,
         posted_at,
         category:categories(id, name, icon, color),
         installment_number,
         installment_total,
         notes
       `)
-      .eq('credit_card_bill_id', billId)
+      .eq('bill_id', billId)
       .eq('user_id', ownerId);
 
-    if (transactionsError) throw transactionsError;
+    if (itemsError) throw itemsError;
 
     // Combine bill with transactions
     const data = {
@@ -78,8 +79,7 @@ export async function GET(
       if (!categoryTotals[catId]) {
         categoryTotals[catId] = { name: catName, icon: catIcon, color: catColor, total: 0, count: 0 };
       }
-      // Convert NUMERIC to cents
-      const amountCents = Math.round(Math.abs(t.amount || 0) * 100);
+      const amountCents = Math.abs(t.amount_cents || 0);
       categoryTotals[catId].total += amountCents;
       categoryTotals[catId].count += 1;
     });
@@ -223,6 +223,10 @@ export async function PATCH(
           .eq('id', id);
       }
 
+      projectionCache.invalidateUser(ownerId);
+
+      projectionCache.invalidateUser(ownerId);
+
       return NextResponse.json({ data: updatedBill });
     }
 
@@ -337,6 +341,8 @@ export async function PATCH(
       .single();
 
     if (error) throw error;
+
+    projectionCache.invalidateUser(ownerId);
 
     return NextResponse.json({ data });
   } catch (error) {

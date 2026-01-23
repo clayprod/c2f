@@ -355,7 +355,7 @@ export default function PluggyImportDialog({ open, onOpenChange, linkId, onImpor
                       <td className={`p-2 text-sm text-right font-medium ${
                         tx.amount_cents >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {formatCurrency(tx.amount_cents / 100)}
+                        {formatCurrency(tx.amount_cents)}
                       </td>
                       <td className="p-2">
                         <Select

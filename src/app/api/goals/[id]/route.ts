@@ -438,6 +438,30 @@ export async function DELETE(
 
     const { id } = await params;
     const { supabase } = createClientFromRequest(request);
+    
+    // Delete related budgets first
+    await supabase
+      .from('budgets')
+      .delete()
+      .eq('user_id', ownerId)
+      .eq('source_type', 'goal')
+      .eq('source_id', id);
+
+    // Delete goal plan entries
+    await supabase
+      .from('goal_plan_entries')
+      .delete()
+      .eq('user_id', ownerId)
+      .eq('goal_id', id);
+
+    // Delete goal contributions
+    await supabase
+      .from('goal_contributions')
+      .delete()
+      .eq('user_id', ownerId)
+      .eq('goal_id', id);
+
+    // Delete the goal
     const { error } = await supabase
       .from('goals')
       .delete()
@@ -445,6 +469,9 @@ export async function DELETE(
       .eq('user_id', ownerId);
 
     if (error) throw error;
+
+    // Invalidate projection cache
+    projectionCache.invalidateUser(ownerId);
 
     return NextResponse.json({ message: 'Goal deleted successfully' });
   } catch (error) {

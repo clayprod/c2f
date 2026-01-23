@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     const { data: profile, error } = await supabase
       .from('profiles')
-      .select('id, full_name, email, role, city, state, birth_date, gender, monthly_income_cents, emergency_goal_months, created_at')
+      .select('id, full_name, email, role, city, state, birth_date, gender, monthly_income_cents, created_at')
       .eq('id', user.id)
       .single();
 
@@ -26,6 +26,12 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching profile:', error);
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
     }
+
+    console.log('[Profile API] User profile:', {
+      id: profile.id,
+      email: profile.email,
+      role: profile.role,
+    });
 
     return NextResponse.json({
       id: profile.id,
@@ -37,7 +43,6 @@ export async function GET(request: NextRequest) {
       birth_date: profile.birth_date,
       gender: profile.gender,
       monthly_income_cents: profile.monthly_income_cents,
-      emergency_goal_months: profile.emergency_goal_months,
       created_at: profile.created_at,
     });
   } catch (error: any) {

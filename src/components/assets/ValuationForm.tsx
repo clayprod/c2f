@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { formatCurrencyInput } from '@/lib/utils';
 
 type ValuationFormData = z.infer<typeof assetValuationSchema>;
 
@@ -73,7 +74,7 @@ export default function ValuationForm({ assetId, valuation, onSubmit, onCancel }
       asset_id: assetId,
       valuation_date: valuation?.valuation_date || new Date().toISOString().split('T')[0],
       valuation_type: valuation?.valuation_type || 'manual',
-      value_reais: valuation ? (valuation.value_cents / 100).toFixed(2).replace('.', ',') : '',
+      value_reais: valuation ? formatCurrencyInput(valuation.value_cents / 100) : '',
       notes: valuation?.notes || '',
     },
   });
@@ -85,7 +86,7 @@ export default function ValuationForm({ assetId, valuation, onSubmit, onCancel }
         asset_id: assetId,
         valuation_date: valuation.valuation_date,
         valuation_type: valuation.valuation_type,
-        value_reais: (valuation.value_cents / 100).toFixed(2).replace('.', ','),
+        value_reais: formatCurrencyInput(valuation.value_cents / 100),
         notes: valuation.notes || '',
       });
     } else {

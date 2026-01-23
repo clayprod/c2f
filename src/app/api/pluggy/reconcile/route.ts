@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
           currency,
           item_id,
           pluggy_items!inner (
-            institution_name
+            connector_name
           )
         ),
         accounts!inner (
@@ -75,9 +75,12 @@ export async function GET(request: NextRequest) {
           .eq('account_id', link.pluggy_accounts.pluggy_account_id)
           .is('imported_at', null);
 
-        const pluggyBalance = link.pluggy_accounts.balance_cents / 100;
-        const internalBalance = link.accounts.current_balance || 0;
-        const divergence = pluggyBalance - internalBalance;
+        // Mantém valores em centavos para consistência
+        const pluggyBalanceCents = link.pluggy_accounts.balance_cents;
+        // accounts.current_balance está em reais, converter para centavos
+        const internalBalanceReais = link.accounts.current_balance || 0;
+        const internalBalanceCents = Math.round(internalBalanceReais * 100);
+        const divergenceCents = pluggyBalanceCents - internalBalanceCents;
 
         return {
           link_id: link.id,
@@ -85,24 +88,24 @@ export async function GET(request: NextRequest) {
             id: link.pluggy_accounts.id,
             pluggy_account_id: link.pluggy_accounts.pluggy_account_id,
             name: link.pluggy_accounts.name,
-            balance: pluggyBalance,
+            balance_cents: pluggyBalanceCents,
             currency: link.pluggy_accounts.currency,
-            institution: link.pluggy_accounts.pluggy_items?.institution_name,
+            institution: link.pluggy_accounts.pluggy_items?.connector_name || 'Open Finance',
           },
           internal_account: {
             id: link.accounts.id,
             name: link.accounts.name,
-            balance: internalBalance,
+            balance_cents: internalBalanceCents,
             currency: link.accounts.currency,
           },
-          divergence,
+          divergence_cents: divergenceCents,
           unimported_count: unimportedCount || 0,
         };
       })
     );
 
     const summary = {
-      total_divergence: reconciliationData.reduce((sum, r) => sum + Math.abs(r.divergence), 0),
+      total_divergence_cents: reconciliationData.reduce((sum, r) => sum + Math.abs(r.divergence_cents), 0),
       total_unimported: reconciliationData.reduce((sum, r) => sum + r.unimported_count, 0),
     };
 

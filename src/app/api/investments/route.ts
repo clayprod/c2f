@@ -8,6 +8,71 @@ import { generateAutoBudgetsForInvestment } from '@/services/budgets/autoGenerat
 import { projectionCache } from '@/services/projections/cache';
 import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 
+const missingColumnRegex = /column "?([^"]+)"?/i;
+
+const getMissingColumn = (error: any) => {
+  if (!error || error.code !== '42703' || typeof error.message !== 'string') {
+    return null;
+  }
+
+  const match = error.message.match(missingColumnRegex);
+  return match?.[1] ?? null;
+};
+
+const applyMissingColumnFallback = (payload: Record<string, any>, column: string) => {
+  const nextPayload = { ...payload };
+
+  if (column === 'include_in_plan') {
+    nextPayload.include_in_budget = nextPayload.include_in_plan;
+    delete nextPayload.include_in_plan;
+    return nextPayload;
+  }
+
+  if (column === 'include_in_budget') {
+    delete nextPayload.include_in_budget;
+    return nextPayload;
+  }
+
+  const optionalColumns = [
+    'category_id',
+    'contribution_frequency',
+    'contribution_count',
+    'monthly_contribution_cents',
+    'contribution_day',
+    'start_date',
+    'assigned_to',
+  ];
+
+  if (optionalColumns.includes(column)) {
+    delete nextPayload[column];
+    return nextPayload;
+  }
+
+  return null;
+};
+
+const normalizeIncludeInPlan = (investment: any, fallback?: boolean) => {
+  const includeInPlan = investment?.include_in_plan ?? investment?.include_in_budget ?? fallback ?? false;
+  return {
+    ...investment,
+    include_in_plan: includeInPlan,
+  };
+};
+
+const shouldDropCategorySelect = (error: any) => {
+  if (!error) return false;
+  const message = typeof error.message === 'string' ? error.message.toLowerCase() : '';
+
+  if (error.code === '42703') {
+    const missingColumn = getMissingColumn(error);
+    if (missingColumn === 'category_id') {
+      return true;
+    }
+  }
+
+  return message.includes('categories') || message.includes('category_id');
+};
+
 export async function GET(request: NextRequest) {
   try {
     const userId = await getUserId(request);
@@ -21,20 +86,28 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type');
 
     const { supabase } = createClientFromRequest(request);
-    let query = supabase
-      .from('investments')
-      .select('*, accounts(*), categories(*)')
-      .eq('user_id', ownerId)
-      .order('created_at', { ascending: false });
+    const buildQuery = (selectColumns: string) => {
+      let query = supabase
+        .from('investments')
+        .select(selectColumns)
+        .eq('user_id', ownerId)
+        .order('created_at', { ascending: false });
 
-    if (status) {
-      query = query.eq('status', status);
-    }
-    if (type) {
-      query = query.eq('type', type);
-    }
+      if (status) {
+        query = query.eq('status', status);
+      }
+      if (type) {
+        query = query.eq('type', type);
+      }
 
-    const { data, error } = await query;
+      return query;
+    };
+
+    let { data, error }: { data: any[] | null; error: any } = await buildQuery('*, accounts(*), categories(*)');
+
+    if (error && shouldDropCategorySelect(error)) {
+      ({ data, error } = await buildQuery('*, accounts(*)') as { data: any[] | null; error: any });
+    }
 
     if (error) throw error;
 
@@ -111,7 +184,11 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json({ data: transformedData });
+    const normalizedData = transformedData.map((investment) =>
+      normalizeIncludeInPlan(investment)
+    );
+
+    return NextResponse.json({ data: normalizedData });
   } catch (error) {
     const errorResponse = createErrorResponse(error);
     return NextResponse.json(
@@ -136,7 +213,7 @@ export async function POST(request: NextRequest) {
 
     // Create a category for this investment (using investment name directly)
     const categoryName = validated.name.toUpperCase();
-    const { data: category, error: categoryError } = await supabase
+    let { data: category, error: categoryError } = await supabase
       .from('categories')
       .insert({
         user_id: ownerId,
@@ -149,6 +226,26 @@ export async function POST(request: NextRequest) {
       .select()
       .single();
 
+    if (categoryError && categoryError.code === '42703') {
+      const missingColumn = getMissingColumn(categoryError);
+      if (missingColumn === 'source_type') {
+        const retryResult = await supabase
+          .from('categories')
+          .insert({
+            user_id: ownerId,
+            name: categoryName,
+            type: 'expense',
+            icon: '📊',
+            color: '#00CED1',
+          })
+          .select()
+          .single();
+
+        category = retryResult.data;
+        categoryError = retryResult.error;
+      }
+    }
+
     if (categoryError) {
       console.error('Error creating investment category:', categoryError);
     }
@@ -157,32 +254,82 @@ export async function POST(request: NextRequest) {
     const includeInPlan = hasCustomPlan ? true : validated.include_in_plan;
     const { plan_entries, ...investmentData } = validated;
 
-    const { data, error } = await supabase
+    let insertPayload: Record<string, any> = {
+      ...investmentData,
+      user_id: ownerId,
+      include_in_plan: includeInPlan,
+      contribution_frequency: hasCustomPlan ? null : validated.contribution_frequency || null,
+      contribution_count: hasCustomPlan ? null : validated.contribution_count || null,
+      initial_investment_cents: validated.initial_investment_cents,
+      current_value_cents: validated.current_value_cents || validated.initial_investment_cents,
+      category_id: category?.id,
+      assigned_to: validated.assigned_to || null,
+    };
+
+    let selectColumns = '*, accounts(*), categories(*)';
+    let { data, error } = await supabase
       .from('investments')
-      .insert({
-        ...investmentData,
-        user_id: ownerId,
-        include_in_plan: includeInPlan,
-        contribution_frequency: hasCustomPlan ? null : validated.contribution_frequency || null,
-        contribution_count: hasCustomPlan ? null : validated.contribution_count || null,
-        initial_investment_cents: validated.initial_investment_cents,
-        current_value_cents: validated.current_value_cents || validated.initial_investment_cents,
-        category_id: category?.id,
-        assigned_to: validated.assigned_to || null,
-      })
-      .select('*, accounts(*), categories(*)')
+      .insert(insertPayload)
+      .select(selectColumns)
       .single();
+
+    if (error) {
+      let fallbackError: any = error;
+      let fallbackPayload = insertPayload;
+      const attemptedColumns = new Set<string>();
+
+      while (fallbackError && fallbackError.code === '42703') {
+        const missingColumn = getMissingColumn(fallbackError);
+        const shouldDropCategories = shouldDropCategorySelect(fallbackError) && selectColumns.includes('categories');
+
+        const nextPayload = missingColumn
+          ? applyMissingColumnFallback(fallbackPayload, missingColumn)
+          : null;
+
+        if (!nextPayload && !shouldDropCategories) {
+          break;
+        }
+
+        if (nextPayload && missingColumn) {
+          attemptedColumns.add(missingColumn);
+          fallbackPayload = nextPayload;
+        } else if (nextPayload) {
+          fallbackPayload = nextPayload;
+        }
+
+        if (shouldDropCategories) {
+          selectColumns = '*, accounts(*)';
+        }
+
+        const retryResult = await supabase
+          .from('investments')
+          .insert(fallbackPayload)
+          .select(selectColumns)
+          .single();
+
+        data = retryResult.data;
+        error = retryResult.error;
+        fallbackError = retryResult.error;
+
+        if (!retryResult.error) {
+          insertPayload = fallbackPayload;
+          break;
+        }
+      }
+    }
 
     if (error) throw error;
 
-    if (data && validated.plan_entries && validated.plan_entries.length > 0) {
+    const normalizedData = normalizeIncludeInPlan(data, includeInPlan);
+
+    if (normalizedData && validated.plan_entries && validated.plan_entries.length > 0) {
       const planEntries = validated.plan_entries.map((entry) => ({
         user_id: ownerId,
-        investment_id: data.id,
-        category_id: data.category_id || null,
+        investment_id: normalizedData.id,
+        category_id: normalizedData.category_id || null,
         entry_month: `${entry.month}-01`,
         amount_cents: entry.amount_cents,
-        description: `Plano personalizado - ${data.name}`,
+        description: `Plano personalizado - ${normalizedData.name}`,
       }));
 
       const { error: planError } = await supabase
@@ -197,7 +344,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate automatic budgets if include_in_plan is true
-    if (data.include_in_plan && data.status === 'active' && data.category_id) {
+    if (normalizedData.include_in_plan && normalizedData.status === 'active' && normalizedData.category_id) {
       try {
         const today = new Date();
         const startMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -209,14 +356,14 @@ export async function POST(request: NextRequest) {
           supabase,
           ownerId,
           {
-            id: data.id,
-            category_id: data.category_id,
-            include_in_plan: data.include_in_plan,
-            status: data.status,
-            contribution_frequency: data.contribution_frequency,
-            contribution_count: data.contribution_count,
-            monthly_contribution_cents: data.monthly_contribution_cents,
-            purchase_date: data.purchase_date,
+            id: normalizedData.id,
+            category_id: normalizedData.category_id,
+            include_in_plan: normalizedData.include_in_plan,
+            status: normalizedData.status,
+            contribution_frequency: normalizedData.contribution_frequency,
+            contribution_count: normalizedData.contribution_count,
+            monthly_contribution_cents: normalizedData.monthly_contribution_cents,
+            purchase_date: normalizedData.purchase_date,
           },
           {
             startMonth,
@@ -234,7 +381,7 @@ export async function POST(request: NextRequest) {
 
     // Create purchase transaction if requested
     const createPurchaseTransaction = (body as any).create_purchase_transaction === true;
-    if (createPurchaseTransaction && data.category_id) {
+    if (createPurchaseTransaction && normalizedData.category_id) {
       try {
         // Get default account if account_id not provided
         let accountId = validated.account_id;
@@ -256,7 +403,7 @@ export async function POST(request: NextRequest) {
             .insert({
               user_id: ownerId,
               account_id: accountId,
-              category_id: data.category_id,
+              category_id: normalizedData.category_id,
               posted_at: validated.purchase_date,
               description: `Compra: ${validated.name}`,
               amount: -validated.initial_investment_cents / 100, // Negative for expense
@@ -277,8 +424,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       data: {
-        ...data,
-        category_id: category?.id,
+        ...normalizedData,
+        category_id: normalizedData.category_id ?? category?.id,
         category_name: category?.name,
       }
     }, { status: 201 });
@@ -296,6 +443,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
-
-

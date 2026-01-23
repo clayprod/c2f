@@ -5,6 +5,7 @@ import { pt } from 'date-fns/locale';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Dot } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import type { ChartConfig } from '@/components/ui/chart';
+import { formatCurrency, formatCurrencyValue } from '@/lib/utils';
 
 interface Valuation {
   id: string;
@@ -32,7 +33,8 @@ interface ChartDataPoint {
 
 export default function ValuationChart({ valuations, purchaseDate, purchasePriceCents }: ValuationChartProps) {
 
-  const formatCurrency = (reais: number) => {
+  // Formatação compacta para eixo do gráfico (sem centavos)
+  const formatCurrencyCompact = (reais: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
@@ -87,7 +89,7 @@ export default function ValuationChart({ valuations, purchaseDate, purchasePrice
       <div className="glass-card p-6">
         <h3 className="font-semibold mb-4">Histórico de Valorização</h3>
         <div className="text-center py-8">
-          <div className="text-2xl font-bold mb-2">{formatCurrency(point.value / 100)}</div>
+          <div className="text-2xl font-bold mb-2">{formatCurrency(point.value)}</div>
           <div className="text-sm text-muted-foreground">
             {formatDateLabel(point.date)} - {point.label}
           </div>
@@ -211,7 +213,7 @@ export default function ValuationChart({ valuations, purchaseDate, purchasePrice
               if (value >= 1000) {
                 return `R$ ${(value / 1000).toFixed(0)}k`;
               }
-              return formatCurrency(value);
+              return formatCurrencyCompact(value);
             }}
             width={80}
           />
@@ -228,7 +230,7 @@ export default function ValuationChart({ valuations, purchaseDate, purchasePrice
                   <div className="flex items-center gap-2">
                     <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: chartConfig[data.type]?.color || '#6b7280' }}></div>
                     <div className="flex flex-col">
-                      <span className="font-semibold">{formatCurrency(value)}</span>
+                      <span className="font-semibold">{formatCurrencyValue(value)}</span>
                       <span className="text-muted-foreground text-xs">{data.label}</span>
                     </div>
                   </div>

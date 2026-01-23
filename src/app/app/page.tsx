@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { CashFlowChart } from '@/components/dashboard/CashFlowChart';
 import { ExpensesByCategoryChart } from '@/components/dashboard/ExpensesByCategoryChart';
@@ -10,6 +10,9 @@ import { Button } from '@/components/ui/button';
 import { InfoIcon } from '@/components/ui/InfoIcon';
 import { useProfile } from '@/hooks/useProfile';
 import { PlanGuard } from '@/components/app/PlanGuard';
+import { useAccountContext } from '@/hooks/useAccountContext';
+import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
+import { formatCurrencyValue } from '@/lib/utils';
 
 interface DashboardData {
   totalBalance: number;
@@ -41,12 +44,8 @@ const PERIOD_OPTIONS = [
   // 10 anos removed - max is 115 months forward (5 back + 115 forward = 120 total)
 ];
 
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(value);
-};
+// Alias para manter compatibilidade com código existente
+const formatCurrency = formatCurrencyValue;
 
 // Função para truncar texto do início (mostrar o final)
 const truncateStart = (text: string, maxLength: number) => {
@@ -71,10 +70,12 @@ export default function DashboardPage() {
   const [cashFlowLoading, setCashFlowLoading] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState(12); // Default: 1 year
   const { isFree, loading: profileLoading } = useProfile();
+  const { context: accountContext, activeAccountId } = useAccountContext();
   const [maxVisibleItems, setMaxVisibleItems] = useState(9);
   const containerRef = useRef<HTMLDivElement>(null);
   const budgetsContainerRef = useRef<HTMLDivElement>(null);
   const transactionsContainerRef = useRef<HTMLDivElement>(null);
+  const ownerId = activeAccountId || accountContext?.currentUserId || null;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -167,16 +168,6 @@ export default function DashboardPage() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchDashboardData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    fetchCashFlowData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPeriod]);
-
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
@@ -259,7 +250,7 @@ export default function DashboardPage() {
     }
   };
 
-  const fetchCashFlowData = async () => {
+  const fetchCashFlowData = useCallback(async () => {
     try {
       setCashFlowLoading(true);
       // Usar timezone do Brasil (UTC-3)
@@ -306,7 +297,22 @@ export default function DashboardPage() {
     } finally {
       setCashFlowLoading(false);
     }
-  };
+  }, [selectedPeriod]);
+
+  useEffect(() => {
+    fetchDashboardData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    fetchCashFlowData();
+  }, [fetchCashFlowData]);
+
+  useRealtimeCashflowUpdates({
+    ownerId,
+    onRefresh: fetchCashFlowData,
+    enabled: true,
+  });
 
   const chartData = useMemo(() => {
     // Usar timezone do Brasil (UTC-3) para determinar o mês atual
@@ -606,13 +612,13 @@ export default function DashboardPage() {
 
       <ExpensesByCategoryChart />
 
-      <div className="grid md:grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 lg:items-stretch items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 lg:items-stretch items-start max-w-full overflow-hidden">
         <PlanGuard minPlan="pro" showFallback={false}>
-          <div ref={budgetsContainerRef}>
+          <div ref={budgetsContainerRef} className="max-w-full overflow-hidden">
             <BudgetsByCategory />
           </div>
         </PlanGuard>
-        <div ref={transactionsContainerRef} className="glass-card p-4 md:p-6 flex flex-col lg:overflow-hidden">
+        <div ref={transactionsContainerRef} className="glass-card p-3 md:p-6 flex flex-col lg:overflow-hidden max-w-full overflow-hidden">
           <div className="flex items-center justify-between mb-4 flex-shrink-0">
             <div className="flex items-center gap-2">
               <h2 className="font-display font-semibold text-sm md:text-base">Transações Recentes</h2>
@@ -642,21 +648,21 @@ export default function DashboardPage() {
               </Link>
             </div>
           ) : (
-            <div ref={containerRef} className="flex-1 min-h-0 overflow-hidden">
+            <div ref={containerRef} className="flex-1 min-h-0 overflow-hidden max-w-full">
               {/* Mobile: Card view */}
-              <div className="md:hidden space-y-2">
+              <div className="md:hidden space-y-1.5 max-w-full">
                 {recentTransactions.slice(0, 9).map((tx) => {
                   const amount = typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount;
                   const isIncome = amount > 0;
                   return (
-                    <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
-                      <div className="flex-1 min-w-0 mr-3">
+                    <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0 gap-2">
+                      <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{tx.description}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-[11px] text-muted-foreground truncate">
                           {tx.categories?.name || 'Sem categoria'} • {new Date(tx.posted_at).toLocaleDateString('pt-BR')}
                         </p>
                       </div>
-                      <p className={`text-sm font-semibold whitespace-nowrap ${isIncome ? 'text-green-500' : 'text-red-500'}`}>
+                      <p className={`text-xs font-semibold whitespace-nowrap flex-shrink-0 ${isIncome ? 'text-green-500' : 'text-red-500'}`}>
                         {isIncome ? '+' : ''}{formatCurrency(amount)}
                       </p>
                     </div>

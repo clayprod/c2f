@@ -27,6 +27,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { PlanGuard } from '@/components/app/PlanGuard';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
+import { formatCurrencyValue, formatCurrency } from '@/lib/utils';
 
 interface Category {
   id: string;
@@ -140,8 +141,13 @@ export default function BudgetsPage() {
   // Fetch minimum amounts for categories without budget
   useEffect(() => {
     // Calculate categories without budget here
+    // Exclude automatic categories (investment, goal, debt, credit_card) as they only have budgets when related entities exist
+    const automaticSourceTypes = ['investment', 'goal', 'debt', 'credit_card', 'receivable'];
     const budgetsByCategoryId = new Map(budgets.map(b => [b.category_id, b]));
-    const categoriesWithoutBudget = categories.filter(cat => !budgetsByCategoryId.has(cat.id));
+    const categoriesWithoutBudget = categories.filter(cat => {
+      const isAutomatic = cat.source_type && automaticSourceTypes.includes(cat.source_type);
+      return !isAutomatic && !budgetsByCategoryId.has(cat.id);
+    });
 
     if (categoriesWithoutBudget.length > 0) {
       fetchCategoryMinimums(categoriesWithoutBudget);
@@ -421,12 +427,8 @@ export default function BudgetsPage() {
     }
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
-  };
+  // Alias para manter compatibilidade (usa reais)
+  const formatCurrencyReais = formatCurrencyValue;
 
   const getMonthLabel = (month: string) => {
     const [year, m] = month.split('-');
@@ -446,10 +448,14 @@ export default function BudgetsPage() {
     // Calculate manual budgets (needed for check)
     const allManualBudgets = budgets.filter(b => (!b.source_type || b.source_type === 'manual') && !b.is_projected);
 
-    // Calculate categories without budget (only general categories)
+    // Calculate categories without budget (only general/manual categories, exclude automatic ones)
+    const automaticSourceTypes = ['investment', 'goal', 'debt', 'credit_card', 'receivable'];
     const budgetsByCategoryId = new Map(allManualBudgets.map(b => [b.category_id, b]));
     const generalCategoriesWithoutBudget = categories.filter(
-      cat => (!cat.source_type || cat.source_type === 'general') && !budgetsByCategoryId.has(cat.id)
+      cat => {
+        const isAutomatic = cat.source_type && automaticSourceTypes.includes(cat.source_type);
+        return !isAutomatic && !budgetsByCategoryId.has(cat.id);
+      }
     );
 
     if (generalCategoriesWithoutBudget.length > 0) {
@@ -567,7 +573,13 @@ export default function BudgetsPage() {
   });
 
   // Categories without budget = categories not in allBudgetsMap (no manual OR auto budget)
-  const categoriesWithoutBudget = filteredCategories.filter(cat => !allBudgetsMap.has(cat.id));
+  // Exclude automatic categories (investment, goal, debt, credit_card) as they only have budgets when related entities exist
+  const automaticSourceTypes = ['investment', 'goal', 'debt', 'credit_card', 'receivable'];
+  const categoriesWithoutBudget = filteredCategories.filter(cat => {
+    const isAutomatic = cat.source_type && automaticSourceTypes.includes(cat.source_type);
+    // Only show manual/general categories without budget, or automatic categories that have budgets
+    return !isAutomatic && !allBudgetsMap.has(cat.id);
+  });
 
   // Separate categories by type (default to expense if type is not defined)
   const incomeCategories = categoriesWithoutBudget.filter(c => c.type === 'income');
@@ -687,7 +699,7 @@ export default function BudgetsPage() {
         <div className="flex items-center justify-between text-xs md:text-sm gap-2">
           <div className="flex items-center gap-1">
             <span className="text-muted-foreground">{isIncome ? 'Rec:' : 'Gasto:'}</span>
-            <span className={`font-medium ${isOver ? 'text-red-500' : ''}`}>{formatCurrency(spent)}</span>
+            <span className={`font-medium ${isOver ? 'text-red-500' : ''}`}>{formatCurrencyReais(spent)}</span>
           </div>
           <div className="flex items-center gap-1">
             <span className="text-muted-foreground hidden sm:inline">{isIncome ? 'Plan:' : (isReadOnly ? 'Pendente:' : 'Limite:')}</span>
@@ -712,7 +724,7 @@ export default function BudgetsPage() {
           <div className="mt-2 py-1.5 px-2 bg-red-500/10 border border-red-500/20 rounded-lg">
             <p className="text-xs text-red-500 flex items-center gap-1">
               <i className='bx bx-error-circle'></i>
-              <span>+{formatCurrency(spent - limit)} acima</span>
+              <span>+{formatCurrencyReais(spent - limit)} acima</span>
             </p>
           </div>
         )}
@@ -720,7 +732,7 @@ export default function BudgetsPage() {
         {/* Minimum info - only on hover */}
         {(budget.minimum_amount_planned_cents ?? 0) > 0 && (
           <div className="mt-1 text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-            Mín: {formatCurrency((budget.minimum_amount_planned_cents ?? 0) / 100)}
+            Mín: {formatCurrency(budget.minimum_amount_planned_cents ?? 0)}
           </div>
         )}
       </div>
@@ -899,18 +911,18 @@ export default function BudgetsPage() {
               <div className="flex items-center gap-1 flex-shrink-0">
                 <i className='bx bx-trending-up text-green-500 text-xs md:text-sm'></i>
                 <span className="text-muted-foreground hidden sm:inline">Receitas:</span>
-                <span className="font-semibold text-green-500 whitespace-nowrap">{formatCurrency(incomeActual)}</span>
-                <span className="text-muted-foreground whitespace-nowrap hidden md:inline">/ {formatCurrency(incomePlanned)}</span>
+                <span className="font-semibold text-green-500 whitespace-nowrap">{formatCurrencyReais(incomeActual)}</span>
+                <span className="text-muted-foreground whitespace-nowrap hidden md:inline">/ {formatCurrencyReais(incomePlanned)}</span>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 <i className='bx bx-trending-down text-red-500 text-xs md:text-sm'></i>
                 <span className="text-muted-foreground hidden sm:inline">Despesas:</span>
-                <span className="font-semibold text-red-500 whitespace-nowrap">{formatCurrency(expenseActual)}</span>
-                <span className="text-muted-foreground whitespace-nowrap hidden md:inline">/ {formatCurrency(expensePlanned)}</span>
+                <span className="font-semibold text-red-500 whitespace-nowrap">{formatCurrencyReais(expenseActual)}</span>
+                <span className="text-muted-foreground whitespace-nowrap hidden md:inline">/ {formatCurrencyReais(expensePlanned)}</span>
               </div>
               <div className={`flex items-center gap-1 font-semibold flex-shrink-0 ${(expensePlanned - expenseActual) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                 <span className="text-muted-foreground hidden sm:inline">Livre:</span>
-                <span className="whitespace-nowrap">{formatCurrency(expensePlanned - expenseActual)}</span>
+                <span className="whitespace-nowrap">{formatCurrencyReais(expensePlanned - expenseActual)}</span>
               </div>
             </div>
           </div>
@@ -1135,8 +1147,12 @@ export default function BudgetsPage() {
                 {(() => {
                   const allManualBudgetsForAlert = budgets.filter(b => (!b.source_type || b.source_type === 'manual') && !b.is_projected);
                   const budgetsByCategoryId = new Map(allManualBudgetsForAlert.map(b => [b.category_id, b]));
+                  const automaticSourceTypes = ['investment', 'goal', 'debt', 'credit_card', 'receivable'];
                   const generalCategoriesWithoutBudget = categories.filter(
-                    cat => (!cat.source_type || cat.source_type === 'general') && !budgetsByCategoryId.has(cat.id)
+                    cat => {
+                      const isAutomatic = cat.source_type && automaticSourceTypes.includes(cat.source_type);
+                      return !isAutomatic && !budgetsByCategoryId.has(cat.id);
+                    }
                   );
                   const count = generalCategoriesWithoutBudget.length;
                   const categoryNames = generalCategoriesWithoutBudget

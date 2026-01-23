@@ -17,7 +17,7 @@ import BillDetailModal from '@/components/credit-cards/BillDetailModal';
 import TransactionForm from '@/components/transactions/TransactionForm';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceArea, PieChart, Pie, Cell } from 'recharts';
 import { MonthYearPicker } from '@/components/ui/month-year-picker';
-import { formatMonthYear } from '@/lib/utils';
+import { formatMonthYear, formatCurrency } from '@/lib/utils';
 import { InfoIcon } from '@/components/ui/InfoIcon';
 
 interface CreditCard {
@@ -58,6 +58,7 @@ interface Bill {
   minimum_payment_cents: number;
   paid_cents: number;
   status: 'open' | 'closed' | 'paid' | 'partial' | 'overdue';
+  transactions?: any[];
 }
 
 
@@ -173,23 +174,11 @@ export default function CreditCardsPage() {
 
           allBills.push(...currentBills);
 
-          // Buscar transações do mês corrente para este cartão
           if (currentBills.length > 0) {
-            const billIds = currentBills.map(b => b.id);
-            try {
-              const txRes = await fetch(`/api/transactions?account_id=${card.id}&limit=100`);
-              const txData = await txRes.json();
-              const allTransactions = txData.data || [];
-              
-              // Filtrar transações que pertencem às faturas do mês corrente
-              const billTransactions = allTransactions.filter((tx: any) => 
-                tx.credit_card_bill_id && billIds.includes(tx.credit_card_bill_id)
-              );
-              
-              transactionsMap.set(card.id, billTransactions);
-            } catch (error) {
-              console.error(`Error fetching transactions for card ${card.id}:`, error);
-            }
+            const billTransactions = currentBills.flatMap(bill => bill.transactions || []);
+            transactionsMap.set(card.id, billTransactions);
+          } else {
+            transactionsMap.set(card.id, []);
           }
         } catch (error) {
           console.error(`Error fetching bills for card ${card.id}:`, error);
@@ -415,49 +404,28 @@ export default function CreditCardsPage() {
 
   const fetchCategorySpending = async (monthStr: string, cardId?: string) => {
     try {
-      const [year, month] = monthStr.split('-');
-      const startDate = `${year}-${month}-01`;
-      const endDate = new Date(parseInt(year), parseInt(month), 0).toISOString().split('T')[0];
-
       let allTransactions: any[] = [];
 
       if (cardId) {
-        // Fetch transactions for selected card
-        const params = new URLSearchParams({
-          from_date: startDate,
-          to_date: endDate,
-          type: 'expense',
-          account_id: cardId,
-        });
-        const res = await fetch(`/api/transactions?${params.toString()}`);
-        const data = await res.json();
-        allTransactions = data.data || [];
+        const cardBills = cardBillsMap.get(cardId) || [];
+        const monthBills = cardBills.filter((bill) => bill.reference_month.substring(0, 7) === monthStr);
+        allTransactions = monthBills.flatMap((bill) => bill.transactions || []);
       } else {
-        // Fetch transactions from all credit cards
-        for (const card of cards) {
-          const cardParams = new URLSearchParams({
-            from_date: startDate,
-            to_date: endDate,
-            type: 'expense',
-            account_id: card.id,
-          });
-          const res = await fetch(`/api/transactions?${cardParams.toString()}`);
-          const data = await res.json();
-          if (data.data) {
-            allTransactions.push(...data.data);
-          }
-        }
+        cardBillsMap.forEach((bills) => {
+          const monthBills = bills.filter((bill) => bill.reference_month.substring(0, 7) === monthStr);
+          allTransactions.push(...monthBills.flatMap((bill) => bill.transactions || []));
+        });
       }
 
       // Group by category
       const categoryMap = new Map<string, { name: string; value: number; color: string }>();
-      
+
       allTransactions.forEach((tx: any) => {
-        if (tx.category_id && tx.categories) {
-          const categoryId = tx.category_id;
-          const categoryName = tx.categories.name || 'Sem categoria';
-          const amount = Math.abs(Math.round((tx.amount || 0) * 100));
-          
+        if (tx.category?.id) {
+          const categoryId = tx.category.id;
+          const categoryName = tx.category.name || 'Sem categoria';
+          const amount = Math.abs(tx.amount_cents || 0);
+
           if (categoryMap.has(categoryId)) {
             const existing = categoryMap.get(categoryId)!;
             existing.value += amount;
@@ -466,7 +434,7 @@ export default function CreditCardsPage() {
             categoryMap.set(categoryId, {
               name: categoryName,
               value: amount,
-              color: tx.categories.color || '#6b7280',
+              color: tx.category.color || '#6b7280',
             });
           }
         }
@@ -483,7 +451,7 @@ export default function CreditCardsPage() {
     if (selectedMonth && cards.length > 0) {
       fetchCategorySpending(selectedMonth, selectedCardId || undefined);
     }
-  }, [selectedMonth, selectedCardId, cards]);
+  }, [selectedMonth, selectedCardId, cards, cardBillsMap]);
 
   const openBillDetail = (cardId: string, billId: string) => {
     setSelectedBill({ cardId, billId });
@@ -620,13 +588,6 @@ export default function CreditCardsPage() {
     card.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     card.institution?.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  const formatCurrency = (cents: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(cents / 100);
-  };
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr + 'T12:00:00').toLocaleDateString('pt-BR');
@@ -1372,7 +1333,7 @@ export default function CreditCardsPage() {
                                   {tx.category && <span>• {tx.category.name}</span>}
                                 </div>
                               </div>
-                              <p className={`font-semibold text-xs flex-shrink-0 ${tx.amount_cents < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                              <p className={`font-semibold text-xs flex-shrink-0 ${tx.amount_cents >= 0 ? 'text-red-500' : 'text-green-500'}`}>
                                 {formatCurrency(Math.abs(tx.amount_cents))}
                               </p>
                             </div>

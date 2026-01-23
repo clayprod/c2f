@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth';
 import { getGlobalSettings } from '@/services/admin/globalSettings';
 
+// Ensure no caching for this dynamic API route
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(request: NextRequest) {
   try {
     await requireAdmin(request);

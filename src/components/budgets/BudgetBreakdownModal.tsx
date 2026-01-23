@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { CurrencyInput } from '@/components/ui/currency-input';
+import { formatCurrency } from '@/lib/utils';
 
 export type BudgetBreakdownItem = {
   id?: string;
@@ -17,11 +18,8 @@ export type BudgetBreakdownItem = {
   amount_cents: number;
 };
 
-function formatCurrencyFromCents(cents: number) {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-    (cents || 0) / 100
-  );
-}
+// Usa formatCurrency de @/lib/utils como alias para manter compatibilidade
+const formatCurrencyFromCents = formatCurrency;
 
 function normalizeItems(items: BudgetBreakdownItem[]) {
   return (items || []).map((it) => ({

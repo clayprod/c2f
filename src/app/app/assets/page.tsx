@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PlanGuard } from '@/components/app/PlanGuard';
+import { formatCurrency } from '@/lib/utils';
 
 interface Asset {
   id: string;
@@ -58,13 +59,6 @@ export default function AssetsPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const formatCurrency = (cents: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(cents / 100);
   };
 
   const activeAssets = assets.filter(a => a.status === 'active');

@@ -374,6 +374,30 @@ export async function DELETE(
 
     const { id } = await params;
     const { supabase } = createClientFromRequest(request);
+    
+    // Delete related budgets first
+    await supabase
+      .from('budgets')
+      .delete()
+      .eq('user_id', ownerId)
+      .eq('source_type', 'debt')
+      .eq('source_id', id);
+
+    // Delete debt plan entries
+    await supabase
+      .from('debt_plan_entries')
+      .delete()
+      .eq('user_id', ownerId)
+      .eq('debt_id', id);
+
+    // Delete debt payments
+    await supabase
+      .from('debt_payments')
+      .delete()
+      .eq('user_id', ownerId)
+      .eq('debt_id', id);
+
+    // Delete the debt
     const { error } = await supabase
       .from('debts')
       .delete()
@@ -381,6 +405,9 @@ export async function DELETE(
       .eq('user_id', ownerId);
 
     if (error) throw error;
+
+    // Invalidate projection cache
+    projectionCache.invalidateUser(ownerId);
 
     return NextResponse.json({ message: 'Debt deleted successfully' });
   } catch (error) {
