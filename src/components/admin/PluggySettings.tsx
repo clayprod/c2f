@@ -25,12 +25,12 @@ interface PluggyStatusData {
   message?: string;
 }
 
-const DEFAULT_CATEGORIZATION_PROMPT = `Voce e um assistente financeiro especializado em categorizar transacoes bancarias.
-Analise as transacoes abaixo e sugira a categoria mais adequada baseado na descricao.
+const DEFAULT_CATEGORIZATION_PROMPT = `Você é um assistente financeiro especializado em categorizar transações bancárias.
+Analise as transações abaixo e sugira a categoria mais adequada baseado na descrição.
 
-Categorias disponiveis: {categories}
+Categorias disponíveis: {categories}
 
-Para cada transacao, retorne um JSON valido com a seguinte estrutura:
+Para cada transação, retorne um JSON válido com a seguinte estrutura:
 {
   "transactions": [
     { "id": "id_da_transacao", "category": "nome_categoria_exato", "confidence": "low|medium|high" }
@@ -39,10 +39,10 @@ Para cada transacao, retorne um JSON valido com a seguinte estrutura:
 
 Regras:
 1. Use APENAS categorias da lista fornecida
-2. Se nao conseguir identificar com certeza, use "Outros" com confidence "low"
+2. Se não conseguir identificar com certeza, use "Outros" com confidence "low"
 3. Analise palavras-chave comuns: supermercado, restaurante, uber, ifood, netflix, etc.
-4. Considere o valor da transacao para contexto adicional
-5. Retorne APENAS o JSON, sem explicacoes adicionais`;
+4. Considere o valor da transação para contexto adicional
+5. Retorne APENAS o JSON, sem explicações adicionais`;
 
 export default function PluggySettings() {
   const { toast } = useToast();
@@ -75,7 +75,7 @@ export default function PluggySettings() {
       toast({
         variant: 'destructive',
         title: 'Erro',
-        description: 'Nao foi possivel carregar as configuracoes',
+        description: 'Não foi possível carregar as configurações',
       });
     } finally {
       setLoading(false);
@@ -129,7 +129,7 @@ export default function PluggySettings() {
 
       toast({
         title: 'Sucesso',
-        description: 'Configuracoes salvas com sucesso',
+        description: 'Configurações salvas com sucesso',
       });
 
       // Refresh status and settings after save
@@ -140,7 +140,7 @@ export default function PluggySettings() {
       toast({
         variant: 'destructive',
         title: 'Erro',
-        description: 'Nao foi possivel salvar as configuracoes',
+        description: 'Não foi possível salvar as configurações',
       });
     } finally {
       setSaving(false);
@@ -171,7 +171,7 @@ export default function PluggySettings() {
       toast({
         variant: 'destructive',
         title: 'Erro',
-        description: error.message || 'Nao foi possivel conectar ao Pluggy',
+        description: error.message || 'Não foi possível conectar ao Pluggy',
       });
     } finally {
       setTestingConnection(false);
@@ -179,7 +179,7 @@ export default function PluggySettings() {
   };
 
   if (loading) {
-    return <div className="text-center py-8">Carregando configuracoes...</div>;
+    return <div className="text-center py-8">Carregando configurações...</div>;
   }
 
   return (
@@ -212,7 +212,7 @@ export default function PluggySettings() {
                   ? 'Conectado'
                   : status?.configured
                   ? 'Credenciais configuradas'
-                  : 'Nao configurado'}
+                  : 'Não configurado'}
               </span>
             </div>
             {status?.enabled && (
@@ -245,7 +245,7 @@ export default function PluggySettings() {
         <CardHeader>
           <CardTitle>Credenciais Pluggy API</CardTitle>
           <CardDescription>
-            Configure as credenciais da sua aplicacao Pluggy para habilitar a integracao Open Finance.
+            Configure as credenciais da sua aplicação Pluggy para habilitar a integração Open Finance.
             Obtenha as credenciais no{' '}
             <a
               href="https://dashboard.pluggy.ai"
@@ -262,7 +262,7 @@ export default function PluggySettings() {
             <div>
               <Label>Habilitar Open Finance</Label>
               <p className="text-sm text-muted-foreground">
-                Ativar integracao bancaria via Pluggy (apenas para testes de superadmin)
+                Ativar integração bancária via Pluggy (apenas para testes de superadmin)
               </p>
             </div>
             <Switch
@@ -309,7 +309,7 @@ export default function PluggySettings() {
           <div className="rounded-md bg-muted p-4">
             <p className="text-sm font-medium mb-2">Informacoes importantes:</p>
             <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
-              <li>A integracao Open Finance esta disponivel apenas para usuarios SuperAdmin</li>
+              <li>A integração Open Finance está disponível apenas para usuários SuperAdmin</li>
               <li>Use o ambiente Sandbox para testes antes de habilitar em producao</li>
               <li>Credenciais de teste: user-ok / password-ok (Sandbox Pluggy Bank)</li>
               <li>Webhook URL para configurar no Pluggy: <code className="bg-background px-1 rounded">/api/pluggy/callback</code></li>
@@ -323,7 +323,7 @@ export default function PluggySettings() {
         <CardHeader>
           <CardTitle>Categorizacao Automatica (IA)</CardTitle>
           <CardDescription>
-            Configure o prompt usado pela IA para categorizar transacoes automaticamente durante importacoes
+            Configure o prompt usado pela IA para categorizar transações automaticamente durante importações
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -335,7 +335,7 @@ export default function PluggySettings() {
                 size="sm"
                 onClick={() => setSettings({ ...settings, categorization_prompt: DEFAULT_CATEGORIZATION_PROMPT })}
               >
-                Restaurar padrao
+                Restaurar padrão
               </Button>
             </div>
             <Textarea
@@ -345,7 +345,7 @@ export default function PluggySettings() {
               className="font-mono text-sm"
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Use {'{categories}'} como placeholder para a lista de categorias do usuario
+              Use {'{categories}'} como placeholder para a lista de categorias do usuário
             </p>
           </div>
         </CardContent>
@@ -354,7 +354,7 @@ export default function PluggySettings() {
       {/* Save Button */}
       <div className="flex justify-end">
         <Button onClick={handleSave} disabled={saving}>
-          {saving ? 'Salvando...' : 'Salvar Configuracoes'}
+          {saving ? 'Salvando...' : 'Salvar Configurações'}
         </Button>
       </div>
     </div>

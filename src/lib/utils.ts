@@ -245,3 +245,70 @@ export function toCents(value: number): number {
 export function toReais(cents: number): number {
   return cents / 100;
 }
+
+/**
+ * Calcula estimativas de gasto diário para um orçamento
+ * @param spent - Valor já gasto (em reais)
+ * @param limit - Limite do orçamento (em reais)
+ * @param year - Ano do orçamento
+ * @param month - Mês do orçamento (1-12)
+ * @returns Objeto com estimativas diárias ou null se não for o mês atual
+ */
+export function calculateDailySpendingEstimates(
+  spent: number,
+  limit: number,
+  year: number,
+  month: number
+): {
+  daysElapsed: number;
+  daysRemaining: number;
+  averageDailySpent: number;
+  estimatedDailyRemaining: number;
+  remaining: number;
+} | null {
+  // Usar timezone do Brasil (America/Sao_Paulo) para calcular o dia atual
+  const now = new Date();
+  const brazilDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+  const currentYear = brazilDate.getFullYear();
+  const currentMonth = brazilDate.getMonth() + 1; // getMonth() retorna 0-11
+  const currentDay = brazilDate.getDate();
+
+  // Só calcular se for o mês atual
+  if (year !== currentYear || month !== currentMonth) {
+    return null;
+  }
+
+  // Não calcular se limite for zero
+  if (limit === 0) {
+    return null;
+  }
+
+  // Calcular dias no mês
+  const daysInMonth = new Date(year, month, 0).getDate();
+  
+  // Dias decorridos (incluindo o dia atual)
+  const daysElapsed = currentDay;
+  
+  // Dias restantes (incluindo o dia atual)
+  const daysRemaining = daysInMonth - currentDay + 1;
+
+  // Evitar divisão por zero
+  if (daysElapsed === 0) {
+    return null;
+  }
+
+  // Calcular valores
+  const remaining = Math.max(0, limit - spent);
+  const averageDailySpent = spent / daysElapsed;
+  
+  // Estimativa diária até o fim (só se houver dias restantes)
+  const estimatedDailyRemaining = daysRemaining > 0 ? remaining / daysRemaining : 0;
+
+  return {
+    daysElapsed,
+    daysRemaining,
+    averageDailySpent,
+    estimatedDailyRemaining,
+    remaining,
+  };
+}

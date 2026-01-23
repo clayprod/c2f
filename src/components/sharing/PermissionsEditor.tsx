@@ -31,15 +31,15 @@ interface PermissionsEditorProps {
 
 const PERMISSION_LABELS: Record<string, { label: string; icon: string }> = {
   dashboard: { label: 'Dashboard', icon: 'bx-home' },
-  transactions: { label: 'Transacoes', icon: 'bx-arrow-right-left' },
-  budgets: { label: 'Orcamentos', icon: 'bx-pie-chart-alt-2' },
+  transactions: { label: 'Transações', icon: 'bx-arrow-right-left' },
+  budgets: { label: 'Orçamentos', icon: 'bx-pie-chart-alt-2' },
   goals: { label: 'Objetivos', icon: 'bx-target-lock' },
-  debts: { label: 'Dividas', icon: 'bx-credit-card' },
+  debts: { label: 'Dívidas', icon: 'bx-credit-card' },
   investments: { label: 'Investimentos', icon: 'bx-line-chart' },
-  assets: { label: 'Patrimonio', icon: 'bx-building-house' },
-  reports: { label: 'Relatorios', icon: 'bx-bar-chart-alt-2' },
-  settings: { label: 'Configuracoes', icon: 'bx-cog' },
-  integrations: { label: 'Integracoes', icon: 'bx-plug' },
+  assets: { label: 'Patrimônio', icon: 'bx-building-house' },
+  reports: { label: 'Relatórios', icon: 'bx-bar-chart-alt-2' },
+  settings: { label: 'Configurações', icon: 'bx-cog' },
+  integrations: { label: 'Integrações', icon: 'bx-plug' },
 };
 
 const ACTION_LABELS: Record<string, string> = {

@@ -9,6 +9,20 @@ export interface PluggyAccount {
   balance: number | { available?: number; current?: number };
   currencyCode: string;
   number: string;
+  // Bank data contains the real institution info (important when using MeuPluggy aggregator)
+  bankData?: {
+    transferNumber?: string;
+    closingBalance?: number;
+    automaticallyInvestedBalance?: number;
+  };
+  // Connector info for the real institution (not the aggregator)
+  connector?: {
+    id: number;
+    name: string;
+    institutionUrl?: string;
+    imageUrl?: string;
+    primaryColor?: string;
+  };
 }
 
 /**
@@ -25,9 +39,42 @@ export function getAccountBalance(balance: PluggyAccount['balance']): number {
   return 0;
 }
 
+/**
+ * Get the institution logo URL from account connector
+ * This is important when using MeuPluggy aggregator, as the item connector is always 200,
+ * but the account connector contains the real institution info
+ */
+export function getAccountLogoUrl(account: PluggyAccount): string | null {
+  // First try to get imageUrl directly from connector (may be CDN URL)
+  if (account.connector?.imageUrl) {
+    // If it's a CDN URL, convert to local if we have the connector ID
+    if (account.connector.imageUrl.includes('cdn.pluggy.ai') && account.connector.id) {
+      return `/assets/connector-icons/${account.connector.id}.svg`;
+    }
+    return account.connector.imageUrl;
+  }
+  // Then try to build from connector id (use local assets)
+  if (account.connector?.id) {
+    return `/assets/connector-icons/${account.connector.id}.svg`;
+  }
+  return null;
+}
+
 export async function getAccountsByItem(itemId: string): Promise<PluggyAccount[]> {
   const response = await pluggyClient.get<{ results: PluggyAccount[] }>(`/accounts?itemId=${itemId}`);
+  console.log('[Pluggy Accounts] Raw response for item', itemId, ':', JSON.stringify(response.results?.[0], null, 2));
   return response.results || [];
+}
+
+export async function getAccountById(accountId: string): Promise<PluggyAccount | null> {
+  try {
+    const response = await pluggyClient.get<PluggyAccount>(`/accounts/${accountId}`);
+    console.log('[Pluggy Accounts] Account details:', JSON.stringify(response, null, 2));
+    return response;
+  } catch (error) {
+    console.error('[Pluggy Accounts] Error fetching account:', error);
+    return null;
+  }
 }
 
 

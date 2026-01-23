@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
         configured: false,
         connected: false,
         enabled: settings.whatsapp_enabled || false,
-        message: 'Evolution API nao configurada',
+        message: 'Evolution API não configurada',
       });
     }
 
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
         configured: true,
         connected: false,
         enabled: settings.whatsapp_enabled || false,
-        message: 'WhatsApp desabilitado ou erro na configuracao',
+        message: 'WhatsApp desabilitado ou erro na configuração',
       });
     }
 
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
           configured: true,
           connected: false,
           enabled: settings.whatsapp_enabled || false,
-          message: 'Nao foi possivel obter status da instancia',
+          message: 'Não foi possível obter status da instância',
         });
       }
 

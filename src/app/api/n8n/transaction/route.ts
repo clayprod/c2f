@@ -69,9 +69,9 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: false,
-        error: 'Numero nao encontrado ou nao verificado',
+        error: 'Número não encontrado ou não verificado',
         action_required: 'register',
-        message: 'Por favor, cadastre e verifique seu numero no aplicativo c2Finance',
+        message: 'Por favor, cadastre e verifique seu número no aplicativo c2Finance',
       }, { status: 404 });
     }
 
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
         // Single transaction
         const result = await createTransactionFromWhatsApp({
           userId: user.userId,
-          description: transaction.description || 'Transacao via WhatsApp',
+          description: transaction.description || 'Transação via WhatsApp',
           amountCents: transaction.amount_cents || 0,
           postedAt: transaction.posted_at || new Date().toISOString().split('T')[0],
           categoryName: transaction.category_name,
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: true,
           transaction_id: result.transactionId,
-          message: 'Transacao criada com sucesso',
+          message: 'Transação criada com sucesso',
         });
       }
 
@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
         if (!existing) {
           return NextResponse.json({
             success: false,
-            error: 'Transacao nao encontrada',
+            error: 'Transação não encontrada',
           }, { status: 404 });
         }
 
@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
         if (updateError) {
           return NextResponse.json({
             success: false,
-            error: 'Erro ao atualizar transacao',
+            error: 'Erro ao atualizar transação',
           }, { status: 500 });
         }
 
@@ -220,7 +220,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: true,
           transaction_id: transaction.id,
-          message: 'Transacao atualizada com sucesso',
+          message: 'Transação atualizada com sucesso',
         });
       }
 
@@ -246,7 +246,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({
             success: false,
             error: result.error,
-          }, { status: result.error?.includes('nao encontrada') ? 404 : 400 });
+          }, { status: result.error?.includes('não encontrada') ? 404 : 400 });
         }
 
         projectionCache.invalidateUser(user.userId);
@@ -254,7 +254,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: true,
           deleted_transaction: result.deletedTransaction,
-          message: `Transacao "${result.deletedTransaction?.description}" excluida com sucesso`,
+          message: `Transação "${result.deletedTransaction?.description}" excluída com sucesso`,
         });
       }
 
@@ -266,7 +266,7 @@ export async function POST(request: NextRequest) {
           if (!context) {
             return NextResponse.json({
               success: false,
-              error: 'Erro ao obter contexto do usuario',
+            error: 'Erro ao obter contexto do usuário',
             }, { status: 500 });
           }
 
@@ -298,7 +298,7 @@ export async function POST(request: NextRequest) {
 
           // Log the query
           await logWhatsAppMessage(user.userId, normalizedPhone, 'incoming', 'text', {
-            contentSummary: `Consulta: ${transactions.length} transacoes`,
+            contentSummary: `Consulta: ${transactions.length} transações`,
             actionType: 'query_transactions',
             status: 'processed',
           });

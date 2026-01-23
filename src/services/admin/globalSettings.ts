@@ -5,10 +5,13 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { decrypt } from '@/lib/encryption';
 
 export interface PlanFeature {
   enabled: boolean;
-  text: string;
+  text?: string;
+  limit?: number;
+  unlimited?: boolean;
 }
 
 export type PlanFeatures = Record<string, PlanFeature>;
@@ -106,15 +109,21 @@ export async function getGlobalSettings(forceRefresh = false): Promise<GlobalSet
     const supabase = createAdminClient();
 
     // Define columns - some may not exist in older databases
-    const allColumns = 'support_email, support_whatsapp, smtp_host, smtp_port, smtp_user, smtp_password, smtp_from_email, smtp_secure, groq_api_key, openai_api_key, ai_model, ai_model_name, advisor_prompt, tips_prompt, categorization_prompt, tips_enabled, chat_max_tokens, session_ttl_minutes, stripe_price_id_pro, stripe_price_id_business, advisor_limit_pro, advisor_limit_premium, evolution_api_url, evolution_api_key, evolution_instance_name, evolution_webhook_secret, n8n_api_key, whatsapp_enabled, pluggy_client_id, pluggy_client_secret, pluggy_enabled, plan_features_free, plan_features_pro, plan_features_premium, plan_display_config';
-    // Columns that exist in current database (including Pluggy settings)
-    const minimalColumns = 'support_email, support_whatsapp, smtp_host, smtp_port, smtp_user, smtp_password, smtp_from_email, groq_api_key, openai_api_key, ai_model, ai_model_name, advisor_prompt, tips_prompt, categorization_prompt, tips_enabled, chat_max_tokens, session_ttl_minutes, stripe_price_id_pro, stripe_price_id_business, evolution_api_url, evolution_api_key, evolution_instance_name, evolution_webhook_secret, n8n_api_key, whatsapp_enabled, pluggy_client_id, pluggy_client_secret, pluggy_enabled';
+    // Note: smtp_secure is removed from allColumns because it doesn't exist in the database
+    const allColumns = 'support_email, support_whatsapp, smtp_host, smtp_port, smtp_user, smtp_password, smtp_password_encrypted, smtp_from_email, groq_api_key, groq_api_key_encrypted, openai_api_key, openai_api_key_encrypted, ai_model, ai_model_name, advisor_prompt, tips_prompt, categorization_prompt, tips_enabled, chat_max_tokens, session_ttl_minutes, stripe_price_id_pro, stripe_price_id_business, advisor_limit_pro, advisor_limit_premium, evolution_api_url, evolution_api_key, evolution_api_key_encrypted, evolution_instance_name, evolution_webhook_secret, evolution_webhook_secret_encrypted, n8n_api_key, n8n_api_key_encrypted, whatsapp_enabled, pluggy_client_id, pluggy_client_secret, pluggy_client_secret_encrypted, pluggy_enabled, plan_features_free, plan_features_pro, plan_features_premium, plan_display_config';
+    // Columns that exist in current database (including Pluggy settings and Plan Features)
+    const minimalColumns = 'support_email, support_whatsapp, smtp_host, smtp_port, smtp_user, smtp_password, smtp_password_encrypted, smtp_from_email, groq_api_key, groq_api_key_encrypted, openai_api_key, openai_api_key_encrypted, ai_model, ai_model_name, advisor_prompt, tips_prompt, categorization_prompt, tips_enabled, chat_max_tokens, session_ttl_minutes, stripe_price_id_pro, stripe_price_id_business, evolution_api_url, evolution_api_key, evolution_api_key_encrypted, evolution_instance_name, evolution_webhook_secret, evolution_webhook_secret_encrypted, n8n_api_key, n8n_api_key_encrypted, whatsapp_enabled, pluggy_client_id, pluggy_client_secret, pluggy_client_secret_encrypted, pluggy_enabled, plan_features_free, plan_features_pro, plan_features_premium, plan_display_config';
 
     let { data, error } = await supabase
       .from('global_settings')
       .select(allColumns)
       .limit(1)
       .single();
+
+    console.log('[GlobalSettings] Query result - error:', error);
+    console.log('[GlobalSettings] Query result - data exists:', !!data);
+    console.log('[GlobalSettings] Query result - plan_features_free:', data?.plan_features_free);
+    console.log('[GlobalSettings] Query result - plan_features_free type:', typeof data?.plan_features_free);
 
     // If column doesn't exist (42703), retry with minimal columns
     if (error && error.code === '42703') {
@@ -139,11 +148,18 @@ export async function getGlobalSettings(forceRefresh = false): Promise<GlobalSet
       settings.smtp_host = data.smtp_host;
       settings.smtp_port = data.smtp_port;
       settings.smtp_user = data.smtp_user;
-      settings.smtp_password = data.smtp_password;
+      // Decrypt sensitive fields if encrypted columns exist, otherwise use plain columns
+      settings.smtp_password = data.smtp_password_encrypted 
+        ? decrypt(data.smtp_password_encrypted) 
+        : data.smtp_password;
       settings.smtp_from_email = data.smtp_from_email;
       settings.smtp_secure = data.smtp_secure;
-      settings.groq_api_key = data.groq_api_key;
-      settings.openai_api_key = data.openai_api_key;
+      settings.groq_api_key = data.groq_api_key_encrypted 
+        ? decrypt(data.groq_api_key_encrypted) 
+        : data.groq_api_key;
+      settings.openai_api_key = data.openai_api_key_encrypted 
+        ? decrypt(data.openai_api_key_encrypted) 
+        : data.openai_api_key;
       settings.ai_model = data.ai_model as 'groq' | 'openai' | null;
       settings.ai_model_name = data.ai_model_name;
       settings.advisor_prompt = data.advisor_prompt;
@@ -159,14 +175,22 @@ export async function getGlobalSettings(forceRefresh = false): Promise<GlobalSet
       settings.support_whatsapp = data.support_whatsapp;
       // Evolution API / WhatsApp Integration
       settings.evolution_api_url = data.evolution_api_url;
-      settings.evolution_api_key = data.evolution_api_key;
+      settings.evolution_api_key = data.evolution_api_key_encrypted 
+        ? decrypt(data.evolution_api_key_encrypted) 
+        : data.evolution_api_key;
       settings.evolution_instance_name = data.evolution_instance_name;
-      settings.evolution_webhook_secret = data.evolution_webhook_secret;
-      settings.n8n_api_key = data.n8n_api_key;
+      settings.evolution_webhook_secret = data.evolution_webhook_secret_encrypted 
+        ? decrypt(data.evolution_webhook_secret_encrypted) 
+        : data.evolution_webhook_secret;
+      settings.n8n_api_key = data.n8n_api_key_encrypted 
+        ? decrypt(data.n8n_api_key_encrypted) 
+        : data.n8n_api_key;
       settings.whatsapp_enabled = data.whatsapp_enabled;
       // Pluggy / Open Finance Integration
       settings.pluggy_client_id = data.pluggy_client_id;
-      settings.pluggy_client_secret = data.pluggy_client_secret;
+      settings.pluggy_client_secret = data.pluggy_client_secret_encrypted 
+        ? decrypt(data.pluggy_client_secret_encrypted) 
+        : data.pluggy_client_secret;
       settings.pluggy_enabled = data.pluggy_enabled;
       settings.categorization_prompt = data.categorization_prompt;
       // Plan Features
@@ -184,6 +208,10 @@ export async function getGlobalSettings(forceRefresh = false): Promise<GlobalSet
         hasPluggyClientId: !!data.pluggy_client_id,
         hasPluggyClientSecret: !!data.pluggy_client_secret,
         pluggyEnabled: data.pluggy_enabled,
+        // Plan Features debug
+        hasPlanFeaturesFree: !!data.plan_features_free,
+        planFeaturesFreeKeys: data.plan_features_free ? Object.keys(data.plan_features_free) : [],
+        planFeaturesFreeBudgets: data.plan_features_free?.budgets,
       });
     }
 
@@ -278,11 +306,36 @@ export async function updateGlobalSettings(updates: Partial<GlobalSettings>): Pr
   if (updates.pluggy_client_secret !== undefined) updateData.pluggy_client_secret = updates.pluggy_client_secret;
   if (updates.pluggy_enabled !== undefined) updateData.pluggy_enabled = updates.pluggy_enabled;
   if (updates.categorization_prompt !== undefined) updateData.categorization_prompt = updates.categorization_prompt;
-  // Plan Features
-  if (updates.plan_features_free !== undefined) updateData.plan_features_free = updates.plan_features_free;
-  if (updates.plan_features_pro !== undefined) updateData.plan_features_pro = updates.plan_features_pro;
-  if (updates.plan_features_premium !== undefined) updateData.plan_features_premium = updates.plan_features_premium;
-  if (updates.plan_display_config !== undefined) updateData.plan_display_config = updates.plan_display_config;
+  // Plan Features - clean up undefined values before saving
+  if (updates.plan_features_free !== undefined) {
+    console.log('[GlobalSettings] Updating plan_features_free:', JSON.stringify(updates.plan_features_free, null, 2));
+    // Remove undefined values from nested objects to avoid JSONB issues
+    const cleanedFree = JSON.parse(JSON.stringify(updates.plan_features_free, (key, value) => 
+      value === undefined ? null : value
+    ));
+    updateData.plan_features_free = cleanedFree;
+  }
+  if (updates.plan_features_pro !== undefined) {
+    console.log('[GlobalSettings] Updating plan_features_pro:', JSON.stringify(updates.plan_features_pro, null, 2));
+    const cleanedPro = JSON.parse(JSON.stringify(updates.plan_features_pro, (key, value) => 
+      value === undefined ? null : value
+    ));
+    updateData.plan_features_pro = cleanedPro;
+  }
+  if (updates.plan_features_premium !== undefined) {
+    console.log('[GlobalSettings] Updating plan_features_premium:', JSON.stringify(updates.plan_features_premium, null, 2));
+    const cleanedPremium = JSON.parse(JSON.stringify(updates.plan_features_premium, (key, value) => 
+      value === undefined ? null : value
+    ));
+    updateData.plan_features_premium = cleanedPremium;
+  }
+  if (updates.plan_display_config !== undefined) {
+    console.log('[GlobalSettings] Updating plan_display_config:', JSON.stringify(updates.plan_display_config, null, 2));
+    const cleanedDisplay = JSON.parse(JSON.stringify(updates.plan_display_config, (key, value) => 
+      value === undefined ? null : value
+    ));
+    updateData.plan_display_config = cleanedDisplay;
+  }
 
   try {
     console.log('updateGlobalSettings - updateData keys:', Object.keys(updateData));
@@ -307,7 +360,7 @@ export async function updateGlobalSettings(updates: Partial<GlobalSettings>): Pr
                                   updateData.pluggy_enabled !== undefined;
           
           if (hasPluggyFields && (error.message?.includes('pluggy') || error.message?.includes('categorization'))) {
-            const pluggyError = new Error('Colunas Pluggy nao encontradas no banco de dados. Execute a migration 050_add_pluggy_settings.sql no Supabase.');
+            const pluggyError = new Error('Colunas Pluggy não encontradas no banco de dados. Execute a migration 050_add_pluggy_settings.sql no Supabase.');
             (pluggyError as any).code = 'PLUGGY_MIGRATION_REQUIRED';
             throw pluggyError;
           }
@@ -340,7 +393,8 @@ export async function updateGlobalSettings(updates: Partial<GlobalSettings>): Pr
           throw error;
         }
       } else {
-        console.log('Successfully updated global_settings');
+        console.log('[GlobalSettings] Successfully updated global_settings');
+        console.log('[GlobalSettings] Updated fields:', Object.keys(updateData));
       }
     } else {
       const { error } = await supabase
@@ -356,7 +410,7 @@ export async function updateGlobalSettings(updates: Partial<GlobalSettings>): Pr
                                   updateData.pluggy_enabled !== undefined;
           
           if (hasPluggyFields && (error.message?.includes('pluggy') || error.message?.includes('categorization'))) {
-            const pluggyError = new Error('Colunas Pluggy nao encontradas no banco de dados. Execute a migration 050_add_pluggy_settings.sql no Supabase.');
+            const pluggyError = new Error('Colunas Pluggy não encontradas no banco de dados. Execute a migration 050_add_pluggy_settings.sql no Supabase.');
             (pluggyError as any).code = 'PLUGGY_MIGRATION_REQUIRED';
             throw pluggyError;
           }
@@ -424,13 +478,25 @@ export async function getAllPlanFeatures(): Promise<{
   pro: PlanFeatures;
   premium: PlanFeatures;
 }> {
-  const settings = await getGlobalSettings();
+  // Force refresh to get latest data
+  const settings = await getGlobalSettings(true);
   
-  return {
+  console.log('[GlobalSettings] getAllPlanFeatures - settings.plan_features_free:', settings.plan_features_free);
+  console.log('[GlobalSettings] getAllPlanFeatures - settings.plan_features_free type:', typeof settings.plan_features_free);
+  console.log('[GlobalSettings] getAllPlanFeatures - settings.plan_features_free is null?', settings.plan_features_free === null);
+  console.log('[GlobalSettings] getAllPlanFeatures - settings.plan_features_free is undefined?', settings.plan_features_free === undefined);
+  
+  const result = {
     free: (settings.plan_features_free as PlanFeatures) || {},
     pro: (settings.plan_features_pro as PlanFeatures) || {},
     premium: (settings.plan_features_premium as PlanFeatures) || {},
   };
+  
+  console.log('[GlobalSettings] getAllPlanFeatures - result.free:', result.free);
+  console.log('[GlobalSettings] getAllPlanFeatures - result.free budgets:', result.free?.budgets);
+  console.log('[GlobalSettings] getAllPlanFeatures - result.free transactions:', result.free?.transactions);
+  
+  return result;
 }
 
 /**

@@ -14,7 +14,7 @@ const CTA = () => {
             Pronto para ter controle <span className="gradient-text">de verdade?</span>
           </h2>
           <p className="text-muted-foreground text-lg mb-8 max-w-2xl mx-auto">
-            Junte-se a mais de 2.000 usuários que já transformaram sua vida financeira com o c2Finance.
+            Junte-se a centenas de usuários que já transformaram sua vida financeira com o c2Finance.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">

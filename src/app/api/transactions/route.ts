@@ -6,6 +6,8 @@ import { transactionSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
 import { isCreditCardExpired } from '@/lib/utils';
 import { getUserPlan } from '@/services/stripe/subscription';
+import { getPlanFeatures } from '@/services/admin/globalSettings';
+import { resolvePlanLimit } from '@/lib/planFeatures';
 import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 import { projectionCache } from '@/services/projections/cache';
 
@@ -16,6 +18,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const ownerId = await getEffectiveOwnerId(request, userId);
+    const userPlan = await getUserPlan(ownerId);
+    const planFeatures = await getPlanFeatures(userPlan.plan);
+    const transactionsFeature = planFeatures?.transactions;
+    if (transactionsFeature?.enabled === false) {
+      return NextResponse.json(
+        { error: 'Acesso a transações não está habilitado no seu plano atual.' },
+        { status: 403 }
+      );
+    }
 
     const { searchParams } = new URL(request.url);
     const accountId = searchParams.get('account_id');
@@ -152,6 +163,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const ownerId = await getEffectiveOwnerId(request, userId);
+    const userPlan = await getUserPlan(ownerId);
+    const planFeatures = await getPlanFeatures(userPlan.plan);
+
+    if (planFeatures?.transactions?.enabled === false) {
+      return NextResponse.json(
+        { error: 'Acesso a transações não está habilitado no seu plano atual.' },
+        { status: 403 }
+      );
+    }
 
     const { supabase } = createClientFromRequest(request);
 
@@ -189,10 +209,23 @@ export async function POST(request: NextRequest) {
     const isCreditCardPurchase = isCreditCard && (validated.type === 'expense' || validated.type === 'income');
     const shouldCountAsTransaction = !isCreditCardPurchase;
 
-    // Check plan limits for Free users (only for real transactions)
+    // Check plan limits for transactions (only for real transactions)
     if (shouldCountAsTransaction) {
-      const userPlan = await getUserPlan(ownerId);
-      if (userPlan.plan === 'free') {
+      const fallbackLimit = userPlan.plan === 'free' ? 100 : -1;
+      const resolved = planFeatures?.transactions
+        ? resolvePlanLimit(planFeatures.transactions, fallbackLimit)
+        : { enabled: true, unlimited: fallbackLimit === -1, limit: fallbackLimit };
+
+      const { limit, unlimited, enabled } = resolved;
+
+      if (!enabled) {
+        return NextResponse.json(
+          { error: 'Acesso a transações não está habilitado no seu plano atual.' },
+          { status: 403 }
+        );
+      }
+
+      if (!unlimited && limit > 0) {
         const now = new Date();
         const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
         const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
@@ -204,9 +237,9 @@ export async function POST(request: NextRequest) {
           .gte('created_at', firstDayOfMonth)
           .lte('created_at', lastDayOfMonth);
 
-        if (count && count >= 100) {
+        if (count !== null && count >= limit) {
           return NextResponse.json(
-            { error: 'Limite de 100 transações mensais atingido no plano Free. Faça upgrade para o plano Pro ou Premium para transações ilimitadas.' },
+            { error: `Limite de ${limit} transações mensais atingido no seu plano.` },
             { status: 403 }
           );
         }

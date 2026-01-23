@@ -176,7 +176,7 @@ export default function MembersList({
 
       toast({
         title: 'Acesso removido',
-        description: 'Voce nao tem mais acesso a esta conta',
+        description: 'Você não tem mais acesso a esta conta',
       });
 
       onRefresh();
@@ -441,7 +441,7 @@ export default function MembersList({
           <AlertDialogHeader>
             <AlertDialogTitle>Remover Membro</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja remover o acesso deste membro? Ele nao podera mais
+              Tem certeza que deseja remover o acesso deste membro? Ele não poderá mais
               visualizar ou editar seus dados financeiros.
             </AlertDialogDescription>
           </AlertDialogHeader>

@@ -31,12 +31,12 @@ interface Category {
   type: string;
 }
 
-const DEFAULT_CATEGORIZATION_PROMPT = `Voce e um assistente financeiro especializado em categorizar transacoes bancarias.
-Analise as transacoes abaixo e sugira a categoria mais adequada baseado na descricao.
+const DEFAULT_CATEGORIZATION_PROMPT = `Você é um assistente financeiro especializado em categorizar transações bancárias.
+Analise as transações abaixo e sugira a categoria mais adequada baseado na descrição.
 
-Categorias disponiveis: {categories}
+Categorias disponíveis: {categories}
 
-Para cada transacao, retorne um JSON valido com a seguinte estrutura:
+Para cada transação, retorne um JSON válido com a seguinte estrutura:
 {
   "transactions": [
     { "id": "id_da_transacao", "category": "nome_categoria_exato", "confidence": "low|medium|high" }
@@ -45,11 +45,11 @@ Para cada transacao, retorne um JSON valido com a seguinte estrutura:
 
 Regras:
 1. Use APENAS categorias da lista fornecida (nome exato)
-2. Se nao conseguir identificar com certeza, use "Outros" com confidence "low"
+2. Se não conseguir identificar com certeza, use "Outros" com confidence "low"
 3. Analise palavras-chave comuns: supermercado, restaurante, uber, ifood, netflix, farmacia, etc.
-4. Considere o valor da transacao para contexto adicional
-5. Para transferencias entre contas proprias, use "Transferencia" se disponivel ou "Outros"
-6. Retorne APENAS o JSON, sem explicacoes adicionais`;
+4. Considere o valor da transação para contexto adicional
+5. Para transferências entre contas próprias, use "Transferência" se disponível ou "Outros"
+6. Retorne APENAS o JSON, sem explicações adicionais`;
 
 /**
  * Categorize a batch of transactions using AI
@@ -88,10 +88,10 @@ export async function categorizeTransactions(
 
     // Prepare transactions for the prompt
     const transactionList = transactions
-      .map(tx => `- ID: ${tx.id} | Data: ${tx.date} | Valor: R$ ${tx.amount.toFixed(2)} | Descricao: ${tx.description}`)
+      .map(tx => `- ID: ${tx.id} | Data: ${tx.date} | Valor: R$ ${tx.amount.toFixed(2)} | Descrição: ${tx.description}`)
       .join('\n');
 
-    const userMessage = `Categorize as seguintes transacoes:\n\n${transactionList}`;
+    const userMessage = `Categorize as seguintes transações:\n\n${transactionList}`;
     
     const messages = [
       {

@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
           number,
           pluggy_account_id,
           item_id,
+          institution_logo,
           pluggy_items!inner (
             connector_name,
             connector_id
@@ -50,31 +51,65 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch links' }, { status: 500 });
     }
 
+    // For credit cards, calculate balance as sum of unpaid bills (open/closed)
+    const creditCardIds = (links || [])
+      .filter((link: any) => link.accounts.type === 'credit_card')
+      .map((link: any) => link.accounts.id);
+
+    let cardBalances = new Map<string, number>();
+    if (creditCardIds.length > 0) {
+      // Get unpaid bills for credit cards
+      const { data: bills, error: billsError } = await supabase
+        .from('credit_card_bills')
+        .select('account_id, total_cents, paid_cents')
+        .eq('user_id', user.id)
+        .in('account_id', creditCardIds)
+        .in('status', ['open', 'closed']);
+
+      if (!billsError && bills) {
+        // Calculate total unpaid amount per card
+        bills.forEach((bill: any) => {
+          const unpaid = (bill.total_cents || 0) - (bill.paid_cents || 0);
+          const current = cardBalances.get(bill.account_id) || 0;
+          cardBalances.set(bill.account_id, current + unpaid);
+        });
+      }
+    }
+
     // Transform data for easier consumption
-    const transformedLinks = (links || []).map((link: any) => ({
-      id: link.id,
-      linked_at: link.linked_at,
-      pluggy_account: {
-        id: link.pluggy_accounts.id,
-        pluggy_account_id: link.pluggy_accounts.pluggy_account_id,
-        name: link.pluggy_accounts.name,
-        type: link.pluggy_accounts.type,
-        subtype: link.pluggy_accounts.subtype,
-        balance_cents: link.pluggy_accounts.balance_cents,
-        currency: link.pluggy_accounts.currency,
-        number: link.pluggy_accounts.number,
-        institution_name: link.pluggy_accounts.pluggy_items?.connector_name || 'Open Finance',
-        institution_logo: null,
-      },
-      internal_account: {
-        id: link.accounts.id,
-        name: link.accounts.name,
-        type: link.accounts.type,
-        current_balance: link.accounts.current_balance,
-        currency: link.accounts.currency,
-        institution: link.accounts.institution,
-      },
-    }));
+    const transformedLinks = (links || []).map((link: any) => {
+      // For credit cards, use calculated unpaid balance instead of current_balance
+      let balance = link.accounts.current_balance || 0;
+      if (link.accounts.type === 'credit_card') {
+        const unpaidBalanceCents = cardBalances.get(link.accounts.id) || 0;
+        balance = unpaidBalanceCents / 100; // Convert to reais
+      }
+
+      return {
+        id: link.id,
+        linked_at: link.linked_at,
+        pluggy_account: {
+          id: link.pluggy_accounts.id,
+          pluggy_account_id: link.pluggy_accounts.pluggy_account_id,
+          name: link.pluggy_accounts.name,
+          type: link.pluggy_accounts.type,
+          subtype: link.pluggy_accounts.subtype,
+          balance_cents: link.pluggy_accounts.balance_cents,
+          currency: link.pluggy_accounts.currency,
+          number: link.pluggy_accounts.number,
+          institution_name: link.pluggy_accounts.pluggy_items?.connector_name || 'Open Finance',
+          institution_logo: link.pluggy_accounts.institution_logo || null,
+        },
+        internal_account: {
+          id: link.accounts.id,
+          name: link.accounts.name,
+          type: link.accounts.type,
+          current_balance: balance,
+          currency: link.accounts.currency,
+          institution: link.accounts.institution,
+        },
+      };
+    });
 
     return NextResponse.json({ data: transformedLinks });
   } catch (error: any) {

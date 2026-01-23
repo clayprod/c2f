@@ -1,8 +1,20 @@
 import { createClient } from '@/lib/supabase/server';
-import { getAccountsByItem, getAccountBalance } from './accounts';
+import { getAccountsByItem, getAccountBalance, getAccountLogoUrl } from './accounts';
 import { getAllTransactionsByAccount } from './transactions';
 import { generateTransactionHash, transactionExists } from './dedupe';
 import { getItem } from './items';
+
+/**
+ * Build institution logo URL from Pluggy connector ID
+ * Uses local assets: /assets/connector-icons/{connector_id}.svg
+ * @deprecated Use getInstitutionLogoUrl from bankMapping instead
+ */
+function buildInstitutionLogoUrl(connectorId: string | number | null | undefined): string | null {
+  if (!connectorId) {
+    return null;
+  }
+  return `/assets/connector-icons/${connectorId}.svg`;
+}
 
 export interface SyncResult {
   success: boolean;
@@ -13,14 +25,35 @@ export interface SyncResult {
 
 export async function syncItem(
   userId: string,
-  itemId: string
+  itemId: string,
+  options?: { supabase?: any }
 ): Promise<SyncResult> {
-  const supabase = await createClient();
+  const supabase = options?.supabase ?? await createClient();
   const startedAt = new Date().toISOString();
 
   try {
-    // Get item details
+    // Get item details from Pluggy API
     const item = await getItem(itemId);
+
+    // Try to get connector_id from API response first
+    let connectorId = item.connector?.id || item.connectorId;
+    
+    // If not found in API response, try to get from database
+    if (!connectorId) {
+      const { data: dbItem } = await supabase
+        .from('pluggy_items')
+        .select('connector_id')
+        .eq('item_id', itemId)
+        .eq('user_id', userId)
+        .single();
+      
+      if (dbItem?.connector_id) {
+        connectorId = dbItem.connector_id;
+      }
+    }
+
+    const institutionLogoUrl = buildInstitutionLogoUrl(connectorId);
+    console.log(`[Pluggy Sync] Item ${itemId}: connector_id=${connectorId}, logo_url=${institutionLogoUrl}`);
 
     // Create sync log
     const { data: syncLog } = await supabase
@@ -44,6 +77,17 @@ export async function syncItem(
       const balanceValue = getAccountBalance(pluggyAccount.balance);
       console.log(`[Pluggy Sync] Account ${pluggyAccount.name}: raw balance =`, pluggyAccount.balance, 'extracted =', balanceValue);
       
+      // Get logo from account's connector (real institution) instead of item's connector (may be aggregator like MeuPluggy)
+      // This is important when using MeuPluggy where item connector is always 200
+      let accountLogoUrl = getAccountLogoUrl(pluggyAccount);
+      
+      // Fallback to item's connector logo if account doesn't have connector info
+      if (!accountLogoUrl) {
+        accountLogoUrl = institutionLogoUrl;
+      }
+      
+      console.log(`[Pluggy Sync] Account ${pluggyAccount.name}: connector =`, pluggyAccount.connector, 'logo =', accountLogoUrl);
+      
       const { data: account, error: accountError } = await supabase
         .from('pluggy_accounts')
         .upsert({
@@ -56,6 +100,7 @@ export async function syncItem(
           balance_cents: Math.round(balanceValue * 100),
           currency: pluggyAccount.currencyCode || 'BRL',
           number: pluggyAccount.number || '',
+          institution_logo: accountLogoUrl,
         }, {
           onConflict: 'user_id,pluggy_account_id',
         })

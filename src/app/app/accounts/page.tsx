@@ -64,6 +64,7 @@ export default function AccountsPage() {
   const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
+  const [pluggyLogos, setPluggyLogos] = useState<Record<string, string | null>>({});
   const [formData, setFormData] = useState({
     name: '',
     type: 'checking',
@@ -103,7 +104,31 @@ export default function AccountsPage() {
 
   useEffect(() => {
     fetchAccounts();
+    fetchPluggyLogos();
   }, []);
+
+  const fetchPluggyLogos = async () => {
+    try {
+      console.log('[Accounts] Fetching Pluggy logos...');
+      const res = await fetch('/api/accounts/pluggy-links');
+      if (res.ok) {
+        const data = await res.json();
+        console.log('[Accounts] Pluggy logos received:', data);
+        console.log('[Accounts] Logo map:', data.logos);
+        // Log each logo URL to see what connector_id is being used
+        Object.entries(data.logos || {}).forEach(([accountId, logoUrl]) => {
+          const connectorIdMatch = (logoUrl as string)?.match(/connector-icons\/(\d+)\.svg/);
+          console.log(`[Accounts] Account ${accountId}: logo=${logoUrl}, connector_id=${connectorIdMatch?.[1] || 'not found'}`);
+        });
+        setPluggyLogos(data.logos || {});
+      } else {
+        const errorData = await res.json();
+        console.error('[Accounts] Error fetching Pluggy logos:', res.status, errorData);
+      }
+    } catch (error) {
+      console.error('[Accounts] Error fetching Pluggy logos:', error);
+    }
+  };
 
   // Fetch CDI rate when dialog opens
   useEffect(() => {
@@ -203,6 +228,7 @@ export default function AccountsPage() {
       });
 
       fetchAccounts();
+      fetchPluggyLogos();
       closeDialog();
     } catch (error: any) {
       toast({
@@ -232,6 +258,7 @@ export default function AccountsPage() {
       });
 
       fetchAccounts();
+      fetchPluggyLogos();
       setDeleteDialogOpen(false);
       setAccountToDelete(null);
     } catch (error: any) {
@@ -367,41 +394,64 @@ export default function AccountsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-full">
-          {filteredAccounts.map((account) => (
-            <div key={account.id} className="glass-card p-4 hover:shadow-lg transition-shadow">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
-                    style={{ backgroundColor: (account.color || '#3b82f6') + '20' }}
-                  >
-                    {account.icon || '🏦'}
+          {filteredAccounts.map((account) => {
+            const institutionLogo = pluggyLogos[account.id];
+            if (institutionLogo) {
+              console.log(`[Accounts] Account ${account.name} (${account.id}) has logo:`, institutionLogo);
+            }
+            return (
+              <div key={account.id} className="glass-card p-4 hover:shadow-lg transition-shadow relative">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div
+                      className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+                      style={{ backgroundColor: (account.color || '#3b82f6') + '20' }}
+                    >
+                      {account.icon || '🏦'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold truncate">{account.name}</h3>
+                        {/* Pluggy institution logo badge - next to account name */}
+                        {institutionLogo && (
+                          <div className="flex-shrink-0">
+                            <div className="w-6 h-6 rounded-full bg-background border border-primary/20 flex items-center justify-center overflow-hidden shadow-sm">
+                              <img
+                                src={institutionLogo}
+                                alt=""
+                                className="w-5 h-5 object-contain"
+                                onError={(e) => {
+                                  // Hide badge if image fails to load
+                                  (e.target as HTMLElement).style.display = 'none';
+                                }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {account.institution || accountTypes.find(t => t.value === account.type)?.label}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold">{account.name}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {account.institution || accountTypes.find(t => t.value === account.type)?.label}
-                    </p>
+                  <div className="flex gap-1 flex-shrink-0">
+                    <button
+                      onClick={() => openEditDialog(account)}
+                      className="p-2 hover:bg-muted rounded-lg transition-colors"
+                    >
+                      <i className='bx bx-edit text-lg'></i>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setAccountToDelete(account);
+                        setDeleteDialogOpen(true);
+                      }}
+                      className="p-2 hover:bg-red-500/10 text-red-500 rounded-lg transition-colors"
+                    >
+                      <i className='bx bx-trash text-lg'></i>
+                    </button>
                   </div>
                 </div>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => openEditDialog(account)}
-                    className="p-2 hover:bg-muted rounded-lg transition-colors"
-                  >
-                    <i className='bx bx-edit text-lg'></i>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setAccountToDelete(account);
-                      setDeleteDialogOpen(true);
-                    }}
-                    className="p-2 hover:bg-red-500/10 text-red-500 rounded-lg transition-colors"
-                  >
-                    <i className='bx bx-trash text-lg'></i>
-                  </button>
-                </div>
-              </div>
 
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
@@ -417,8 +467,9 @@ export default function AccountsPage() {
                   </span>
                 </div>
               </div>
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
 

@@ -32,10 +32,19 @@ const inviteSchema = z.object({
 
 type InviteFormData = z.infer<typeof inviteSchema>;
 
+interface SharingInfo {
+  membersCount: number;
+  pendingCount: number;
+  totalCount: number;
+  limit: number;
+  canInvite: boolean;
+}
+
 interface InviteMemberModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  sharingInfo?: SharingInfo | null;
 }
 
 const DEFAULT_PERMISSIONS: Permissions = {
@@ -83,6 +92,7 @@ export default function InviteMemberModal({
   open,
   onOpenChange,
   onSuccess,
+  sharingInfo,
 }: InviteMemberModalProps) {
   const [loading, setLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -136,7 +146,7 @@ export default function InviteMemberModal({
           
           toast({
             variant: 'destructive',
-            title: 'Convite criado, mas email nao foi enviado',
+            title: 'Convite criado, mas email não foi enviado',
             description: `${errorMsg}${detailsMsg}${linkMsg}`,
             duration: 15000,
           });
@@ -206,7 +216,7 @@ export default function InviteMemberModal({
           </div>
 
           <div>
-            <Label>Nivel de Acesso</Label>
+            <Label>Nível de Acesso</Label>
             <Select value={role} onValueChange={handleRoleChange}>
               <SelectTrigger className="w-full mt-1">
                 <SelectValue />
@@ -229,7 +239,7 @@ export default function InviteMemberModal({
                     <div>
                       <span className="font-medium">Editor</span>
                       <p className="text-xs text-muted-foreground">
-                        Pode criar e editar transacoes
+                        Pode criar e editar transações
                       </p>
                     </div>
                   </div>
@@ -240,7 +250,7 @@ export default function InviteMemberModal({
                     <div>
                       <span className="font-medium">Administrador</span>
                       <p className="text-xs text-muted-foreground">
-                        Acesso total (exceto configuracoes)
+                        Acesso total (exceto configurações)
                       </p>
                     </div>
                   </div>
@@ -256,7 +266,7 @@ export default function InviteMemberModal({
               className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               <i className={`bx ${showAdvanced ? 'bx-chevron-up' : 'bx-chevron-down'}`}></i>
-              Permissoes avancadas
+              Permissões avançadas
             </button>
 
             {showAdvanced && (
@@ -275,9 +285,21 @@ export default function InviteMemberModal({
               <strong>Como funciona:</strong>
             </p>
             <p className="text-muted-foreground mt-1">
-              Um email sera enviado para o convidado. Se ele ja tiver conta, podera
-              aceitar o convite. Caso contrario, podera criar uma conta.
+              Um email será enviado para o convidado. Se ele já tiver conta, poderá
+              aceitar o convite. Caso contrário, poderá criar uma conta.
             </p>
+            {sharingInfo && (
+              <p className="text-muted-foreground mt-2 flex items-center gap-1">
+                <i className="bx bx-group"></i>
+                <span>
+                  Compartilhando com {sharingInfo.totalCount} de {sharingInfo.limit}{' '}
+                  {sharingInfo.limit === 1 ? 'pessoa' : 'pessoas'}
+                  {sharingInfo.pendingCount > 0 && (
+                    <span className="text-amber-500"> ({sharingInfo.pendingCount} pendente{sharingInfo.pendingCount > 1 ? 's' : ''})</span>
+                  )}
+                </span>
+              </p>
+            )}
           </div>
 
           <DialogFooter>

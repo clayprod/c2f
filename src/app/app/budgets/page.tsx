@@ -1025,7 +1025,7 @@ export default function BudgetsPage() {
         <Dialog open={formOpen} onOpenChange={setFormOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Novo Orcamento</DialogTitle>
+              <DialogTitle>Novo Orçamento</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-4">
               <div>

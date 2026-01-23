@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
 
     if (!settings.pluggy_client_id || !settings.pluggy_client_secret) {
       return NextResponse.json(
-        { error: 'Credenciais Pluggy nao configuradas' },
+        { error: 'Credenciais Pluggy não configuradas' },
         { status: 400 }
       );
     }

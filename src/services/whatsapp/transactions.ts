@@ -229,7 +229,7 @@ export async function createTransactionFromWhatsApp(
     console.error('[WhatsApp Transactions] Error creating transaction:', error);
     return {
       success: false,
-      error: 'Erro ao criar transacao',
+      error: 'Erro ao criar transação',
     };
   }
 
@@ -702,14 +702,14 @@ export function formatBalanceInfo(context: UserContext): FormattedBalance {
   }
 
   if (creditCards.length > 0) {
-    message += `*Cartoes de credito:*\n`;
+    message += `*Cartões de crédito:*\n`;
     creditCards.forEach((cc) => {
       message += `- ${cc.name}: Fatura R$ ${cc.currentBill.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | Disponivel R$ ${cc.availableLimit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n`;
     });
     message += `\n`;
   }
 
-  message += `*Este mes:*\n`;
+  message += `*Este mês:*\n`;
   message += `- Receitas: R$ ${monthlyIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n`;
   message += `- Despesas: R$ ${monthlyExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
@@ -726,10 +726,10 @@ export function formatBalanceInfo(context: UserContext): FormattedBalance {
  */
 export function formatTransactionsList(transactions: any[]): string {
   if (transactions.length === 0) {
-    return 'Nenhuma transacao encontrada neste periodo.';
+    return 'Nenhuma transação encontrada neste período.';
   }
 
-  let message = `*Ultimas ${transactions.length} transacoes:*\n\n`;
+  let message = `*Últimas ${transactions.length} transações:*\n\n`;
 
   transactions.forEach((tx, i) => {
     const amount = Math.abs(tx.amount) / 100;
@@ -805,14 +805,14 @@ export async function deleteTransaction(
   } else {
     return {
       success: false,
-      error: 'Informe o ID, descricao ou use delete_last para excluir a ultima transacao',
+      error: 'Informe o ID, descrição ou use delete_last para excluir a última transação',
     };
   }
 
   if (!txToDelete) {
     return {
       success: false,
-      error: 'Transacao nao encontrada',
+      error: 'Transação não encontrada',
     };
   }
 
@@ -826,7 +826,7 @@ export async function deleteTransaction(
     console.error('[WhatsApp] Error deleting transaction:', error);
     return {
       success: false,
-      error: 'Erro ao excluir transacao',
+      error: 'Erro ao excluir transação',
     };
   }
 

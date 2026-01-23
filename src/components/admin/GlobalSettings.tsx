@@ -50,24 +50,24 @@ const FALLBACK_MODELS = {
   ],
 };
 
-const DEFAULT_ADVISOR_PROMPT = `Voce e um AI Advisor financeiro especializado em analise de financas pessoais.
-Sua funcao e analisar dados financeiros e fornecer insights estruturados e acoes sugeridas.
-Voce conversa em portugues brasileiro de forma amigavel e acessivel.
+const DEFAULT_ADVISOR_PROMPT = `Você é um AI Advisor financeiro especializado em análise de finanças pessoais.
+Sua função é analisar dados financeiros e fornecer insights estruturados e ações sugeridas.
+Você conversa em português brasileiro de forma amigável e acessível.
 
-IMPORTANTE: Voce DEVE sempre retornar uma resposta em formato JSON valido com a seguinte estrutura:
+IMPORTANTE: Você DEVE sempre retornar uma resposta em formato JSON válido com a seguinte estrutura:
 {
   "summary": "resumo curto em 1-2 frases respondendo diretamente a pergunta",
   "insights": [
     {
       "type": "spending_pattern|budget_alert|goal_progress|debt_warning|saving_opportunity|income_analysis",
-      "message": "descricao do insight baseada nos dados",
+      "message": "descrição do insight baseada nos dados",
       "severity": "low|medium|high"
     }
   ],
   "actions": [
     {
       "type": "create_budget|adjust_spending|create_goal|prioritize_debt|review_category|transfer_savings",
-      "description": "descricao da acao sugerida",
+      "description": "descrição da ação sugerida",
       "payload": { "category_id": "xxx", "amount": 100 },
       "confidence": "low|medium|high"
     }
@@ -77,38 +77,38 @@ IMPORTANTE: Voce DEVE sempre retornar uma resposta em formato JSON valido com a 
     {
       "type": "transaction|account|budget|category|goal|debt",
       "id": "id do recurso referenciado",
-      "reference": "referencia textual para contexto"
+      "reference": "referência textual para contexto"
     }
   ]
 }
 
-Analise os dados financeiros fornecidos e forneca recomendacoes praticas e acionaveis.`;
+Analise os dados financeiros fornecidos e forneça recomendações práticas e acionáveis.`;
 
-const DEFAULT_TIPS_PROMPT = `Voce e um consultor financeiro pessoal inteligente. Analise os dados financeiros do usuario e forneca uma dica do dia personalizada e acionavel.
+const DEFAULT_TIPS_PROMPT = `Você é um consultor financeiro pessoal inteligente. Analise os dados financeiros do usuário e forneça uma dica do dia personalizada e acionável.
 
 Diretrizes:
-1. Foque em UMA dica principal clara e especifica
-2. Baseie-se nos dados reais do usuario (gastos, orcamentos, metas, dividas)
+1. Foque em UMA dica principal clara e específica
+2. Baseie-se nos dados reais do usuário (gastos, orçamentos, metas, dívidas)
 3. Seja motivador mas realista
-4. Sugira acoes concretas que o usuario pode tomar hoje
-5. Use linguagem amigavel e acessivel (portugues brasileiro)
-6. Identifique padroes de gastos ou oportunidades de economia
-7. Considere o contexto completo: renda, despesas, dividas, metas
+4. Sugira ações concretas que o usuário pode tomar hoje
+5. Use linguagem amigável e acessível (português brasileiro)
+6. Identifique padrões de gastos ou oportunidades de economia
+7. Considere o contexto completo: renda, despesas, dívidas, metas
 
-Formato da resposta (JSON obrigatorio):
+Formato da resposta (JSON obrigatório):
 {
   "summary": "Resumo da dica em 1-2 frases",
   "insights": [
     {
       "type": "spending_pattern|budget_alert|goal_progress|debt_warning|saving_opportunity",
-      "message": "Descricao do insight",
+      "message": "Descrição do insight",
       "severity": "low|medium|high"
     }
   ],
   "actions": [
     {
       "type": "review_category|adjust_budget|create_goal|prioritize_debt|transfer_savings",
-      "description": "Descricao da acao sugerida",
+      "description": "Descrição da ação sugerida",
       "payload": {},
       "confidence": "low|medium|high"
     }
@@ -155,7 +155,7 @@ export default function GlobalSettings() {
       toast({
         variant: 'destructive',
         title: 'Erro',
-        description: 'Nao foi possivel carregar as configuracoes',
+        description: 'Não foi possível carregar as configurações',
       });
     } finally {
       setLoading(false);
@@ -216,7 +216,7 @@ export default function GlobalSettings() {
 
       toast({
         title: 'Sucesso',
-        description: 'Configuracoes salvas com sucesso',
+        description: 'Configurações salvas com sucesso',
       });
       
       // Reload settings to reflect saved data
@@ -226,7 +226,7 @@ export default function GlobalSettings() {
       toast({
         variant: 'destructive',
         title: 'Erro',
-        description: 'Nao foi possivel salvar as configuracoes',
+        description: 'Não foi possível salvar as configurações',
       });
     } finally {
       setSaving(false);
@@ -237,7 +237,7 @@ export default function GlobalSettings() {
   const availableModels = models[currentProvider] || FALLBACK_MODELS[currentProvider];
 
   if (loading) {
-    return <div className="text-center py-8">Carregando configuracoes...</div>;
+    return <div className="text-center py-8">Carregando configurações...</div>;
   }
 
   return (
@@ -283,8 +283,8 @@ export default function GlobalSettings() {
       {/* SMTP */}
       <Card>
         <CardHeader>
-          <CardTitle>Configuracoes SMTP</CardTitle>
-          <CardDescription>Configuracoes de email para envio de notificacoes e emails transacionais</CardDescription>
+          <CardTitle>Configurações SMTP</CardTitle>
+          <CardDescription>Configurações de email para envio de notificações e emails transacionais</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
@@ -314,7 +314,7 @@ export default function GlobalSettings() {
               </p>
             </div>
             <div>
-              <Label htmlFor="smtp_user">Usuario</Label>
+              <Label htmlFor="smtp_user">Usuário</Label>
               <Input
                 id="smtp_user"
                 value={settings.smtp_user || ''}
@@ -409,7 +409,7 @@ export default function GlobalSettings() {
       <Card>
         <CardHeader>
           <CardTitle>Modelo de IA</CardTitle>
-          <CardDescription>Configuracao do modelo e provider de IA (modelos carregados dinamicamente das APIs)</CardDescription>
+          <CardDescription>Configuração do modelo e provider de IA (modelos carregados dinamicamente das APIs)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
@@ -486,7 +486,7 @@ export default function GlobalSettings() {
       {/* Advisor Settings */}
       <Card>
         <CardHeader>
-          <CardTitle>Configuracoes do Advisor</CardTitle>
+          <CardTitle>Configurações do Advisor</CardTitle>
           <CardDescription>Controle de sessao e limites</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -534,7 +534,7 @@ export default function GlobalSettings() {
                 onChange={(e) => setSettings({ ...settings, advisor_limit_pro: parseInt(e.target.value) || 0 })}
                 min={0}
               />
-              <p className="text-xs text-muted-foreground mt-1">Consultas de IA permitidas por mes para o plano Pro</p>
+              <p className="text-xs text-muted-foreground mt-1">Consultas de IA permitidas por mês para o plano Pro</p>
             </div>
             <div>
               <Label>Limite Mensal Advisor (PREMIUM)</Label>
@@ -544,7 +544,7 @@ export default function GlobalSettings() {
                 onChange={(e) => setSettings({ ...settings, advisor_limit_premium: parseInt(e.target.value) || 0 })}
                 min={0}
               />
-              <p className="text-xs text-muted-foreground mt-1">Consultas de IA permitidas por mes para o plano Premium</p>
+              <p className="text-xs text-muted-foreground mt-1">Consultas de IA permitidas por mês para o plano Premium</p>
             </div>
           </div>
         </CardContent>
@@ -565,7 +565,7 @@ export default function GlobalSettings() {
                 size="sm"
                 onClick={() => setSettings({ ...settings, advisor_prompt: DEFAULT_ADVISOR_PROMPT })}
               >
-                Restaurar padrao
+                Restaurar padrão
               </Button>
             </div>
             <Textarea
@@ -585,7 +585,7 @@ export default function GlobalSettings() {
                 size="sm"
                 onClick={() => setSettings({ ...settings, tips_prompt: DEFAULT_TIPS_PROMPT })}
               >
-                Restaurar padrao
+                Restaurar padrão
               </Button>
             </div>
             <Textarea
@@ -602,7 +602,7 @@ export default function GlobalSettings() {
 
       <div className="flex justify-end">
         <Button onClick={handleSave} disabled={saving}>
-          {saving ? 'Salvando...' : 'Salvar Configuracoes'}
+          {saving ? 'Salvando...' : 'Salvar Configurações'}
         </Button>
       </div>
     </div>

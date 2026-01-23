@@ -10,7 +10,7 @@ import {
 export interface NotificationRule {
   id: string;
   user_id: string | null;
-  rule_type: 'debt_due' | 'receivable_due' | 'budget_limit' | 'budget_empty';
+  rule_type: 'debt_due' | 'receivable_due' | 'budget_limit' | 'budget_empty' | 'balance_divergence' | 'daily_spending_exceeded';
   enabled: boolean;
   threshold_days?: number | null;
   threshold_percentage?: number | null;
@@ -366,6 +366,212 @@ export async function getUserNotificationRules(userId: string): Promise<Notifica
 }
 
 /**
+ * Check balance divergence notifications
+ */
+export async function checkBalanceDivergenceNotifications(
+  userId: string,
+  rules: NotificationRule[]
+): Promise<number> {
+  const supabase = await createClient();
+  const rule = rules.find((r) => r.rule_type === 'balance_divergence' && r.enabled);
+
+  if (!rule) return 0;
+
+  // Get all account links for this user with Pluggy accounts
+  const { data: links, error } = await supabase
+    .from('account_links')
+    .select(`
+      id,
+      pluggy_account_id,
+      internal_account_id,
+      pluggy_accounts!inner (
+        id,
+        name,
+        balance_cents,
+        currency
+      ),
+      accounts!inner (
+        id,
+        name,
+        current_balance,
+        currency
+      )
+    `)
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error checking balance divergence notifications:', error);
+    return 0;
+  }
+
+  if (!links || links.length === 0) return 0;
+
+  let count = 0;
+
+  for (const link of links) {
+    const pluggyAccount = (link as any).pluggy_accounts;
+    const internalAccount = (link as any).accounts;
+
+    if (!pluggyAccount || !internalAccount) continue;
+
+    // Convert internal balance from reais (NUMERIC) to cents
+    const internalBalanceCents = Math.round((internalAccount.current_balance || 0) * 100);
+    const pluggyBalanceCents = pluggyAccount.balance_cents || 0;
+    const divergenceCents = Math.abs(pluggyBalanceCents - internalBalanceCents);
+
+    // Check for any divergence (as per plan: any divergence triggers notification)
+    if (divergenceCents > 0) {
+      const shouldSend = await shouldSendNotification(
+        userId,
+        'balance_divergence',
+        link.id,
+        rule.frequency_hours
+      );
+
+      if (shouldSend) {
+        const divergence = formatCurrency(divergenceCents);
+        const accountName = internalAccount.name || pluggyAccount.name || 'Conta';
+        const notificationId = await createNotification(userId, {
+          title: 'Divergência de Saldo Detectada',
+          message: `A conta "${accountName}" apresenta divergência de ${divergence} entre o saldo real e o Open Finance`,
+          type: 'warning',
+          link: '/app/integration',
+          metadata: {
+            entity_type: 'account_links',
+            entity_id: link.id,
+            rule_type: 'balance_divergence',
+            divergence_cents: divergenceCents,
+            pluggy_balance_cents: pluggyBalanceCents,
+            internal_balance_cents: internalBalanceCents,
+          },
+        });
+
+        if (notificationId) {
+          await updateNotificationSentLog(userId, 'balance_divergence', link.id, 'account_links');
+          count++;
+        }
+      }
+    }
+  }
+
+  return count;
+}
+
+/**
+ * Check daily spending exceeded notifications
+ */
+export async function checkDailySpendingNotifications(
+  userId: string,
+  rules: NotificationRule[]
+): Promise<number> {
+  const supabase = await createClient();
+  const rule = rules.find((r) => r.rule_type === 'daily_spending_exceeded' && r.enabled);
+
+  if (!rule) return 0;
+
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1;
+
+  // Get budgets for current month with categories
+  const { data: budgets, error } = await supabase
+    .from('budgets')
+    .select(`
+      id,
+      amount_planned,
+      amount_actual,
+      categories!inner (
+        id,
+        type
+      )
+    `)
+    .eq('user_id', userId)
+    .eq('year', currentYear)
+    .eq('month', currentMonth)
+    .gt('amount_planned', 0);
+
+  if (error) {
+    console.error('Error checking daily spending notifications:', error);
+    return 0;
+  }
+
+  if (!budgets || budgets.length === 0) return 0;
+
+  // Filter to only expense categories
+  const expenseBudgets = budgets.filter(
+    (budget) => (budget.categories as any)?.type === 'expense'
+  );
+
+  if (expenseBudgets.length === 0) return 0;
+
+  // Calculate total planned and actual expenses
+  let totalPlannedCents = 0;
+  let totalActualCents = 0;
+
+  for (const budget of expenseBudgets) {
+    totalPlannedCents += Math.round((budget.amount_planned || 0) * 100);
+    totalActualCents += Math.round((budget.amount_actual || 0) * 100);
+  }
+
+  if (totalPlannedCents === 0) return 0;
+
+  // Calculate days elapsed and remaining
+  const firstDayOfMonth = new Date(currentYear, currentMonth - 1, 1);
+  firstDayOfMonth.setHours(0, 0, 0, 0);
+  const lastDayOfMonth = new Date(currentYear, currentMonth, 0);
+  const daysInMonth = lastDayOfMonth.getDate();
+  
+  // Days elapsed: from first day to today (inclusive)
+  // Use current day of month (1-31)
+  const currentDay = today.getDate();
+  const daysElapsed = Math.max(1, currentDay);
+  const daysRemaining = Math.max(1, daysInMonth - currentDay + 1); // Include today
+
+  // Calculate average daily spending
+  const averageDailyCents = daysElapsed > 0 ? totalActualCents / daysElapsed : 0;
+
+  // Calculate remaining budget and allowed daily spending
+  const remainingBudgetCents = totalPlannedCents - totalActualCents;
+  const allowedDailyCents = daysRemaining > 0 ? remainingBudgetCents / daysRemaining : 0;
+
+  // Check if average daily spending exceeds allowed daily spending
+  if (averageDailyCents > allowedDailyCents && allowedDailyCents >= 0) {
+    const shouldSend = await shouldSendNotification(
+      userId,
+      'daily_spending_exceeded',
+      null,
+      rule.frequency_hours
+    );
+
+    if (shouldSend) {
+      const avgDaily = formatCurrency(Math.round(averageDailyCents));
+      const allowedDaily = formatCurrency(Math.round(allowedDailyCents));
+      const notificationId = await createNotification(userId, {
+        title: 'Gasto Diário Acima do Permitido',
+        message: `Sua média de gasto diário (${avgDaily}) está acima do permitido (${allowedDaily}) para o restante do mês`,
+        type: 'error',
+        link: '/app/budgets',
+        metadata: {
+          entity_type: 'budgets',
+          rule_type: 'daily_spending_exceeded',
+          average_daily_cents: Math.round(averageDailyCents),
+          allowed_daily_cents: Math.round(allowedDailyCents),
+          total_spent_cents: totalActualCents,
+          total_budget_cents: totalPlannedCents,
+        },
+      });
+
+      if (notificationId) {
+        await updateNotificationSentLog(userId, 'daily_spending_exceeded', null, 'budgets');
+        return 1;
+      }
+    }
+  }
+
+  return 0;
+}
+
+/**
  * Run all notification checks for a user
  */
 export async function checkAllNotifications(userId: string): Promise<{
@@ -373,15 +579,26 @@ export async function checkAllNotifications(userId: string): Promise<{
   receivable_due: number;
   budget_limit: number;
   budget_empty: number;
+  balance_divergence: number;
+  daily_spending_exceeded: number;
   total: number;
 }> {
   const rules = await getUserNotificationRules(userId);
 
-  const [debt_due, receivable_due, budget_limit, budget_empty] = await Promise.all([
+  const [
+    debt_due,
+    receivable_due,
+    budget_limit,
+    budget_empty,
+    balance_divergence,
+    daily_spending_exceeded,
+  ] = await Promise.all([
     checkDebtDueNotifications(userId, rules),
     checkReceivableDueNotifications(userId, rules),
     checkBudgetLimitNotifications(userId, rules),
     checkBudgetEmptyNotifications(userId, rules),
+    checkBalanceDivergenceNotifications(userId, rules),
+    checkDailySpendingNotifications(userId, rules),
   ]);
 
   return {
@@ -389,6 +606,14 @@ export async function checkAllNotifications(userId: string): Promise<{
     receivable_due,
     budget_limit,
     budget_empty,
-    total: debt_due + receivable_due + budget_limit + budget_empty,
+    balance_divergence,
+    daily_spending_exceeded,
+    total:
+      debt_due +
+      receivable_due +
+      budget_limit +
+      budget_empty +
+      balance_divergence +
+      daily_spending_exceeded,
   };
 }

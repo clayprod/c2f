@@ -161,7 +161,7 @@ export async function POST(
 
     if (existingBill) {
       return NextResponse.json(
-        { error: 'Ja existe uma fatura para este mes' },
+        { error: 'Já existe uma fatura para este mês' },
         { status: 409 }
       );
     }

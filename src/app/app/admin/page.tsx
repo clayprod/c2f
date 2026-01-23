@@ -87,8 +87,8 @@ export default function AdminPage() {
         <TabsList className="grid w-full grid-cols-9">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="map">Mapa</TabsTrigger>
-          <TabsTrigger value="reports">Relatorios</TabsTrigger>
-          <TabsTrigger value="users">Usuarios</TabsTrigger>
+          <TabsTrigger value="reports">Relatórios</TabsTrigger>
+          <TabsTrigger value="users">Usuários</TabsTrigger>
           <TabsTrigger value="settings">Config</TabsTrigger>
           <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
           <TabsTrigger value="openfinance">Open Finance</TabsTrigger>

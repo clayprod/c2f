@@ -91,3 +91,5 @@ docker-compose -f docker-compose.dev.yml exec app env | grep NEXT_PUBLIC
 - O healthcheck usa Node.js nativo (não precisa de wget/curl)
 - Variáveis de ambiente são carregadas do arquivo `.env`
 
+
+

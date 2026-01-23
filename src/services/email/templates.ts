@@ -41,7 +41,7 @@ function wrapTemplate(content: string): string {
     ${content}
     <div class="footer">
       <p>Este email foi enviado pelo c2Finance.</p>
-      <p>Se voce nao esperava este email, pode ignora-lo com seguranca.</p>
+      <p>Se você não esperava este email, pode ignorá-lo com segurança.</p>
     </div>
   </div>
 </body>
@@ -60,15 +60,15 @@ export function inviteNewUserTemplate(data: InviteEmailData): { subject: string;
   
   const content = `
     <div class="content">
-      <h2>Voce foi convidado para compartilhar uma conta!</h2>
-      <p><strong>${data.ownerName}</strong> (${data.ownerEmail}) convidou voce para acessar a conta financeira dele no c2Finance.</p>
+      <h2>Você foi convidado para compartilhar uma conta!</h2>
+      <p><strong>${data.ownerName}</strong> (${data.ownerEmail}) convidou você para acessar a conta financeira dele no c2Finance.</p>
       
       <div class="info-box">
-        <p><strong>Nivel de acesso:</strong> <span class="role-badge">${roleLabel}</span></p>
-        <p><strong>Valido ate:</strong> ${data.expiresAt}</p>
+      <p><strong>Nível de acesso:</strong> <span class="role-badge">${roleLabel}</span></p>
+        <p><strong>Válido até:</strong> ${data.expiresAt}</p>
       </div>
       
-      <p>Para aceitar o convite e criar sua conta, clique no botao abaixo:</p>
+      <p>Para aceitar o convite e criar sua conta, clique no botão abaixo:</p>
       
       <p style="text-align: center;">
         <a href="${data.inviteLink}" class="button">Aceitar Convite e Criar Conta</a>
@@ -82,7 +82,7 @@ export function inviteNewUserTemplate(data: InviteEmailData): { subject: string;
   `;
   
   return {
-    subject: `${data.ownerName} convidou voce para o c2Finance`,
+    subject: `${data.ownerName} convidou você para o c2Finance`,
     html: wrapTemplate(content),
   };
 }
@@ -93,14 +93,14 @@ export function inviteExistingUserTemplate(data: InviteEmailData): { subject: st
   const content = `
     <div class="content">
       <h2>Novo acesso compartilhado!</h2>
-      <p><strong>${data.ownerName}</strong> (${data.ownerEmail}) compartilhou a conta financeira dele com voce no c2Finance.</p>
+      <p><strong>${data.ownerName}</strong> (${data.ownerEmail}) compartilhou a conta financeira dele com você no c2Finance.</p>
       
       <div class="info-box">
-        <p><strong>Nivel de acesso:</strong> <span class="role-badge">${roleLabel}</span></p>
-        <p><strong>Valido ate:</strong> ${data.expiresAt}</p>
+      <p><strong>Nível de acesso:</strong> <span class="role-badge">${roleLabel}</span></p>
+        <p><strong>Válido até:</strong> ${data.expiresAt}</p>
       </div>
       
-      <p>Para aceitar o convite, clique no botao abaixo:</p>
+      <p>Para aceitar o convite, clique no botão abaixo:</p>
       
       <p style="text-align: center;">
         <a href="${data.inviteLink}" class="button">Aceitar Convite</a>
@@ -111,12 +111,12 @@ export function inviteExistingUserTemplate(data: InviteEmailData): { subject: st
         <a href="${data.inviteLink}" style="color: #8b5cf6;">${data.inviteLink}</a>
       </p>
       
-      <p>Apos aceitar, voce podera alternar entre sua conta e a conta compartilhada a qualquer momento.</p>
+      <p>Após aceitar, você poderá alternar entre sua conta e a conta compartilhada a qualquer momento.</p>
     </div>
   `;
   
   return {
-    subject: `${data.ownerName} compartilhou uma conta com voce`,
+    subject: `${data.ownerName} compartilhou uma conta com você`,
     html: wrapTemplate(content),
   };
 }
@@ -127,9 +127,9 @@ export function accessRemovedTemplate(data: AccessRemovedEmailData): { subject: 
       <h2>Acesso removido</h2>
       <p><strong>${data.ownerName}</strong> (${data.ownerEmail}) removeu seu acesso compartilhado a conta financeira dele no c2Finance.</p>
       
-      <p>Voce nao podera mais visualizar ou editar os dados dessa conta.</p>
+      <p>Você não poderá mais visualizar ou editar os dados dessa conta.</p>
       
-      <p>Se voce acredita que isso foi um erro, entre em contato diretamente com ${data.ownerName}.</p>
+      <p>Se você acredita que isso foi um erro, entre em contato diretamente com ${data.ownerName}.</p>
       
       <p style="text-align: center;">
         <a href="${process.env.NEXT_PUBLIC_APP_URL || ''}/app" class="button">Acessar Minha Conta</a>
@@ -149,7 +149,7 @@ export function inviteAcceptedTemplate(data: { memberName: string; memberEmail: 
       <h2>Convite aceito!</h2>
       <p><strong>${data.memberName}</strong> (${data.memberEmail}) aceitou seu convite e agora tem acesso compartilhado a sua conta financeira.</p>
       
-      <p>Voce pode gerenciar as permissoes desse usuario a qualquer momento nas configuracoes da sua conta.</p>
+      <p>Você pode gerenciar as permissões desse usuário a qualquer momento nas configurações da sua conta.</p>
       
       <p style="text-align: center;">
         <a href="${process.env.NEXT_PUBLIC_APP_URL || ''}/app/settings" class="button">Gerenciar Acessos</a>

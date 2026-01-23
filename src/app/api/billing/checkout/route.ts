@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     if (!priceId) {
       console.error(`[Billing] Price ID not configured for plan: ${validated.plan}. Set STRIPE_PRICE_ID_${validated.plan.toUpperCase()} in environment variables.`);
       return NextResponse.json({
-        error: `Plano ${validated.plan} ainda nao esta configurado. Entre em contato com o suporte.`
+        error: `Plano ${validated.plan} ainda não está configurado. Entre em contato com o suporte.`
       }, { status: 500 });
     }
 

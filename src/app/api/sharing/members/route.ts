@@ -212,7 +212,7 @@ export async function DELETE(request: NextRequest) {
         if (memberEmail) {
           try {
             const emailTemplate = accessRemovedTemplate({
-              ownerName: ownerProfile.full_name || 'Usuario',
+              ownerName: ownerProfile.full_name || 'Usuário',
               ownerEmail: ownerProfile.email,
             });
             await sendEmail({

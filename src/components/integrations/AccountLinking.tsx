@@ -151,7 +151,7 @@ export default function AccountLinking({ onLinkChange }: Props) {
   const handleUnlink = async (linkId: string) => {
     const confirmed = await confirm({
       title: 'Desvincular Contas',
-      description: 'Tem certeza que deseja desvincular estas contas? As transacoes importadas nao serao afetadas.',
+      description: 'Tem certeza que deseja desvincular estas contas? As transações importadas não serão afetadas.',
       confirmText: 'Desvincular',
       cancelText: 'Cancelar',
       variant: 'destructive',
@@ -317,7 +317,7 @@ export default function AccountLinking({ onLinkChange }: Props) {
             <div className="text-center py-8 text-muted-foreground">
               <i className="bx bx-link-alt text-4xl mb-2"></i>
               <p>Nenhuma conta vinculada ainda</p>
-              <p className="text-sm">Vincule suas contas para comparar saldos e importar transacoes</p>
+              <p className="text-sm">Vincule suas contas para comparar saldos e importar transações</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -332,8 +332,8 @@ export default function AccountLinking({ onLinkChange }: Props) {
                       hasDivergence ? 'border-yellow-500/50 bg-yellow-500/5' : 'border-border'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6 min-w-0">
                         {/* Pluggy Account */}
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
@@ -347,8 +347,8 @@ export default function AccountLinking({ onLinkChange }: Props) {
                               <i className="bx bx-bank text-xl text-muted-foreground"></i>
                             )}
                           </div>
-                          <div>
-                            <p className="font-medium text-sm">
+                          <div className="min-w-0">
+                            <p className="font-medium text-sm break-words">
                               {(link.pluggy_account.type === 'CREDIT' || link.pluggy_account.subtype === 'credit_card') 
                                 ? `Cartão de crédito: ${link.pluggy_account.name}` 
                                 : link.pluggy_account.name}
@@ -363,7 +363,7 @@ export default function AccountLinking({ onLinkChange }: Props) {
                         </div>
 
                         {/* Arrow */}
-                        <div className="px-4">
+                        <div className="hidden sm:flex px-4">
                           <i className="bx bx-link-alt text-2xl text-muted-foreground"></i>
                         </div>
 
@@ -372,8 +372,8 @@ export default function AccountLinking({ onLinkChange }: Props) {
                           <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
                             <i className="bx bx-wallet text-xl text-primary"></i>
                           </div>
-                          <div>
-                            <p className="font-medium text-sm">
+                          <div className="min-w-0">
+                            <p className="font-medium text-sm break-words">
                               {(link.internal_account.type === 'credit' || link.internal_account.type === 'credit_card')
                                 ? `Cartão de crédito: ${link.internal_account.name}` 
                                 : link.internal_account.name}
@@ -388,7 +388,7 @@ export default function AccountLinking({ onLinkChange }: Props) {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-4">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4 w-full sm:w-auto sm:justify-end">
                         {/* Unimported transactions */}
                         {reconciliation[link.id]?.unimported_count > 0 && (
                           <Button
@@ -398,16 +398,16 @@ export default function AccountLinking({ onLinkChange }: Props) {
                               setImportLinkId(link.id);
                               setImportDialogOpen(true);
                             }}
-                            className="text-primary"
+                            className="text-primary w-full sm:w-auto"
                           >
-                            <i className="bx bx-import mr-1"></i>
+                            <i className="bx bx-file-plus mr-1"></i>
                             {reconciliation[link.id].unimported_count} pendente(s)
                           </Button>
                         )}
 
                         {/* Divergence Alert */}
                         {hasDivergence && (
-                          <div className="text-right">
+                          <div className="text-left sm:text-right">
                             <p className="text-xs text-yellow-600 font-medium">Divergencia</p>
                             <p className={`text-sm font-bold ${diff > 0 ? 'text-green-600' : 'text-red-600'}`}>
                               {diff > 0 ? '+' : ''}{formatCurrencyValue(diff)}
@@ -442,10 +442,10 @@ export default function AccountLinking({ onLinkChange }: Props) {
                 <i className="bx bx-info-circle text-xl text-yellow-500"></i>
               </div>
               <div>
-                <h3 className="font-semibold mb-1">Contas nao vinculadas</h3>
+                <h3 className="font-semibold mb-1">Contas não vinculadas</h3>
                 <p className="text-sm text-muted-foreground mb-2">
                   Voce tem {unlinkedPluggyAccounts.length} conta(s) do Open Finance que podem ser vinculadas,
-                  mas nao ha contas disponiveis no c2Finance.
+                  mas não há contas disponíveis no c2Finance.
                 </p>
                 <p className="text-sm text-muted-foreground">
                   Crie novas contas em <a href="/app/accounts" className="text-primary hover:underline">Contas</a> para vincular.

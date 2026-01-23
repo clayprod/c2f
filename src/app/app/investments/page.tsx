@@ -146,7 +146,7 @@ export default function InvestmentsPage() {
       }
 
       toast({
-        title: 'Investimento excluido',
+        title: 'Investimento excluído',
         description: 'O investimento foi removido com sucesso.',
       });
 
@@ -155,7 +155,7 @@ export default function InvestmentsPage() {
       toast({
         variant: 'destructive',
         title: 'Falha ao excluir investimento',
-        description: error.message || 'Nao foi possivel excluir o investimento. Tente novamente.',
+        description: error.message || 'Não foi possível excluir o investimento. Tente novamente.',
       });
     }
   };

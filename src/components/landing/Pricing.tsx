@@ -50,8 +50,11 @@ async function getPricingData(): Promise<Plan[]> {
         cta: 'Começar agora',
         popular: false,
         features: [
-          { id: 'transactions_limit', text: 'Até 100 transações/mês', enabled: true },
-          { id: 'csv_import', text: 'Importação CSV', enabled: true },
+          { id: 'dashboard', text: 'Dashboard', enabled: true },
+          { id: 'transactions', text: 'Até 100 transações/mês', enabled: true },
+          { id: 'accounts', text: 'Contas', enabled: true },
+          { id: 'credit_cards', text: 'Cartões', enabled: true },
+          { id: 'categories', text: 'Categorias', enabled: true },
         ],
       },
       {
@@ -64,9 +67,13 @@ async function getPricingData(): Promise<Plan[]> {
         cta: 'Assinar Pro',
         popular: true,
         features: [
-          { id: 'transactions_unlimited', text: 'Transações ilimitadas', enabled: true },
+          { id: 'all_free', text: 'Tudo do Free', enabled: true },
+          { id: 'transactions', text: 'Transações ilimitadas', enabled: true },
+          { id: 'budgets', text: 'Orçamentos', enabled: true },
+          { id: 'debts', text: 'Dívidas', enabled: true },
+          { id: 'investments', text: 'Investimentos', enabled: true },
+          { id: 'goals', text: 'Objetivos', enabled: true },
           { id: 'ai_advisor', text: 'AI Advisor (10 consultas/mês)', enabled: true },
-          { id: 'ofx_import', text: 'Importação OFX', enabled: true },
         ],
       },
       {
@@ -79,7 +86,10 @@ async function getPricingData(): Promise<Plan[]> {
         cta: 'Assinar Premium',
         popular: false,
         features: [
-          { id: 'transactions_unlimited', text: 'Transações ilimitadas', enabled: true },
+          { id: 'all_pro', text: 'Tudo do Pro', enabled: true },
+          { id: 'reports', text: 'Relatórios', enabled: true },
+          { id: 'integrations', text: 'Integrações (Whatsapp + OpenFinance*)', enabled: true },
+          { id: 'assets', text: 'Patrimônio', enabled: true },
           { id: 'ai_advisor', text: 'AI Advisor (100 consultas/mês)', enabled: true },
         ],
       },
@@ -90,7 +100,7 @@ async function getPricingData(): Promise<Plan[]> {
 const Pricing = async () => {
   const plans = await getPricingData();
   return (
-    <section id="pricing" className="section-padding">
+    <section id="pricing" className="section-padding pt-10 md:pt-12">
       <div className="container-custom">
         <div className="text-center mb-16">
           <span className="badge-pill mb-4">
@@ -109,7 +119,7 @@ const Pricing = async () => {
           {plans.map((plan) => (
             <div
               key={plan.name}
-              className={`glass-card p-6 md:p-8 relative ${plan.popular ? 'border-primary/50 md:scale-105' : ''
+              className={`glass-card p-6 md:p-8 relative flex h-full flex-col ${plan.popular ? 'border-primary/50 md:scale-105' : ''
                 }`}
             >
               {plan.popular && (
@@ -140,12 +150,18 @@ const Pricing = async () => {
 
               <Link
                 href="/signup"
-                className={`w-full text-center ${plan.popular ? 'btn-primary' : 'btn-secondary'}`}
+                className={`mt-auto w-full text-center ${plan.popular ? 'btn-primary' : 'btn-secondary'}`}
               >
                 {plan.cta}
               </Link>
             </div>
           ))}
+        </div>
+        
+        <div className="mt-8 text-center">
+          <p className="text-xs text-muted-foreground">
+            * Open Finance estará disponível em breve
+          </p>
         </div>
       </div>
     </section>

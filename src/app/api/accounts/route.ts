@@ -4,6 +4,7 @@ import { getUserId } from '@/lib/auth';
 import { accountSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
 import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
+import { logDataAccess, logDataModification } from '@/lib/audit';
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,6 +23,11 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
+
+    // Log data access
+    await logDataAccess(ownerId, 'accounts', undefined, request).catch((err) =>
+      console.error('[Audit] Failed to log account access:', err)
+    );
 
     // Convert current_balance (NUMERIC) to balance_cents (BIGINT) for API response
     const transformedData = (data || []).map((account: any) => ({
@@ -85,6 +91,17 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) throw error;
+
+    // Log data creation
+    await logDataModification(
+      ownerId,
+      'CREATE',
+      'accounts',
+      data.id,
+      undefined,
+      insertData,
+      request
+    ).catch((err) => console.error('[Audit] Failed to log account creation:', err));
 
     // Convert current_balance (NUMERIC) to balance_cents (BIGINT) for API response
     const transformedData = {

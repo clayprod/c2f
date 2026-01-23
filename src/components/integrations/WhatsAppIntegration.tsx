@@ -117,7 +117,7 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
       toast({
         variant: 'destructive',
         title: 'Erro',
-        description: 'Digite seu numero de WhatsApp',
+        description: 'Digite seu número de WhatsApp',
       });
       return;
     }
@@ -133,12 +133,12 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Erro ao registrar numero');
+        throw new Error(data.error || 'Erro ao registrar número');
       }
 
       toast({
-        title: 'Codigo enviado',
-        description: 'Verifique seu WhatsApp para o codigo de verificacao',
+        title: 'Código enviado',
+        description: 'Verifique seu WhatsApp para o código de verificação',
       });
 
       setResendCooldown(60);
@@ -159,7 +159,7 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
       toast({
         variant: 'destructive',
         title: 'Erro',
-        description: 'Digite o codigo de 6 digitos',
+        description: 'Digite o código de 6 dígitos',
       });
       return;
     }
@@ -175,7 +175,7 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Codigo invalido');
+        throw new Error(data.error || 'Código inválido');
       }
 
       toast({
@@ -207,11 +207,11 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Erro ao reenviar codigo');
+        throw new Error(data.error || 'Erro ao reenviar código');
       }
 
       toast({
-        title: 'Codigo reenviado',
+        title: 'Código reenviado',
         description: 'Verifique seu WhatsApp',
       });
 
@@ -246,7 +246,7 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
 
       toast({
         title: 'WhatsApp desconectado',
-        description: 'Voce pode conectar novamente a qualquer momento',
+        description: 'Você pode conectar novamente a qualquer momento',
       });
 
       setPhoneNumber('');
@@ -303,7 +303,7 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
             WhatsApp
           </CardTitle>
           <CardDescription>
-            Gerencie suas transacoes por mensagens de WhatsApp
+            Gerencie suas transações por mensagens de WhatsApp
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -311,7 +311,7 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
             <i className={`bx ${isUpgradeRequired ? 'bx-up-arrow-circle' : 'bx-info-circle'} mt-0.5`}></i>
             <div className="flex-1">
               <p className="font-medium mb-1">
-                {status?.message || 'Esta integracao sera disponibilizada em breve'}
+                {status?.message || 'Esta integração será disponibilizada em breve'}
               </p>
               {isUpgradeRequired && (
                 <a
@@ -340,11 +340,11 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
             </span>
           </CardTitle>
           <CardDescription>
-            Gerencie suas transacoes por mensagens de WhatsApp
+            Gerencie suas transações por mensagens de WhatsApp
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-medium">{status?.phoneNumber}</p>
               <p className="text-sm text-muted-foreground">
@@ -356,6 +356,7 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
               size="sm"
               onClick={handleDisconnect}
               disabled={submitting}
+              className="w-full sm:w-auto"
             >
               Desconectar
             </Button>
@@ -385,9 +386,9 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
           <div className="p-4 bg-muted rounded-lg">
             <p className="text-sm font-medium mb-2">Como usar:</p>
             <ul className="text-sm text-muted-foreground space-y-1">
-              <li>- Envie mensagens de texto ou audio</li>
+              <li>- Envie mensagens de texto ou áudio</li>
               <li>- Ex: &quot;Gastei 50 reais no mercado&quot;</li>
-              <li>- Ex: &quot;Recebi 1000 de salario&quot;</li>
+              <li>- Ex: &quot;Recebi 1000 de salário&quot;</li>
               <li>- Ex: &quot;Quanto tenho na conta?&quot;</li>
             </ul>
           </div>
@@ -404,24 +405,24 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
             <i className="bxl bx-whatsapp text-green-500 text-2xl"></i>
             WhatsApp
             <span className="text-xs bg-yellow-600 text-white px-2 py-0.5 rounded-full">
-              Verificacao Pendente
+              Verificação Pendente
             </span>
           </CardTitle>
           <CardDescription>
-            Digite o codigo de 6 digitos enviado para {status?.phoneNumber}
+            Digite o código de 6 dígitos enviado para {status?.phoneNumber}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="verification_code">Codigo de Verificacao</Label>
-            <div className="flex gap-2">
+            <Label htmlFor="verification_code">Código de Verificação</Label>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <Input
                 id="verification_code"
                 value={verificationCode}
                 onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="000000"
                 maxLength={6}
-                className="max-w-[150px] text-center text-2xl tracking-widest"
+                className="w-full sm:max-w-[150px] text-center text-2xl tracking-widest"
               />
               <Button onClick={handleVerify} disabled={submitting || verificationCode.length !== 6}>
                 {submitting ? (
@@ -434,7 +435,7 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Button
               variant="ghost"
               size="sm"
@@ -446,7 +447,7 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
               ) : (
                 <>
                   <i className="bx bx-repeat mr-1"></i>
-                  Reenviar codigo
+                  Reenviar código
                 </>
               )}
             </Button>
@@ -459,7 +460,7 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
               }}
               disabled={submitting}
             >
-              Usar outro numero
+              Usar outro número
             </Button>
           </div>
         </CardContent>
@@ -476,38 +477,38 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
           WhatsApp
         </CardTitle>
         <CardDescription>
-          Conecte seu WhatsApp para gerenciar transacoes por mensagens
+          Conecte seu WhatsApp para gerenciar transações por mensagens
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="phone_number">Numero do WhatsApp</Label>
-          <div className="flex gap-2">
-            <Input
-              id="phone_number"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              placeholder="+5511999999999"
-              className="max-w-[200px]"
-            />
-            <Button onClick={handleRegister} disabled={submitting || !phoneNumber}>
-              {submitting ? (
-                <i className="bx bx-loader-alt bx-spin mr-1"></i>
-              ) : (
+          <Label htmlFor="phone_number">Número do WhatsApp</Label>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Input
+                id="phone_number"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="+5511999999999"
+                className="w-full sm:max-w-[200px]"
+              />
+              <Button onClick={handleRegister} disabled={submitting || !phoneNumber}>
+                {submitting ? (
+                  <i className="bx bx-loader-alt bx-spin mr-1"></i>
+                ) : (
                 <i className="bx bx-send mr-1"></i>
               )}
-              Enviar Codigo
+              Enviar Código
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Voce recebera um codigo de verificacao no WhatsApp
+            Você receberá um código de verificação no WhatsApp
           </p>
         </div>
 
         <div className="p-4 bg-muted rounded-lg">
-          <p className="text-sm font-medium mb-2">Com esta integracao voce pode:</p>
+          <p className="text-sm font-medium mb-2">Com esta integração você pode:</p>
           <ul className="text-sm text-muted-foreground space-y-1">
-            <li>- Registrar transacoes por mensagem de texto ou audio</li>
+            <li>- Registrar transações por mensagem de texto ou áudio</li>
             <li>- Consultar saldos e resumos</li>
             <li>- Receber lembretes e alertas</li>
           </ul>

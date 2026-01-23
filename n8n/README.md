@@ -11,7 +11,7 @@
 3. Selecione o arquivo `c2f-whatsapp-agent.json`
 4. Clique em **Import**
 
-## Configuracao de Credenciais
+## Configuração de Credenciais
 
 Apos importar, voce precisa configurar as credenciais:
 
@@ -64,25 +64,25 @@ Configure no n8n em **Settings** > **Variables**:
    |
 2. Filtra: ignora grupos, mensagens do bot
    |
-3. Extrai dados: numero, texto, audio URL
+3. Extrai dados: número, texto, áudio URL
    |
 4. Se audio: Download + Transcreve com Groq/Whisper
    |
-5. Busca contexto do usuario via API c2Finance
+5. Busca contexto do usuário via API c2Finance
    |
-6. Se nao verificado: responde pedindo cadastro
+6. Se não verificado: responde pedindo cadastro
    |
 7. Se verificado: processa com AI Agent
    |
-8. Se intent = criar transacao: chama API c2Finance
+8. Se intent = criar transação: chama API c2Finance
    |
-9. Envia resposta ao usuario via Evolution API
+9. Envia resposta ao usuário via Evolution API
 ```
 
 ## Testando
 
 1. Certifique-se de que:
-   - Usuario tem numero verificado no c2Finance
+- Usuário tem número verificado no c2Finance
    - Evolution API esta conectada ao WhatsApp
    - Todas as credenciais estao configuradas
 
@@ -98,14 +98,14 @@ Configure no n8n em **Settings** > **Variables**:
 - Verifique se a API key bate com a configurada no admin
 
 ### Erro "User not verified"
-- Usuario precisa verificar o numero no app c2Finance
+- Usuário precisa verificar o número no app c2Finance
 - Acesse: /app/integrations
 
-### Audio nao transcreve
+### Áudio não transcreve
 - Verifique credencial do Groq
 - Verifique se o modelo `whisper-large-v3` esta disponivel
 
-### Mensagem nao chega
+### Mensagem não chega
 - Verifique webhook URL na Evolution API
 - Verifique se o workflow esta ativo
 - Verifique logs de execucao no n8n

@@ -21,11 +21,11 @@ async function checkWhatsAppAccess(userId: string): Promise<{ allowed: boolean; 
   // Default: WhatsApp is enabled for Pro and Premium plans
   // Only check settings if explicitly configured
   let whatsappEnabled: boolean;
-  if (planFeatures?.whatsapp_integration?.enabled !== undefined) {
-    // Use explicit configuration if set
+  if (planFeatures?.integrations?.enabled !== undefined) {
+    whatsappEnabled = planFeatures.integrations.enabled;
+  } else if (planFeatures?.whatsapp_integration?.enabled !== undefined) {
     whatsappEnabled = planFeatures.whatsapp_integration.enabled;
   } else {
-    // Default: enabled for Pro and Premium, disabled for Free
     whatsappEnabled = plan === 'pro' || plan === 'premium';
   }
 
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
     const rateLimit = checkRateLimit(ownerId);
     if (!rateLimit.allowed) {
       return NextResponse.json({
-        error: `Aguarde ${rateLimit.waitSeconds} segundos para reenviar o codigo`,
+        error: `Aguarde ${rateLimit.waitSeconds} segundos para reenviar o código`,
       }, { status: 429 });
     }
 
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
     // Check if WhatsApp is enabled
     if (!settings.whatsapp_enabled) {
       return NextResponse.json({
-        error: 'Integracao WhatsApp nao esta disponivel',
+        error: 'Integração WhatsApp não está disponível',
       }, { status: 400 });
     }
 
@@ -106,13 +106,13 @@ export async function POST(request: NextRequest) {
 
     if (!verification.phoneNumber) {
       return NextResponse.json({
-        error: 'Nenhum numero cadastrado para verificacao',
+        error: 'Nenhum número cadastrado para verificação',
       }, { status: 400 });
     }
 
     if (verification.status === 'verified') {
       return NextResponse.json({
-        error: 'Numero ja esta verificado',
+        error: 'Número já está verificado',
       }, { status: 400 });
     }
 
@@ -121,18 +121,18 @@ export async function POST(request: NextRequest) {
 
     if (!result.success) {
       return NextResponse.json({
-        error: result.error || 'Erro ao reenviar codigo',
+        error: result.error || 'Erro ao reenviar código',
       }, { status: 400 });
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Codigo reenviado com sucesso',
+      message: 'Código reenviado com sucesso',
     });
   } catch (error: any) {
     console.error('[WhatsApp Resend] Error:', error);
     return NextResponse.json({
-      error: error.message || 'Erro ao reenviar codigo',
+      error: error.message || 'Erro ao reenviar código',
     }, { status: 500 });
   }
 }

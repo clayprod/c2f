@@ -93,11 +93,22 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
     if (finalCurrentMonthIndex < 0) {
       // Se não encontrou nenhum mês, retornar dados originais
       return {
-        chartData: processedData.map((item, index) => ({
-          ...item,
-          cumulativeBalanceHistorical: !item.isProjected ? item.cumulativeBalance : null,
-          cumulativeBalanceProjected: item.isProjected ? item.cumulativeBalance : null,
-        })),
+        chartData: processedData.map((item, index) => {
+          const incomeActual = item.income_actual !== undefined ? item.income_actual : (!item.isProjected ? item.income : null);
+          const incomePlanned = item.income_planned !== undefined ? item.income_planned : (item.isProjected ? item.income : null);
+          const expensesActual = item.expenses_actual !== undefined ? item.expenses_actual : (!item.isProjected ? item.expenses : null);
+          const expensesPlanned = item.expenses_planned !== undefined ? item.expenses_planned : (item.isProjected ? item.expenses : null);
+
+          return {
+            ...item,
+            cumulativeBalanceHistorical: !item.isProjected ? item.cumulativeBalance : null,
+            cumulativeBalanceProjected: item.isProjected ? item.cumulativeBalance : null,
+            income_real: (!item.isProjected && incomeActual !== null) ? incomeActual : null,
+            income_proj: (item.isProjected && incomePlanned !== null) ? incomePlanned : null,
+            expenses_real: (!item.isProjected && expensesActual !== null) ? expensesActual : null,
+            expenses_proj: (item.isProjected && expensesPlanned !== null) ? expensesPlanned : null,
+          };
+        }),
         currentMonthIndex: 0,
       };
     }
@@ -174,6 +185,56 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
       // e continua nos meses futuros
       const shouldIncludeInProjected = isCurrentMonth || isProjected;
 
+      // Separar valores reais de projetados para as barras
+      // Receitas: usar valores explícitos se disponíveis, senão inferir do contexto
+      const incomeActual = item.income_actual !== undefined ? item.income_actual : (!isProjected ? item.income : null);
+      const incomePlanned = item.income_planned !== undefined ? item.income_planned : (isProjected ? item.income : null);
+      
+      // Despesas: usar valores explícitos se disponíveis, senão inferir do contexto
+      const expensesActual = item.expenses_actual !== undefined ? item.expenses_actual : (!isProjected ? item.expenses : null);
+      const expensesPlanned = item.expenses_planned !== undefined ? item.expenses_planned : (isProjected ? item.expenses : null);
+
+      // Separar em campos distintos para renderização
+      // Valores reais: para meses históricos OU mês corrente quando há valores reais
+      const income_real = (!isProjected && incomeActual !== null && incomeActual > 0) ? incomeActual : null;
+      const expenses_real = (!isProjected && expensesActual !== null && expensesActual > 0) ? expensesActual : null;
+      
+      // Valores projetados: para meses futuros OU mês corrente quando há valores projetados
+      // Quando há valores reais e projetados no mesmo mês, ambos serão mostrados e a projeção ficará sobreposta
+      const hasProjectedIncome = isProjected || (isCurrentMonth && (incomePlanned !== null || item.income > 0));
+      const income_proj = hasProjectedIncome && (incomePlanned !== null || (isProjected && item.income > 0)) ? (incomePlanned || item.income) : null;
+      
+      const hasProjectedExpenses = isProjected || (isCurrentMonth && (expensesPlanned !== null || item.expenses > 0));
+      const expenses_proj = hasProjectedExpenses && (expensesPlanned !== null || (isProjected && item.expenses > 0)) ? (expensesPlanned || item.expenses) : null;
+
+      // Flags para indicar quando há sobreposição (valores reais e projetados no mesmo mês)
+      const hasIncomeOverlap = income_real !== null && income_proj !== null;
+      const hasExpensesOverlap = expenses_real !== null && expenses_proj !== null;
+
+      // Para sobreposição visual: quando há valores reais e projetados, ajustar os dados
+      // da projeção para que seja renderizada na mesma posição base da real
+      // Com stackId, isso requer que a projeção tenha um offset baseado no valor real
+      // Mas na verdade, com stackId, as barras são empilhadas automaticamente
+      // Para sobreposição visual, precisamos usar uma técnica diferente
+      
+      // Ajustar valores projetados para sobreposição visual quando há sobreposição
+      // Quando há sobreposição, a projeção deve ser renderizada na mesma posição base
+      // Isso é feito ajustando o valor da projeção para incluir o offset da real
+      let income_proj_adjusted = income_proj;
+      let expenses_proj_adjusted = expenses_proj;
+      
+      if (hasIncomeOverlap && income_real !== null && income_proj !== null) {
+        // Para sobreposição visual, a projeção deve começar na mesma posição base da real
+        // Com stackId, isso significa que a projeção deve ter um valor que inclui o offset
+        // Mas na verdade, com stackId, não consigo fazer isso diretamente
+        // Vou manter o valor original e usar opacidade para diferenciar
+        income_proj_adjusted = income_proj;
+      }
+      
+      if (hasExpensesOverlap && expenses_real !== null && expenses_proj !== null) {
+        expenses_proj_adjusted = expenses_proj;
+      }
+
       return {
         ...item,
         isProjected: isProjected && !isCurrentMonth,
@@ -184,6 +245,14 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
         cumulativeBalanceProjected: shouldIncludeInProjected 
           ? (isCurrentMonth ? lastHistoricalBalance : cumulativeBalanceProjected) 
           : null,
+        // Campos separados para barras reais e projetadas
+        income_real,
+        income_proj: income_proj_adjusted,
+        expenses_real,
+        expenses_proj: expenses_proj_adjusted,
+        // Flags para sobreposição visual
+        hasIncomeOverlap,
+        hasExpensesOverlap,
       };
     });
 
@@ -218,32 +287,28 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
           {/* Receitas */}
           {dataItem && (
             <>
-              {dataItem.income_actual !== undefined && dataItem.income_actual > 0 && (
-                <p className="text-sm" style={{ color: 'hsl(142, 71%, 45%)' }}>
-                  Receitas: {formatCurrency(dataItem.income_actual)} <span className="text-muted-foreground">(realizado)</span>
+              {dataItem.income_real !== null && dataItem.income_real !== undefined && dataItem.income_real > 0 && (
+                <p className="text-sm" style={{ color: 'hsl(142, 71%, 35%)' }}>
+                  Receitas: {formatCurrency(dataItem.income_real)} <span className="text-muted-foreground">(realizado)</span>
                 </p>
               )}
-              {dataItem.income_planned !== undefined &&
-                dataItem.income_planned > 0 &&
-                (dataItem.income_actual === undefined || dataItem.income_actual !== dataItem.income_planned) && (
-                  <p className="text-sm opacity-70" style={{ color: 'hsl(142, 71%, 45%)' }}>
-                    Receitas: {formatCurrency(dataItem.income_planned)} <span className="text-muted-foreground">(projetado)</span>
-                  </p>
-                )}
+              {dataItem.income_proj !== null && dataItem.income_proj !== undefined && dataItem.income_proj > 0 && (
+                <p className="text-sm" style={{ color: 'hsl(142, 71%, 60%)' }}>
+                  Receitas: {formatCurrency(dataItem.income_proj)} <span className="text-muted-foreground">(projetado)</span>
+                </p>
+              )}
 
               {/* Despesas */}
-              {dataItem.expenses_actual !== undefined && dataItem.expenses_actual > 0 && (
-                <p className="text-sm" style={{ color: 'hsl(0, 84%, 60%)' }}>
-                  Despesas: {formatCurrency(dataItem.expenses_actual)} <span className="text-muted-foreground">(realizado)</span>
+              {dataItem.expenses_real !== null && dataItem.expenses_real !== undefined && dataItem.expenses_real > 0 && (
+                <p className="text-sm" style={{ color: 'hsl(0, 84%, 50%)' }}>
+                  Despesas: {formatCurrency(dataItem.expenses_real)} <span className="text-muted-foreground">(realizado)</span>
                 </p>
               )}
-              {dataItem.expenses_planned !== undefined &&
-                dataItem.expenses_planned > 0 &&
-                (dataItem.expenses_actual === undefined || dataItem.expenses_actual !== dataItem.expenses_planned) && (
-                  <p className="text-sm opacity-70" style={{ color: 'hsl(0, 84%, 60%)' }}>
-                    Despesas: {formatCurrency(dataItem.expenses_planned)} <span className="text-muted-foreground">(projetado)</span>
-                  </p>
-                )}
+              {dataItem.expenses_proj !== null && dataItem.expenses_proj !== undefined && dataItem.expenses_proj > 0 && (
+                <p className="text-sm" style={{ color: 'hsl(0, 84%, 75%)' }}>
+                  Despesas: {formatCurrency(dataItem.expenses_proj)} <span className="text-muted-foreground">(projetado)</span>
+                </p>
+              )}
             </>
           )}
 
@@ -274,6 +339,8 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
             ? { top: 10, right: 10, left: 0, bottom: 50 }
             : { top: 20, right: 30, left: 20, bottom: 60 }
           }
+          barGap={0}
+          barCategoryGap="20%"
         >
 
           {/* Patterns removed for cleaner outlined style */}
@@ -297,6 +364,26 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
               if (periodMonths <= 60) return 5; // Every 6th
               return 11; // Every 12th
             })()}
+            tick={(props: any) => {
+              const { x, y, payload } = props;
+              const isCurrentMonth = payload.value && chartData[currentMonthIndex]?.monthLabel === payload.value;
+              return (
+                <g transform={`translate(${x},${y})`}>
+                  <text
+                    x={0}
+                    y={0}
+                    dy={16}
+                    textAnchor="end"
+                    fill={isCurrentMonth ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))'}
+                    fontSize={isMobile ? 10 : 12}
+                    fontWeight={isCurrentMonth ? 'bold' : 'normal'}
+                    transform="rotate(-45)"
+                  >
+                    {payload.value}
+                  </text>
+                </g>
+              );
+            }}
           />
           <YAxis
             stroke="hsl(var(--muted-foreground))"
@@ -373,56 +460,58 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
             }
           })()}
 
-          {/* Income bars - green, with opacity for projected */}
+          {/* Ordem de renderização para empilhar receitas sobre despesas */}
+          {/* 1. Despesas Reais - escuro, opacidade 100% (base da pilha) */}
           <Bar
-            dataKey="income"
-            name="Receitas"
-            fill="hsl(142, 71%, 45%)"
-            radius={[4, 4, 0, 0]}
-          >
-            {chartData.map((entry, index) => {
-              // Se houver valores reais, mostrar sólido; senão, mostrar projetado apagado
-              const hasActualValues = entry.income_actual !== undefined && entry.income_actual > 0;
-              const isCurrentMonth = index === currentMonthIndex;
-              const shouldBeSolid = !entry.isProjected || (isCurrentMonth && hasActualValues);
+            dataKey="expenses_real"
+            name="Despesas (Real)"
+            fill="hsl(0, 84%, 50%)"
+            radius={[0, 0, 0, 0]}
+            stackId="cashflow"
+          />
 
-              return (
-                <Cell
-                  key={`income-cell-${index}`}
-                  fill={shouldBeSolid ? "hsl(142, 71%, 45%)" : "transparent"}
-                  stroke={"hsl(142, 71%, 45%)"}
-                  strokeWidth={shouldBeSolid ? 0 : 2}
-                  strokeOpacity={shouldBeSolid ? 1 : 0.6}
-                  strokeDasharray="0"
-                />
-              );
-            })}
+          {/* 2. Despesas Projeção - claro, translúcido (opacidade 55%) */}
+          <Bar
+            dataKey="expenses_proj"
+            name="Despesas (Proj.)"
+            fill="hsl(0, 84%, 75%)"
+            radius={[0, 0, 0, 0]}
+            stackId="cashflow"
+          >
+            {chartData.map((entry, index) => (
+              <Cell 
+                key={`expenses-proj-${index}`} 
+                fill="hsl(0, 84%, 75%)" 
+                opacity={0.55}
+              />
+            ))}
           </Bar>
 
-          {/* Expense bars - red, with opacity for projected */}
+          {/* 3. Receitas Reais - escuro, opacidade 100% (sobre as despesas) */}
           <Bar
-            dataKey="expenses"
-            name="Despesas"
-            fill="hsl(0, 84%, 60%)"
+            dataKey="income_real"
+            name="Receitas (Real)"
+            fill="hsl(142, 71%, 35%)"
             radius={[4, 4, 0, 0]}
-          >
-            {chartData.map((entry, index) => {
-              // Se houver valores reais, mostrar sólido; senão, mostrar projetado apagado
-              const hasActualValues = entry.expenses_actual !== undefined && entry.expenses_actual > 0;
-              const isCurrentMonth = index === currentMonthIndex;
-              const shouldBeSolid = !entry.isProjected || (isCurrentMonth && hasActualValues);
+            stackId="cashflow"
+          />
 
-              return (
-                <Cell
-                  key={`expenses-cell-${index}`}
-                  fill={shouldBeSolid ? "hsl(0, 84%, 60%)" : "transparent"}
-                  stroke={"hsl(0, 84%, 60%)"}
-                  strokeWidth={shouldBeSolid ? 0 : 2}
-                  strokeOpacity={shouldBeSolid ? 1 : 0.6}
-                  strokeDasharray="0"
-                />
-              );
-            })}
+          {/* 4. Receitas Projeção - claro, translúcido (opacidade 55%) */}
+          {/* Com stackId, será empilhada sobre a real; a opacidade cria efeito de sobreposição visual */}
+          <Bar
+            dataKey="income_proj"
+            name="Receitas (Proj.)"
+            fill="hsl(142, 71%, 60%)"
+            radius={[4, 4, 0, 0]}
+            stackId="cashflow"
+          >
+            {chartData.map((entry, index) => (
+              <Cell 
+                key={`income-proj-${index}`} 
+                fill="hsl(142, 71%, 60%)" 
+                opacity={0.55}
+              />
+            ))}
           </Bar>
 
           {/* Balance line - sólida para histórico */}
@@ -481,32 +570,28 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
             opacity={0.5}
           />
 
-          {/* Legenda customizada mais clara */}
+          {/* Legenda customizada com cores sólidas */}
           <Legend
             wrapperStyle={{ paddingTop: isMobile ? '10px' : '20px' }}
             content={() => (
               <div className={`flex items-center justify-center flex-wrap ${isMobile ? 'gap-x-3 gap-y-1.5 text-xs px-2' : 'gap-6 text-sm'}`}>
                 <div className="flex items-center gap-1.5">
-                  <div className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} rounded`} style={{ backgroundColor: 'hsl(142, 71%, 45%)' }}></div>
+                  <div className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} rounded`} style={{ backgroundColor: 'hsl(142, 71%, 35%)' }}></div>
                   <span>Receitas</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} rounded`} style={{
-                    border: '2px solid hsl(142, 71%, 45%)',
-                    opacity: 0.6,
-                    backgroundColor: 'transparent'
+                    backgroundColor: 'hsl(142, 71%, 60%)'
                   }}></div>
                   <span>{isMobile ? 'Rec. (Proj.)' : 'Receitas (Proj.)'}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} rounded`} style={{ backgroundColor: 'hsl(0, 84%, 60%)' }}></div>
+                  <div className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} rounded`} style={{ backgroundColor: 'hsl(0, 84%, 50%)' }}></div>
                   <span>Despesas</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} rounded`} style={{
-                    border: '2px solid hsl(0, 84%, 60%)',
-                    opacity: 0.6,
-                    backgroundColor: 'transparent'
+                    backgroundColor: 'hsl(0, 84%, 75%)'
                   }}></div>
                   <span>{isMobile ? 'Desp. (Proj.)' : 'Despesas (Proj.)'}</span>
                 </div>

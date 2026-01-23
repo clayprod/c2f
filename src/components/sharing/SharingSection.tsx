@@ -32,6 +32,14 @@ interface Invite {
   created_at: string;
 }
 
+interface SharingInfo {
+  membersCount: number;
+  pendingCount: number;
+  totalCount: number;
+  limit: number;
+  canInvite: boolean;
+}
+
 interface SharedAccount {
   id: string;
   owner_id: string;
@@ -51,6 +59,7 @@ export default function SharingSection() {
   const [members, setMembers] = useState<Member[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
   const [sharedAccounts, setSharedAccounts] = useState<SharedAccount[]>([]);
+  const [sharingInfo, setSharingInfo] = useState<SharingInfo | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const { toast } = useToast();
 
@@ -76,12 +85,16 @@ export default function SharingSection() {
       if (invitesRes.ok && invitesData.data) {
         setInvites(invitesData.data || []);
       }
+
+      if (invitesRes.ok && invitesData.sharingInfo) {
+        setSharingInfo(invitesData.sharingInfo);
+      }
     } catch (error) {
       console.error('Error fetching sharing data:', error);
       toast({
         variant: 'destructive',
         title: 'Erro ao carregar dados',
-        description: 'Nao foi possivel carregar os dados de compartilhamento',
+        description: 'Não foi possível carregar os dados de compartilhamento',
       });
     } finally {
       setLoading(false);
@@ -111,16 +124,41 @@ export default function SharingSection() {
           <h2 className="font-display font-semibold text-lg flex items-center gap-2">
             <i className="bx bx-share-alt text-xl text-primary"></i>
             Compartilhamento
+            {sharingInfo && (
+              <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                {sharingInfo.totalCount}/{sharingInfo.limit}
+              </span>
+            )}
           </h2>
           <p className="text-sm text-muted-foreground">
             Gerencie quem tem acesso aos seus dados financeiros
           </p>
         </div>
-        <Button onClick={() => setShowInviteModal(true)}>
+        <Button 
+          onClick={() => setShowInviteModal(true)}
+          disabled={sharingInfo ? !sharingInfo.canInvite : false}
+          title={sharingInfo && !sharingInfo.canInvite ? `Limite de ${sharingInfo.limit} pessoas atingido` : undefined}
+        >
           <i className="bx bx-user-plus mr-2"></i>
           Convidar
         </Button>
       </div>
+
+      {/* Limit Warning */}
+      {sharingInfo && !sharingInfo.canInvite && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+          <div className="flex gap-3">
+            <i className="bx bx-error-circle text-amber-500 text-xl flex-shrink-0"></i>
+            <div className="text-sm">
+              <p className="font-medium text-amber-500 mb-1">Limite de compartilhamento atingido</p>
+              <p className="text-muted-foreground">
+                Você já compartilha sua conta com {sharingInfo.limit} {sharingInfo.limit === 1 ? 'pessoa' : 'pessoas'} 
+                (máximo permitido). Para convidar alguém novo, remova um membro existente ou cancele um convite pendente.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Info Box */}
       <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
@@ -150,6 +188,7 @@ export default function SharingSection() {
         open={showInviteModal}
         onOpenChange={setShowInviteModal}
         onSuccess={fetchData}
+        sharingInfo={sharingInfo}
       />
     </div>
   );

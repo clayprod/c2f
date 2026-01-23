@@ -13,7 +13,7 @@ export default function TermsOfServicePage() {
           <div>
             <h2 className="text-xl font-semibold mb-2">1. Informações Gerais</h2>
             <p className="text-gray-700">
-              O presente Termo de Uso ("Termos") é celebrado entre Tenryu Ltda, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 45.693.933/0001-40, com sede na [endereço completo], doravante denominada "Tenryu", e o usuário ("Usuário") do serviço c2Finance ("Serviço"), plataforma de gestão financeira pessoal e empresarial.
+              O presente Termo de Uso ("Termos") é celebrado entre Tenryu Ltda, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 45.693.933/0001-40, com sede na Rua Antonio Cometti, 237, Quadra D Lote 17, Vereador Adilson Leitao Xavier - Bragança Paulista - SP, CEP: 12927-161, doravante denominada "Tenryu", e o usuário ("Usuário") do serviço c2Finance ("Serviço"), plataforma de gestão financeira pessoal e empresarial.
             </p>
           </div>
 
@@ -27,7 +27,7 @@ export default function TermsOfServicePage() {
           <div>
             <h2 className="text-xl font-semibold mb-2">3. Descrição do Serviço</h2>
             <p className="text-gray-700">
-              O c2Finance é uma plataforma de tecnologia que oferece serviços de gestão financeira pessoal e empresarial, incluindo mas não se limitando a: controle de despesas e receitas, elaboração de orçamentos, projeções financeiras, integração com instituições financeiras via Open Banking e consultoria financeira por meio de inteligência artificial.
+              O c2Finance é uma plataforma de tecnologia que oferece serviços de gestão financeira pessoal e empresarial, incluindo controle de despesas e receitas, elaboração de orçamentos, projeções financeiras, importação de dados, integração com instituições financeiras via Open Banking e consultoria financeira por meio de inteligência artificial. As funcionalidades disponíveis podem variar conforme o plano contratado.
             </p>
           </div>
 
@@ -58,45 +58,53 @@ export default function TermsOfServicePage() {
           <div>
             <h2 className="text-xl font-semibold mb-2">6. Dados Financeiros e Integração Bancária</h2>
             <p className="text-gray-700 mb-2">
-              O Serviço pode integrar-se com instituições financeiras para obter informações sobre contas, transações e outros dados financeiros do Usuário. Esta integração é realizada por meio de tecnologia de Open Banking, de acordo com as normas do Banco Central do Brasil.
+              O Serviço pode integrar-se com instituições financeiras para obter informações sobre contas, transações e outros dados financeiros do Usuário. Esta integração é realizada por meio de tecnologia de Open Banking, de acordo com as normas do Banco Central do Brasil e mediante consentimento do Usuário.
             </p>
             <p className="text-gray-700">
-              O Usuário reconhece que a Tenryu atua apenas como intermediária tecnológica e não tem acesso direto às credenciais bancárias do Usuário. A segurança e confidencialidade das informações bancárias são de responsabilidade das instituições financeiras.
+              O Usuário reconhece que a Tenryu atua como intermediária tecnológica e não tem acesso direto às credenciais bancárias do Usuário. A segurança e confidencialidade das informações bancárias são de responsabilidade das instituições financeiras participantes.
             </p>
           </div>
 
           <div>
-            <h2 className="text-xl font-semibold mb-2">7. Propriedade Intelectual</h2>
+            <h2 className="text-xl font-semibold mb-2">7. Planos, Preços e Pagamentos</h2>
+            <p className="text-gray-700 mb-2">
+              O Serviço pode ser ofertado em planos gratuitos e pagos, com cobrança recorrente processada por provedores de pagamento terceirizados. Ao contratar um plano pago, o Usuário autoriza a cobrança recorrente nos valores e periodicidades informados no momento da contratação.
+            </p>
+            <p className="text-gray-700">
+              Em caso de falha de pagamento, o acesso a funcionalidades pagas poderá ser suspenso até a regularização. Cancelamentos podem ser realizados a qualquer momento, com efeitos ao final do período já contratado, salvo disposição legal em contrário. Reembolsos seguem a legislação aplicável e as políticas apresentadas no momento da contratação.
+            </p>
+          </div>
+
+          <div>
+            <h2 className="text-xl font-semibold mb-2">8. Propriedade Intelectual</h2>
             <p className="text-gray-700">
               Todos os direitos de propriedade intelectual sobre o Serviço, incluindo mas não se limitando a softwares, interfaces, marcas, logotipos, textos, gráficos, imagens e códigos, são de propriedade exclusiva da Tenryu ou de seus licenciadores.
             </p>
           </div>
 
           <div>
-            <h2 className="text-xl font-semibold mb-2">8. Limitação de Responsabilidade</h2>
+            <h2 className="text-xl font-semibold mb-2">9. Limitação de Responsabilidade</h2>
             <p className="text-gray-700">
-              A Tenryu não se responsabiliza por decisões financeiras tomadas pelo Usuário com base nas informações ou recomendações fornecidas pelo Serviço. O Serviço é fornecido "como está", sem garantias de qualquer natureza. A Tenryu não será responsável por quaisquer danos diretos, indiretos, incidentais, especiais ou consequenciais decorrentes do uso do Serviço.
+              A Tenryu não se responsabiliza por decisões financeiras tomadas pelo Usuário com base nas informações ou recomendações fornecidas pelo Serviço. As recomendações automatizadas não constituem aconselhamento financeiro profissional. O Serviço é fornecido "como está", sem garantias de qualquer natureza. A Tenryu não será responsável por quaisquer danos diretos, indiretos, incidentais, especiais ou consequenciais decorrentes do uso do Serviço.
             </p>
           </div>
 
           <div>
-            <h2 className="text-xl font-semibold mb-2">9. Modificações nos Termos</h2>
+            <h2 className="text-xl font-semibold mb-2">10. Modificações nos Termos</h2>
             <p className="text-gray-700">
               A Tenryu poderá modificar estes Termos a qualquer momento, mediante aviso prévio ao Usuário. O uso contínuo do Serviço após as modificações constitui aceitação dos novos Termos.
             </p>
           </div>
 
           <div>
-            <h2 className="text-xl font-semibold mb-2">10. Lei Aplicável e Foro</h2>
+            <h2 className="text-xl font-semibold mb-2">11. Lei Aplicável e Foro</h2>
             <p className="text-gray-700">
-              Estes Termos são regidos pelas leis da República Federativa do Brasil. Para dirimir quaisquer dúvidas ou controvérsias decorrentes deste Termo, as partes elegem o foro da comarca de [cidade sede da empresa], com renúncia expressa a qualquer outro.
+              Estes Termos são regidos pelas leis da República Federativa do Brasil. Para dirimir quaisquer dúvidas ou controvérsias decorrentes deste Termo, as partes elegem o foro da comarca de Bragança Paulista - SP, com renúncia expressa a qualquer outro.
             </p>
           </div>
 
           <div className="pt-4">
-            <p className="text-gray-700">
-              Data de vigência: {new Date().toLocaleDateString('pt-BR')}
-            </p>
+            <p className="text-gray-700">Data de vigência: 23/01/2026</p>
           </div>
         </CardContent>
       </Card>

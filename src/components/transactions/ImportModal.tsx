@@ -39,10 +39,21 @@ interface ParsedTransaction {
   category_id: string | null;
   ai_suggested: boolean;
   ai_confidence?: 'low' | 'medium' | 'high';
+  // Open Finance metadata
+  link_id?: string;
+  account_name?: string;
 }
 
-type ImportType = 'csv' | 'ofx';
+type ImportType = 'csv' | 'ofx' | 'openfinance';
 type ImportStep = 'upload' | 'preview' | 'importing' | 'completed';
+
+interface AccountLink {
+  id: string;
+  pluggy_account: {
+    name: string;
+    institution_name: string;
+  };
+}
 
 export default function ImportModal({
   open,
@@ -60,6 +71,12 @@ export default function ImportModal({
   const [transactions, setTransactions] = useState<ParsedTransaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectAll, setSelectAll] = useState(true);
+  // Open Finance states
+  const [openFinanceAvailable, setOpenFinanceAvailable] = useState(false);
+  const [openFinanceLoading, setOpenFinanceLoading] = useState(false);
+  const [accountLinks, setAccountLinks] = useState<AccountLink[]>([]);
+  const [selectedLinkId, setSelectedLinkId] = useState<string>('all');
+  const [batchSize, setBatchSize] = useState<5 | 10 | 25 | 50 | 100>(10);
   const [progress, setProgress] = useState<{
     status: 'idle' | 'uploading' | 'processing' | 'completed' | 'error';
     message?: string;
@@ -72,12 +89,48 @@ export default function ImportModal({
   }>({ status: 'idle' });
   const { toast } = useToast();
 
-  // Fetch categories when modal opens
+  // Fetch categories and check Open Finance availability when modal opens
   useEffect(() => {
     if (open) {
       fetchCategories();
+      checkOpenFinanceAvailability();
     }
   }, [open]);
+
+  const checkOpenFinanceAvailability = async () => {
+    try {
+      const res = await fetch('/api/pluggy/availability');
+      if (!res.ok) {
+        setOpenFinanceAvailable(false);
+        return;
+      }
+      const data = await res.json();
+      setOpenFinanceAvailable(data.available && data.hasLinkedAccounts);
+      if (data.available) {
+        fetchAccountLinks();
+      }
+    } catch (error) {
+      console.error('Error checking Open Finance availability:', error);
+      setOpenFinanceAvailable(false);
+    }
+  };
+
+  const fetchAccountLinks = async () => {
+    try {
+      const res = await fetch('/api/pluggy/links');
+      if (!res.ok) return;
+      const data = await res.json();
+      setAccountLinks((data.data || []).map((link: any) => ({
+        id: link.id,
+        pluggy_account: {
+          name: link.pluggy_account?.name || 'Conta',
+          institution_name: link.pluggy_account?.institution_name || 'Open Finance',
+        },
+      })));
+    } catch (error) {
+      console.error('Error fetching account links:', error);
+    }
+  };
 
   const fetchCategories = async () => {
     try {
@@ -117,6 +170,13 @@ export default function ImportModal({
   };
 
   const handlePreview = async () => {
+    // Handle Open Finance import
+    if (importType === 'openfinance') {
+      await fetchOpenFinanceTransactions();
+      return;
+    }
+
+    // Handle CSV/OFX import
     if (!file) {
       toast({
         title: 'Nenhum arquivo selecionado',
@@ -185,6 +245,76 @@ export default function ImportModal({
         variant: 'destructive',
       });
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchOpenFinanceTransactions = async () => {
+    setOpenFinanceLoading(true);
+    setLoading(true);
+    setProgress({ status: 'processing', message: 'Buscando transações...' });
+
+    try {
+      const params = new URLSearchParams({ batch_size: String(batchSize) });
+      if (selectedLinkId !== 'all') {
+        params.set('link_id', selectedLinkId);
+      }
+
+      const res = await fetch(`/api/pluggy/pending-transactions?${params}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Erro ao buscar transações');
+      }
+
+      if (!data.transactions || data.transactions.length === 0) {
+        toast({
+          title: 'Nenhuma transação encontrada',
+          description: 'Não há transações pendentes para importar',
+        });
+        setProgress({ status: 'idle' });
+        return;
+      }
+
+      // Convert to ParsedTransaction format with link metadata
+      // Apply sign based on type: debit = negative (expense), credit = positive (income)
+      const parsedTransactions: ParsedTransaction[] = data.transactions.map((tx: any) => {
+        const amountCents = Number(tx.amount_cents) || 0;
+        const signedAmount = tx.type === 'debit' ? -Math.abs(amountCents) : Math.abs(amountCents);
+        return {
+          id: tx.id,
+          date: tx.date,
+          description: tx.description,
+          amount: signedAmount,
+          selected: true,
+          category_id: null,
+          ai_suggested: false,
+          // Store link metadata for import
+          link_id: tx.link_id,
+          account_name: tx.account_name,
+        };
+      });
+
+      setTransactions(parsedTransactions);
+      setStep('preview');
+      setProgress({ status: 'idle' });
+
+      // Auto-categorize with AI
+      if (parsedTransactions.length > 0) {
+        await categorizeWithAI(parsedTransactions);
+      }
+    } catch (error: any) {
+      setProgress({
+        status: 'error',
+        message: error.message || 'Erro ao buscar transações',
+      });
+      toast({
+        title: 'Falha ao buscar transações',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setOpenFinanceLoading(false);
       setLoading(false);
     }
   };
@@ -268,9 +398,15 @@ export default function ImportModal({
       setStep('importing');
       setProgress({ status: 'processing', message: 'Importando transações...' });
 
+      // Handle Open Finance import
+      if (importType === 'openfinance') {
+        await importOpenFinanceTransactions(selectedTransactions);
+        return;
+      }
+
+      // Handle CSV/OFX import
       const fileContent = await file!.text();
 
-      // Call import API with categories
       const endpoint = importType === 'csv' ? '/api/import/csv' : '/api/import/ofx';
       const bodyKey = importType === 'csv' ? 'csv_content' : 'ofx_content';
 
@@ -331,6 +467,108 @@ export default function ImportModal({
     }
   };
 
+  const importOpenFinanceTransactions = async (selectedTransactions: ParsedTransaction[]) => {
+    try {
+      // Group transactions by link_id for batch import
+      const byLink = selectedTransactions.reduce((acc, tx) => {
+        const linkId = (tx as any).link_id;
+        if (linkId) {
+          if (!acc[linkId]) acc[linkId] = [];
+          acc[linkId].push(tx);
+        }
+        return acc;
+      }, {} as Record<string, ParsedTransaction[]>);
+
+      let totalImported = 0;
+      let totalSkipped = 0;
+      const allErrors: string[] = [];
+
+      // Import each group
+      for (const [linkId, txs] of Object.entries(byLink)) {
+        const res = await fetch('/api/pluggy/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            link_id: linkId,
+            transactions: txs.map(tx => ({
+              id: tx.id,
+              category_id: tx.category_id,
+            })),
+          }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          allErrors.push(data.error || `Erro ao importar lote`);
+          continue;
+        }
+
+        totalImported += data.results?.imported || 0;
+        totalSkipped += data.results?.skipped || 0;
+        if (data.results?.errors) {
+          allErrors.push(...data.results.errors);
+        }
+      }
+
+      setStep('completed');
+
+      if (totalImported === 0 && totalSkipped === 0 && allErrors.length > 0) {
+        const errorMessage = allErrors[0];
+        setProgress({
+          status: 'error',
+          message: errorMessage || 'Erro ao importar transações',
+        });
+        toast({
+          title: 'Falha na importação',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      setProgress({
+        status: 'completed',
+        message: allErrors.length > 0 ? 'Importação concluída com avisos.' : 'Importação concluída!',
+        result: {
+          totalRows: selectedTransactions.length,
+          imported: totalImported,
+          skipped: totalSkipped,
+          errors: allErrors.slice(0, 5),
+        },
+      });
+
+      if (allErrors.length > 0) {
+        toast({
+          title: 'Importação concluída com avisos',
+          description: allErrors[0],
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Sucesso',
+          description: `${totalImported} transações importadas com sucesso`,
+        });
+      }
+
+      if (onSuccess) {
+        onSuccess();
+      }
+    } catch (error: any) {
+      setProgress({
+        status: 'error',
+        message: error.message || 'Erro ao importar transações',
+      });
+      toast({
+        title: 'Falha na importação',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleClose = () => {
     setFile(null);
     setSelectedAccountId('');
@@ -339,6 +577,9 @@ export default function ImportModal({
     setStep('upload');
     setTransactions([]);
     setSelectAll(true);
+    // Reset Open Finance states
+    setSelectedLinkId('all');
+    setBatchSize(10);
     onOpenChange(false);
   };
 
@@ -395,11 +636,11 @@ export default function ImportModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[90vh] !grid-cols-1 flex flex-col overflow-hidden">
+        <DialogHeader className="shrink-0">
           <DialogTitle>Importar Transações</DialogTitle>
           <DialogDescription>
-            {step === 'upload' && 'Importe transações de arquivos CSV ou OFX (extrato bancário)'}
+            {step === 'upload' && 'Importe transações de contas bancárias (não suporta cartão de crédito) via CSV, OFX ou Open Finance'}
             {step === 'preview' && 'Revise e categorize as transações antes de importar'}
             {step === 'importing' && 'Importando transações...'}
             {step === 'completed' && 'Importação finalizada'}
@@ -409,7 +650,7 @@ export default function ImportModal({
         {step === 'upload' && (
           <>
             {/* Import Type Tabs */}
-            <div className="flex border-b border-border">
+            <div className="flex border-b border-border shrink-0">
               <button
                 onClick={() => handleTypeChange('csv')}
                 className={`flex-1 py-3 px-4 text-sm font-medium transition-colors relative ${
@@ -438,49 +679,117 @@ export default function ImportModal({
                   <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
                 )}
               </button>
+              {openFinanceAvailable && (
+                <button
+                  onClick={() => handleTypeChange('openfinance')}
+                  className={`flex-1 py-3 px-4 text-sm font-medium transition-colors relative ${
+                    importType === 'openfinance'
+                      ? 'text-primary'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <i className='bx bx-link mr-2'></i>
+                  Open Finance
+                  {importType === 'openfinance' && (
+                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                  )}
+                </button>
+              )}
             </div>
 
-            <div className="space-y-4">
-              {/* Account Selection */}
-              <div>
-                <label htmlFor="account-select" className="block text-sm font-medium mb-2">
-                  Conta de destino (opcional)
-                </label>
-                <select
-                  id="account-select"
-                  value={selectedAccountId}
-                  onChange={(e) => setSelectedAccountId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-md border border-input bg-background"
-                >
-                  <option value="">Usar conta padrão ou criar nova</option>
-                  {accounts.map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.name}
-                    </option>
-                  ))}
-                </select>
+            <div className="space-y-4 flex-1 overflow-y-auto min-h-0">
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700">
+                Importação disponível apenas para contas bancárias. Transações de cartão de crédito não devem ser importadas aqui.
               </div>
+              {/* CSV/OFX: Account Selection and File Input */}
+              {importType !== 'openfinance' && (
+                <>
+                  <div>
+                    <label htmlFor="account-select" className="block text-sm font-medium mb-2">
+                      Conta de destino (opcional)
+                    </label>
+                    <select
+                      id="account-select"
+                      value={selectedAccountId}
+                      onChange={(e) => setSelectedAccountId(e.target.value)}
+                      className="w-full px-3 py-2 rounded-md border border-input bg-background"
+                    >
+                      <option value="">Usar conta padrão ou criar nova</option>
+                      {accounts.map((account) => (
+                        <option key={account.id} value={account.id}>
+                          {account.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              {/* File Input */}
-              <div>
-                <label htmlFor="file-input" className="block text-sm font-medium mb-2">
-                  Arquivo {importType.toUpperCase()}
-                </label>
-                <input
-                  id="file-input"
-                  type="file"
-                  accept={acceptedTypes}
-                  onChange={handleFileChange}
-                  className="w-full px-3 py-2 rounded-md border border-input bg-background file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer"
-                  disabled={loading}
-                />
-                {file && (
-                  <p className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
-                    <i className='bx bx-check-circle text-green-500'></i>
-                    Arquivo selecionado: {file.name}
-                  </p>
-                )}
-              </div>
+                  <div>
+                    <label htmlFor="file-input" className="block text-sm font-medium mb-2">
+                      Arquivo {importType.toUpperCase()}
+                    </label>
+                    <input
+                      id="file-input"
+                      type="file"
+                      accept={acceptedTypes}
+                      onChange={handleFileChange}
+                      className="w-full px-3 py-2 rounded-md border border-input bg-background file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 cursor-pointer"
+                      disabled={loading}
+                    />
+                    {file && (
+                      <p className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
+                        <i className='bx bx-check-circle text-green-500'></i>
+                        Arquivo selecionado: {file.name}
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Open Finance: Account Link and Batch Size Selection */}
+              {importType === 'openfinance' && (
+                <>
+                  <div>
+                    <label htmlFor="link-select" className="block text-sm font-medium mb-2">
+                      Conta vinculada
+                    </label>
+                    <select
+                      id="link-select"
+                      value={selectedLinkId}
+                      onChange={(e) => setSelectedLinkId(e.target.value)}
+                      className="w-full px-3 py-2 rounded-md border border-input bg-background"
+                    >
+                      <option value="all">Todas as contas vinculadas</option>
+                      {accountLinks.map((link) => (
+                        <option key={link.id} value={link.id}>
+                          {link.pluggy_account.name} - {link.pluggy_account.institution_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Quantidade de transações
+                    </label>
+                    <div className="flex gap-2">
+                      {([5, 10, 25, 50, 100] as const).map((size) => (
+                        <button
+                          key={size}
+                          type="button"
+                          onClick={() => setBatchSize(size)}
+                          className={`flex-1 px-4 py-2 rounded-md border text-sm font-medium transition-colors ${
+                            batchSize === size
+                              ? 'bg-primary text-primary-foreground border-primary'
+                              : 'bg-background border-input hover:bg-muted'
+                          }`}
+                        >
+                          Últimas {size}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
 
               {/* Import Guide */}
               {showGuide && (
@@ -538,11 +847,14 @@ export default function ImportModal({
               )}
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="shrink-0">
               <Button variant="outline" onClick={handleClose} disabled={loading}>
                 Cancelar
               </Button>
-              <Button onClick={handlePreview} disabled={!file || loading}>
+              <Button
+                onClick={handlePreview}
+                disabled={loading || (importType !== 'openfinance' && !file)}
+              >
                 {loading ? 'Processando...' : 'Continuar'}
               </Button>
             </DialogFooter>
@@ -551,7 +863,7 @@ export default function ImportModal({
 
         {step === 'preview' && (
           <>
-            <div className="flex items-center justify-between py-2 border-b">
+            <div className="flex items-center justify-between py-2 border-b shrink-0">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <Checkbox
@@ -578,7 +890,7 @@ export default function ImportModal({
               </Button>
             </div>
 
-            <div className="flex-1 overflow-auto min-h-[300px]">
+            <div className="flex-1 overflow-auto min-h-0">
               <table className="w-full">
                 <thead className="sticky top-0 bg-background">
                   <tr className="text-left text-xs text-muted-foreground border-b">
@@ -642,11 +954,11 @@ export default function ImportModal({
               </table>
             </div>
 
-            <div className="text-sm text-muted-foreground pt-2 border-t">
+            <div className="text-sm text-muted-foreground pt-2 border-t shrink-0">
               Transações sem categoria serão importadas como "Outros"
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="shrink-0">
               <Button variant="outline" onClick={handleBack} disabled={loading}>
                 Voltar
               </Button>
@@ -659,7 +971,7 @@ export default function ImportModal({
 
         {(step === 'importing' || step === 'completed') && (
           <>
-            <div className="flex-1 flex items-center justify-center py-12">
+            <div className="flex-1 flex items-center justify-center py-12 min-h-0">
               {progress.status === 'processing' && (
                 <div className="text-center">
                   <i className="bx bx-loader-alt bx-spin text-4xl text-primary"></i>
@@ -688,6 +1000,13 @@ export default function ImportModal({
                           {progress.result.errors.length} erros
                         </p>
                       )}
+                      {progress.result.errors.length > 0 && (
+                        <div className="text-red-500 text-xs space-y-1">
+                          {progress.result.errors.slice(0, 3).map((error, index) => (
+                            <p key={`${error}-${index}`}>{error}</p>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -700,7 +1019,7 @@ export default function ImportModal({
               )}
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="shrink-0">
               <Button onClick={handleClose}>
                 Fechar
               </Button>

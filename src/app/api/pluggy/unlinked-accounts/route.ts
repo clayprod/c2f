@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
         currency,
         number,
         item_id,
+        institution_logo,
         pluggy_items!inner (
           connector_name,
           connector_id,
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest) {
         currency: acc.currency,
         number: acc.number,
         institution_name: acc.pluggy_items?.connector_name || 'Open Finance',
-        institution_logo: null, // Not stored in pluggy_items
+        institution_logo: acc.institution_logo || null,
         status: acc.pluggy_items?.status,
       }));
 
@@ -89,8 +90,46 @@ export async function GET(request: NextRequest) {
     const linkedInternalIds = new Set((internalLinks || []).map(l => l.internal_account_id));
 
     // Filter out already linked internal accounts
-    const availableInternalAccounts = (internalAccounts || [])
+    let availableInternalAccounts = (internalAccounts || [])
       .filter((acc: any) => !linkedInternalIds.has(acc.id));
+
+    // For credit cards, calculate balance as sum of unpaid bills (open/closed)
+    const creditCardIds = availableInternalAccounts
+      .filter((acc: any) => acc.type === 'credit_card')
+      .map((acc: any) => acc.id);
+
+    if (creditCardIds.length > 0) {
+      // Get unpaid bills for credit cards
+      const { data: bills, error: billsError } = await supabase
+        .from('credit_card_bills')
+        .select('account_id, total_cents, paid_cents')
+        .eq('user_id', user.id)
+        .in('account_id', creditCardIds)
+        .in('status', ['open', 'closed']);
+
+      if (!billsError && bills) {
+        // Calculate total unpaid amount per card
+        const cardBalances = new Map<string, number>();
+        bills.forEach((bill: any) => {
+          const unpaid = (bill.total_cents || 0) - (bill.paid_cents || 0);
+          const current = cardBalances.get(bill.account_id) || 0;
+          cardBalances.set(bill.account_id, current + unpaid);
+        });
+
+        // Update credit card balances
+        availableInternalAccounts = availableInternalAccounts.map((acc: any) => {
+          if (acc.type === 'credit_card') {
+            const unpaidBalanceCents = cardBalances.get(acc.id) || 0;
+            // Convert to reais for consistency with current_balance format
+            return {
+              ...acc,
+              current_balance: unpaidBalanceCents / 100,
+            };
+          }
+          return acc;
+        });
+      }
+    }
 
     return NextResponse.json({
       pluggy_accounts: unlinkedAccounts,

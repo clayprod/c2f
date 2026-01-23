@@ -54,8 +54,11 @@ async function getPricingData(): Promise<Plan[]> {
         cta: 'Começar agora',
         popular: false,
         features: [
-          { id: 'transactions_limit', text: 'Até 100 transações/mês', enabled: true },
-          { id: 'csv_import', text: 'Importação CSV', enabled: true },
+          { id: 'dashboard', text: 'Dashboard', enabled: true },
+          { id: 'transactions', text: 'Até 100 transações/mês', enabled: true },
+          { id: 'accounts', text: 'Contas', enabled: true },
+          { id: 'credit_cards', text: 'Cartões', enabled: true },
+          { id: 'categories', text: 'Categorias', enabled: true },
         ],
       },
       {
@@ -68,9 +71,13 @@ async function getPricingData(): Promise<Plan[]> {
         cta: 'Assinar Pro',
         popular: true,
         features: [
-          { id: 'transactions_unlimited', text: 'Transações ilimitadas', enabled: true },
+          { id: 'all_free', text: 'Tudo do Free', enabled: true },
+          { id: 'transactions', text: 'Transações ilimitadas', enabled: true },
+          { id: 'budgets', text: 'Orçamentos', enabled: true },
+          { id: 'debts', text: 'Dívidas', enabled: true },
+          { id: 'investments', text: 'Investimentos', enabled: true },
+          { id: 'goals', text: 'Objetivos', enabled: true },
           { id: 'ai_advisor', text: 'AI Advisor (10 consultas/mês)', enabled: true },
-          { id: 'ofx_import', text: 'Importação OFX', enabled: true },
         ],
       },
       {
@@ -83,7 +90,10 @@ async function getPricingData(): Promise<Plan[]> {
         cta: 'Assinar Premium',
         popular: false,
         features: [
-          { id: 'transactions_unlimited', text: 'Transações ilimitadas', enabled: true },
+          { id: 'all_pro', text: 'Tudo do Pro', enabled: true },
+          { id: 'reports', text: 'Relatórios', enabled: true },
+          { id: 'integrations', text: 'Integrações (Whatsapp + OpenFinance*)', enabled: true },
+          { id: 'assets', text: 'Patrimônio', enabled: true },
           { id: 'ai_advisor', text: 'AI Advisor (100 consultas/mês)', enabled: true },
         ],
       },
@@ -116,7 +126,7 @@ export default async function PricingPage() {
             {plans.map((plan) => (
               <div
                 key={plan.name}
-                className={`glass-card p-6 md:p-8 relative ${plan.popular ? 'border-primary/50 md:scale-105' : ''
+                className={`glass-card p-6 md:p-8 relative flex h-full flex-col ${plan.popular ? 'border-primary/50 md:scale-105' : ''
                   }`}
               >
                 {plan.popular && (
@@ -151,12 +161,18 @@ export default async function PricingPage() {
 
                 <Link
                   href="/signup"
-                  className={`w-full text-center block ${plan.popular ? 'btn-primary' : 'btn-secondary'}`}
+                  className={`mt-auto w-full text-center block ${plan.popular ? 'btn-primary' : 'btn-secondary'}`}
                 >
                   {plan.cta}
                 </Link>
               </div>
             ))}
+          </div>
+
+          <div className="max-w-3xl mx-auto text-center mb-8">
+            <p className="text-xs text-muted-foreground">
+              * Open Finance estará disponível em breve
+            </p>
           </div>
 
           <div className="max-w-3xl mx-auto text-center">

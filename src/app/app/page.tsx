@@ -71,83 +71,13 @@ export default function DashboardPage() {
   const [selectedPeriod, setSelectedPeriod] = useState(12); // Default: 1 year
   const { isFree, loading: profileLoading } = useProfile();
   const { context: accountContext, activeAccountId } = useAccountContext();
-  const [maxVisibleItems, setMaxVisibleItems] = useState(9);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const maxVisibleItems = 9; // Número fixo de transações visíveis
   const budgetsContainerRef = useRef<HTMLDivElement>(null);
-  const transactionsContainerRef = useRef<HTMLDivElement>(null);
   const ownerId = activeAccountId || accountContext?.currentUserId || null;
 
-  useEffect(() => {
-    if (!containerRef.current) return;
+  // Número fixo de itens para evitar cortes - 9 itens no desktop e mobile
 
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (window.innerWidth >= 1024) { // Only on desktop (lg)
-        const height = entry.contentRect.height;
-        // Approx item height (row + border) is ~53px. 
-        // Using 50px to be slightly aggressive/fill more, 55px to be safe.
-        // Let's use 55px to avoid partial rows.
-        const count = Math.floor(height / 55);
-        setMaxVisibleItems(Math.max(5, count));
-      } else {
-        setMaxVisibleItems(9);
-      }
-    });
-
-    observer.observe(containerRef.current);
-    return () => observer.disconnect();
-  }, [loading]); // Re-attach if loading state changes layout, though mostly static ref.
-
-  // Sincronizar altura entre orçamentos e transações no desktop
-  useEffect(() => {
-    let lastHeight = 0;
-
-    const syncHeights = () => {
-      if (!transactionsContainerRef.current) return;
-
-      if (window.innerWidth < 1024) {
-        transactionsContainerRef.current.style.height = '';
-        lastHeight = 0;
-        return;
-      }
-
-      if (!budgetsContainerRef.current) return;
-
-      const budgetsCard = budgetsContainerRef.current.querySelector('.glass-card') as HTMLElement;
-      if (!budgetsCard) return;
-
-      const budgetsHeight = budgetsCard.offsetHeight;
-
-      // Só atualizar se a altura mudou e é válida
-      if (budgetsHeight > 100 && budgetsHeight !== lastHeight) {
-        lastHeight = budgetsHeight;
-        transactionsContainerRef.current.style.height = `${budgetsHeight}px`;
-        transactionsContainerRef.current.style.overflow = 'hidden';
-      }
-    };
-
-    // Intervalo contínuo para manter sincronizado
-    const intervalId = setInterval(syncHeights, 200);
-
-    // ResizeObserver como backup
-    const resizeObserver = new ResizeObserver(syncHeights);
-
-    if (budgetsContainerRef.current) {
-      resizeObserver.observe(budgetsContainerRef.current);
-      const budgetsCard = budgetsContainerRef.current.querySelector('.glass-card');
-      if (budgetsCard) {
-        resizeObserver.observe(budgetsCard);
-      }
-    }
-
-    window.addEventListener('resize', syncHeights);
-
-    return () => {
-      clearInterval(intervalId);
-      resizeObserver.disconnect();
-      window.removeEventListener('resize', syncHeights);
-    };
-  }, [loading, recentTransactions.length]);
+  // Altura das transações agora é automática para evitar cortes
 
   // Memoizar o nome do mês atual para evitar recálculos
   const currentMonthName = useMemo(() => {
@@ -612,16 +542,16 @@ export default function DashboardPage() {
 
       <ExpensesByCategoryChart />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 lg:items-stretch items-start max-w-full overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 lg:items-stretch items-start w-full">
         <PlanGuard minPlan="pro" showFallback={false}>
-          <div ref={budgetsContainerRef} className="max-w-full overflow-hidden">
+          <div ref={budgetsContainerRef} className="w-full min-w-0">
             <BudgetsByCategory />
           </div>
         </PlanGuard>
-        <div ref={transactionsContainerRef} className="glass-card p-3 md:p-6 flex flex-col lg:overflow-hidden max-w-full overflow-hidden">
+        <div className="glass-card p-3 md:p-6 flex flex-col w-full min-w-0">
           <div className="flex items-center justify-between mb-4 flex-shrink-0">
-            <div className="flex items-center gap-2">
-              <h2 className="font-display font-semibold text-sm md:text-base">Transações Recentes</h2>
+            <div className="flex items-center gap-2 min-w-0">
+              <h2 className="font-display font-semibold text-sm md:text-base whitespace-nowrap">Transações Recentes</h2>
               <InfoIcon
                 content={
                   <div className="space-y-2">
@@ -636,7 +566,7 @@ export default function DashboardPage() {
                 }
               />
             </div>
-            <Link href="/app/transactions" className="text-xs md:text-sm text-primary hover:underline">
+            <Link href="/app/transactions" className="text-xs md:text-sm text-primary hover:underline whitespace-nowrap flex-shrink-0">
               Ver todas
             </Link>
           </div>
@@ -648,9 +578,9 @@ export default function DashboardPage() {
               </Link>
             </div>
           ) : (
-            <div ref={containerRef} className="flex-1 min-h-0 overflow-hidden max-w-full">
+            <div className="flex-1 w-full min-w-0">
               {/* Mobile: Card view */}
-              <div className="md:hidden space-y-1.5 max-w-full">
+              <div className="md:hidden space-y-1.5 w-full">
                 {recentTransactions.slice(0, 9).map((tx) => {
                   const amount = typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount;
                   const isIncome = amount > 0;
@@ -670,31 +600,31 @@ export default function DashboardPage() {
                 })}
               </div>
               {/* Tablet: Compact table view */}
-              <div className="hidden md:block lg:hidden overflow-x-hidden">
-                <table className="w-full">
+              <div className="hidden md:block lg:hidden w-full">
+                <table className="w-full table-fixed">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground w-[40%]">Descrição</th>
-                      <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Data</th>
-                      <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">Valor</th>
+                      <th className="text-left py-2 px-2 text-xs font-medium text-muted-foreground w-[45%]">Descrição</th>
+                      <th className="text-left py-2 px-2 text-xs font-medium text-muted-foreground w-[25%]">Data</th>
+                      <th className="text-right py-2 px-2 text-xs font-medium text-muted-foreground w-[30%]">Valor</th>
                     </tr>
                   </thead>
                   <tbody>
                     {recentTransactions.slice(0, 9).map((tx) => (
                       <tr key={tx.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                        <td className="py-2 px-3 text-xs min-w-0 max-w-[140px]">
-                          <div className="text-left" title={tx.description}>
-                            {truncateStart(tx.description, 25)}
+                        <td className="py-2 px-2 text-xs">
+                          <div className="truncate" title={tx.description}>
+                            {tx.description}
                           </div>
-                          <div className="text-[10px] text-muted-foreground mt-0.5">
+                          <div className="text-[10px] text-muted-foreground mt-0.5 truncate">
                             {tx.categories?.name || 'Sem categoria'}
                           </div>
                         </td>
-                        <td className="py-2 px-3 text-xs text-muted-foreground whitespace-nowrap">
+                        <td className="py-2 px-2 text-xs text-muted-foreground">
                           {new Date(tx.posted_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
                         </td>
                         <td
-                          className={`py-2 px-3 text-xs text-right font-medium whitespace-nowrap ${(() => {
+                          className={`py-2 px-2 text-xs text-right font-medium ${(() => {
                             const amount = typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount;
                             return amount > 0 ? 'text-green-500' : 'text-red-500';
                           })()
@@ -712,34 +642,34 @@ export default function DashboardPage() {
                 </table>
               </div>
               {/* Desktop: Full table view */}
-              <div className="hidden lg:block overflow-hidden">
-                <table className="w-full">
+              <div className="hidden lg:block w-full">
+                <table className="w-full table-fixed">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground w-[30%]">Descrição</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Categoria</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Data</th>
-                      <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Valor</th>
+                      <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground w-[30%]">Descrição</th>
+                      <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground w-[25%]">Categoria</th>
+                      <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground w-[20%]">Data</th>
+                      <th className="text-right py-3 px-2 text-sm font-medium text-muted-foreground w-[25%]">Valor</th>
                     </tr>
                   </thead>
                   <tbody>
                     {recentTransactions.slice(0, maxVisibleItems).map((tx) => (
                       <tr key={tx.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                        <td className="py-3 px-4 text-sm min-w-0 max-w-[180px]">
-                          <div className="text-left" title={tx.description}>
-                            {truncateStart(tx.description, 35)}
+                        <td className="py-3 px-2 text-sm">
+                          <div className="truncate" title={tx.description}>
+                            {tx.description}
                           </div>
                         </td>
-                        <td className="py-3 px-4">
-                          <span className="badge-pill text-xs">
+                        <td className="py-3 px-2">
+                          <span className="badge-pill text-xs truncate inline-block max-w-full">
                             {tx.categories?.name || 'Sem categoria'}
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-sm text-muted-foreground whitespace-nowrap">
+                        <td className="py-3 px-2 text-sm text-muted-foreground">
                           {new Date(tx.posted_at).toLocaleDateString('pt-BR')}
                         </td>
                         <td
-                          className={`py-3 px-4 text-sm text-right font-medium whitespace-nowrap ${(() => {
+                          className={`py-3 px-2 text-sm text-right font-medium ${(() => {
                             const amount = typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount;
                             return amount > 0 ? 'text-green-500' : 'text-red-500';
                           })()

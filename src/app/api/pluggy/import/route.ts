@@ -112,6 +112,11 @@ export async function POST(request: NextRequest) {
         const categoryId = requestedCategoryId || fallbackCategoryId;
 
         // Create the transaction
+        // Apply sign based on type: debit = negative (expense), credit = positive (income)
+        const amountCents = Number(pluggyTx.amount_cents) || 0;
+        const signedAmountCents = pluggyTx.type === 'debit' ? -Math.abs(amountCents) : Math.abs(amountCents);
+        const signedAmountReais = signedAmountCents / 100;
+
         const { data: newTx, error: insertError } = await supabase
           .from('transactions')
           .insert({
@@ -120,11 +125,11 @@ export async function POST(request: NextRequest) {
             category_id: categoryId,
             posted_at: pluggyTx.date,
             description: pluggyTx.description,
-            amount: pluggyTx.amount_cents / 100, // Convert cents to reais
+            amount: signedAmountReais,
             currency: pluggyTx.currency || 'BRL',
             source: 'pluggy',
             provider_tx_id: pluggyTx.pluggy_transaction_id,
-            notes: `Importado via Open Finance - ${pluggyTx.type || 'transacao'}`,
+            notes: `Importado via Open Finance - ${pluggyTx.type === 'debit' ? 'despesa' : 'receita'}`,
           })
           .select('id')
           .single();
@@ -134,7 +139,8 @@ export async function POST(request: NextRequest) {
             results.skipped++;
           } else {
             console.error('Error inserting transaction:', insertError);
-            results.errors.push(`Erro ao importar: ${pluggyTx.description}`);
+            const errorDetail = insertError.message || 'Erro desconhecido';
+            results.errors.push(`Erro ao importar: ${pluggyTx.description} - ${errorDetail}`);
           }
           continue;
         }

@@ -4,12 +4,14 @@ import { useState, useEffect, useMemo } from 'react';
 import { MonthYearPicker } from '@/components/ui/month-year-picker';
 import { Progress } from '@/components/ui/progress';
 import { InfoIcon } from '@/components/ui/InfoIcon';
-import { cn, formatCurrencyValue } from '@/lib/utils';
+import { cn, formatCurrencyValue, calculateDailySpendingEstimates } from '@/lib/utils';
 import {
   AlertCircle,
   CheckCircle2,
   AlertTriangle,
   Filter,
+  TrendingUp,
+  Calendar,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -21,6 +23,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from '@/components/ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Category {
   id: string;
@@ -53,6 +62,7 @@ export function BudgetsByCategory() {
   const [loading, setLoading] = useState(false);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     fetchBudgets();
@@ -113,8 +123,9 @@ export function BudgetsByCategory() {
   }, [budgets, statusFilter]);
 
   return (
-    <div className="glass-card p-3 md:p-4 lg:p-6 max-w-full overflow-hidden">
-      <div className="flex flex-col gap-2 md:gap-3 mb-3 md:mb-4 lg:mb-6">
+    <TooltipProvider delayDuration={200} skipDelayDuration={0}>
+      <div className="glass-card p-3 md:p-4 lg:p-6 max-w-full">
+        <div className="flex flex-col gap-2 md:gap-3 mb-3 md:mb-4 lg:mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
             <h2 className="font-display font-semibold text-sm md:text-sm lg:text-lg">Orçamentos por Categoria</h2>
@@ -196,7 +207,7 @@ export function BudgetsByCategory() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-2 md:gap-3 lg:gap-4 max-w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-2 md:gap-3 lg:gap-4 max-w-full overflow-visible">
           {filteredBudgets.map((budget) => {
             const spent = Math.abs(budget.amount_actual || 0);
             const limit = Math.abs((budget.limit_cents || budget.amount_planned_cents || 0) / 100);
@@ -215,13 +226,18 @@ export function BudgetsByCategory() {
               autoSourceTypes.includes(budget.source_type || '') ||
               budget.is_projected === true;
 
-            return (
+            // Calcular estimativas diárias (apenas para mês atual)
+            const estimates = calculateDailySpendingEstimates(spent, limit, budget.year, budget.month);
+            const showEstimates = estimates !== null;
+
+            const budgetCard = (
               <div
-                key={budget.id}
                 className={cn(
-                  "group relative p-2.5 md:p-3 lg:p-4 rounded-xl border border-border/50 bg-card/30 hover:bg-card/50 transition-all duration-300",
-                  isOver && "border-red-500/20 bg-red-500/[0.02] hover:bg-red-500/[0.04]",
-                  isWarning && "border-amber-500/20 bg-amber-500/[0.02] hover:bg-amber-500/[0.04]"
+                  "group relative p-2.5 md:p-3 lg:p-4 rounded-xl border border-border/50 bg-card/30",
+                  "hover:bg-card/50 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-pointer",
+                  isOver && "border-red-500/20 bg-red-500/[0.02] hover:bg-red-500/[0.04] hover:border-red-500/40",
+                  isWarning && "border-amber-500/20 bg-amber-500/[0.02] hover:bg-amber-500/[0.04] hover:border-amber-500/40",
+                  showEstimates && !isMobile && !isAutomatic && "hover:ring-2 hover:ring-primary/20"
                 )}
                 style={!isOver && !isWarning ? { borderLeft: `3px solid ${categoryColor}` } : undefined}
               >
@@ -305,13 +321,112 @@ export function BudgetsByCategory() {
                       </span>
                     </div>
                   </div>
+
+                  {/* Estimativas diárias - sempre visível no mobile (apenas para categorias não automáticas) */}
+                  {showEstimates && isMobile && !isAutomatic && (
+                    <div className="pt-1.5 mt-1.5 border-t border-border/10">
+                      <div className="flex items-center justify-between gap-2 text-[9px] text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <TrendingUp className="w-3 h-3" />
+                          <span>Média: {formatCurrency(estimates!.averageDailySpent)}/dia</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          <span>
+                            {estimates!.daysRemaining > 0 
+                              ? `Restante: ${formatCurrency(estimates!.estimatedDailyRemaining)}/dia (${estimates!.daysRemaining} dias)`
+                              : 'Fim do mês'
+                            }
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             );
+
+            // Envolver com Tooltip apenas no desktop, se houver estimativas e não for categoria automática
+            if (showEstimates && !isMobile && !isAutomatic) {
+              return (
+                <Tooltip key={budget.id} delayDuration={300}>
+                  <TooltipTrigger asChild>
+                    {budgetCard}
+                  </TooltipTrigger>
+                  <TooltipContent 
+                    side="top" 
+                    sideOffset={16}
+                    className={cn(
+                      "max-w-[320px] bg-gradient-to-br from-popover to-popover/95",
+                      "border-2 shadow-2xl backdrop-blur-sm",
+                      "px-4 py-3",
+                      isOver && "border-red-500/30 shadow-red-500/20",
+                      isWarning && "border-amber-500/30 shadow-amber-500/20",
+                      !isOver && !isWarning && "border-primary/30 shadow-primary/20"
+                    )}
+                    style={{ zIndex: 999999 }}
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 font-bold text-sm text-foreground">
+                        <div className={cn(
+                          "p-1.5 rounded-md",
+                          isOver ? "bg-red-500/20 text-red-500" :
+                          isWarning ? "bg-amber-500/20 text-amber-500" :
+                          "bg-primary/20 text-primary"
+                        )}>
+                          <TrendingUp className="w-4 h-4" />
+                        </div>
+                        <span>Estimativas Diárias</span>
+                      </div>
+                      <div className="space-y-2.5 text-xs">
+                        <div className="bg-muted/50 rounded-lg p-2.5 space-y-1">
+                          <div className="flex items-start justify-between gap-4">
+                            <span className="text-muted-foreground font-medium">Média diária até agora:</span>
+                            <span className="font-bold text-foreground text-right">
+                              {formatCurrency(estimates!.averageDailySpent)}/dia
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-muted-foreground pl-1">
+                            ({estimates!.daysElapsed} {estimates!.daysElapsed === 1 ? 'dia' : 'dias'} decorridos)
+                          </div>
+                        </div>
+                        <div className="bg-muted/50 rounded-lg p-2.5 space-y-1">
+                          <div className="flex items-start justify-between gap-4">
+                            <span className="text-muted-foreground font-medium">Estimativa até o fim:</span>
+                            <span className={cn(
+                              "font-bold text-right",
+                              estimates!.estimatedDailyRemaining > estimates!.averageDailySpent * 1.2 
+                                ? "text-amber-500" 
+                                : estimates!.estimatedDailyRemaining < estimates!.averageDailySpent * 0.8
+                                ? "text-emerald-500"
+                                : "text-foreground"
+                            )}>
+                              {estimates!.daysRemaining > 0 
+                                ? `${formatCurrency(estimates!.estimatedDailyRemaining)}/dia`
+                                : 'Fim do mês'
+                              }
+                            </span>
+                          </div>
+                          {estimates!.daysRemaining > 0 && (
+                            <div className="text-[10px] text-muted-foreground pl-1">
+                              ({estimates!.daysRemaining} {estimates!.daysRemaining === 1 ? 'dia' : 'dias'} restantes)
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            }
+
+            // Sem tooltip no mobile ou quando não há estimativas
+            return <div key={budget.id}>{budgetCard}</div>;
           })}
         </div>
       )}
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }
 

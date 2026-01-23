@@ -5,6 +5,9 @@ import { createErrorResponse } from '@/lib/errors';
 import { sendEmail, inviteNewUserTemplate, inviteExistingUserTemplate } from '@/services/email';
 import { z } from 'zod';
 
+// Limite máximo de membros que podem ter acesso a uma conta
+export const MAX_SHARING_MEMBERS = 2;
+
 const createInviteSchema = z.object({
   email: z.string().email('Email invalido'),
   role: z.enum(['viewer', 'editor', 'admin']).default('viewer'),
@@ -40,6 +43,7 @@ export async function GET() {
 
     const supabase = await createClient();
 
+    // Get pending invites
     const { data: invites, error } = await supabase
       .from('account_invites')
       .select('*')
@@ -49,7 +53,25 @@ export async function GET() {
 
     if (error) throw error;
 
-    return NextResponse.json({ data: invites });
+    // Get current members count for limit info
+    const { count: membersCount } = await supabase
+      .from('account_members')
+      .select('*', { count: 'exact', head: true })
+      .eq('owner_id', userId);
+
+    const pendingCount = invites?.length || 0;
+    const totalSharing = (membersCount || 0) + pendingCount;
+
+    return NextResponse.json({ 
+      data: invites,
+      sharingInfo: {
+        membersCount: membersCount || 0,
+        pendingCount,
+        totalCount: totalSharing,
+        limit: MAX_SHARING_MEMBERS,
+        canInvite: totalSharing < MAX_SHARING_MEMBERS
+      }
+    });
   } catch (error) {
     console.error('[Sharing/Invites] GET error:', error);
     const errorResponse = createErrorResponse(error);
@@ -82,7 +104,7 @@ export async function POST(request: NextRequest) {
     // Check if user is trying to invite themselves
     if (validatedData.email.toLowerCase() === ownerProfile.email.toLowerCase()) {
       return NextResponse.json(
-        { error: 'Voce nao pode convidar a si mesmo' },
+        { error: 'Você não pode convidar a si mesmo' },
         { status: 400 }
       );
     }
@@ -119,7 +141,34 @@ export async function POST(request: NextRequest) {
 
     if (existingUser && existingMember?.member_id === existingUser.id) {
       return NextResponse.json(
-        { error: 'Este usuario ja tem acesso a sua conta' },
+        { error: 'Este usuário já tem acesso a sua conta' },
+        { status: 400 }
+      );
+    }
+
+    // Check sharing limit (members + pending invites)
+    const { count: membersCount } = await supabase
+      .from('account_members')
+      .select('*', { count: 'exact', head: true })
+      .eq('owner_id', userId);
+
+    const { count: pendingInvitesCount } = await supabase
+      .from('account_invites')
+      .select('*', { count: 'exact', head: true })
+      .eq('owner_id', userId)
+      .eq('status', 'pending');
+
+    const totalSharing = (membersCount || 0) + (pendingInvitesCount || 0);
+
+    if (totalSharing >= MAX_SHARING_MEMBERS) {
+      return NextResponse.json(
+        { 
+          error: `Limite de compartilhamento atingido`,
+          details: `Você pode compartilhar sua conta com no máximo ${MAX_SHARING_MEMBERS} pessoas. Remova um membro ou cancele um convite pendente para convidar alguém novo.`,
+          currentCount: membersCount || 0,
+          pendingCount: pendingInvitesCount || 0,
+          limit: MAX_SHARING_MEMBERS
+        },
         { status: 400 }
       );
     }
@@ -155,14 +204,14 @@ export async function POST(request: NextRequest) {
     // Send email
     const emailTemplate = existingUser
       ? inviteExistingUserTemplate({
-          ownerName: ownerProfile.full_name || 'Usuario',
+          ownerName: ownerProfile.full_name || 'Usuário',
           ownerEmail: ownerProfile.email,
           inviteLink,
           role: validatedData.role,
           expiresAt: expiresAt.toLocaleDateString('pt-BR'),
         })
       : inviteNewUserTemplate({
-          ownerName: ownerProfile.full_name || 'Usuario',
+          ownerName: ownerProfile.full_name || 'Usuário',
           ownerEmail: ownerProfile.email,
           inviteLink,
           role: validatedData.role,
@@ -184,8 +233,8 @@ export async function POST(request: NextRequest) {
       if (errorMessage.includes('SMTP not configured') || errorMessage.includes('not configured')) {
         return NextResponse.json(
           { 
-            error: 'SMTP nao configurado. Por favor, configure as configuracoes de email no painel administrativo antes de enviar convites.',
-            details: 'O convite foi criado, mas o email nao foi enviado. Configure o SMTP e tente novamente.'
+            error: 'SMTP não configurado. Por favor, configure as configurações de email no painel administrativo antes de enviar convites.',
+            details: 'O convite foi criado, mas o email não foi enviado. Configure o SMTP e tente novamente.'
           },
           { status: 500 }
         );

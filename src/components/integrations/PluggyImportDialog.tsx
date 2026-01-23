@@ -86,7 +86,7 @@ export default function PluggyImportDialog({ open, onOpenChange, linkId, onImpor
       toast({
         variant: 'destructive',
         title: 'Erro',
-        description: 'Nao foi possivel carregar as transacoes',
+        description: 'Não foi possível carregar as transações',
       });
     } finally {
       setLoading(false);
@@ -147,15 +147,15 @@ export default function PluggyImportDialog({ open, onOpenChange, linkId, onImpor
       );
 
       toast({
-        title: 'Categorizacao concluida',
-        description: 'As transacoes foram categorizadas automaticamente',
+        title: 'Categorização concluída',
+        description: 'As transações foram categorizadas automaticamente',
       });
     } catch (error: any) {
       console.error('Error categorizing:', error);
       toast({
         variant: 'destructive',
         title: 'Erro',
-        description: 'Nao foi possivel categorizar as transacoes',
+        description: 'Não foi possível categorizar as transações',
       });
     } finally {
       setCategorizing(false);
@@ -197,7 +197,7 @@ export default function PluggyImportDialog({ open, onOpenChange, linkId, onImpor
       toast({
         variant: 'destructive',
         title: 'Erro',
-        description: 'Selecione pelo menos uma transacao para importar',
+        description: 'Selecione pelo menos uma transação para importar',
       });
       return;
     }
@@ -224,8 +224,8 @@ export default function PluggyImportDialog({ open, onOpenChange, linkId, onImpor
       const data = await res.json();
 
       toast({
-        title: 'Importacao concluida',
-        description: `${data.results.imported} transacoes importadas${
+        title: 'Importação concluída',
+        description: `${data.results.imported} transações importadas${
           data.results.skipped > 0 ? `, ${data.results.skipped} ignoradas (duplicadas)` : ''
         }`,
       });
@@ -265,11 +265,11 @@ export default function PluggyImportDialog({ open, onOpenChange, linkId, onImpor
       <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <i className="bx bx-import text-primary"></i>
-            Importar Transacoes
+            <i className="bx bx-file-plus text-primary"></i>
+            Importar Transações
           </DialogTitle>
           <DialogDescription>
-            Selecione as transacoes que deseja importar e defina as categorias
+            Selecione as transações que deseja importar e defina as categorias
           </DialogDescription>
         </DialogHeader>
 
@@ -277,16 +277,16 @@ export default function PluggyImportDialog({ open, onOpenChange, linkId, onImpor
           <div className="flex-1 flex items-center justify-center py-12">
             <div className="text-center">
               <i className="bx bx-loader-alt bx-spin text-4xl text-primary"></i>
-              <p className="mt-2 text-muted-foreground">Carregando transacoes...</p>
+              <p className="mt-2 text-muted-foreground">Carregando transações...</p>
             </div>
           </div>
         ) : transactions.length === 0 ? (
           <div className="flex-1 flex items-center justify-center py-12">
             <div className="text-center">
               <i className="bx bx-check-circle text-4xl text-green-500"></i>
-              <p className="mt-2 font-medium">Todas as transacoes ja foram importadas!</p>
+              <p className="mt-2 font-medium">Todas as transações já foram importadas!</p>
               <p className="text-sm text-muted-foreground">
-                Nao ha transacoes pendentes para importar
+                Não há transações pendentes para importar
               </p>
             </div>
           </div>
@@ -325,7 +325,7 @@ export default function PluggyImportDialog({ open, onOpenChange, linkId, onImpor
                   <tr className="text-left text-xs text-muted-foreground border-b">
                     <th className="p-2 w-10"></th>
                     <th className="p-2">Data</th>
-                    <th className="p-2">Descricao</th>
+                    <th className="p-2">Descrição</th>
                     <th className="p-2 text-right">Valor</th>
                     <th className="p-2">Categoria</th>
                   </tr>
@@ -385,11 +385,11 @@ export default function PluggyImportDialog({ open, onOpenChange, linkId, onImpor
 
             <div className="flex items-center justify-between pt-4 border-t text-sm text-muted-foreground">
               <div>
-                {selectedCount} transacoes selecionadas
+                {selectedCount} transações selecionadas
                 {categorizedCount > 0 && ` • ${categorizedCount} categorizadas`}
               </div>
               <div className="text-xs">
-                Transacoes sem categoria serao importadas como "Outros"
+                Transações sem categoria serão importadas como "Outros"
               </div>
             </div>
           </>
@@ -406,7 +406,7 @@ export default function PluggyImportDialog({ open, onOpenChange, linkId, onImpor
             {importing ? (
               <i className="bx bx-loader-alt bx-spin mr-2"></i>
             ) : (
-              <i className="bx bx-import mr-2"></i>
+              <i className="bx bx-file-plus mr-2"></i>
             )}
             Importar {selectedCount > 0 ? `(${selectedCount})` : ''}
           </Button>

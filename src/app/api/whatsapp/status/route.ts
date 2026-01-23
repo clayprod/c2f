@@ -22,11 +22,11 @@ async function checkWhatsAppAccess(userId: string): Promise<{ allowed: boolean; 
   // Default: WhatsApp is enabled for Pro and Premium plans
   // Only check settings if explicitly configured
   let whatsappEnabled: boolean;
-  if (planFeatures?.whatsapp_integration?.enabled !== undefined) {
-    // Use explicit configuration if set
+  if (planFeatures?.integrations?.enabled !== undefined) {
+    whatsappEnabled = planFeatures.integrations.enabled;
+  } else if (planFeatures?.whatsapp_integration?.enabled !== undefined) {
     whatsappEnabled = planFeatures.whatsapp_integration.enabled;
   } else {
-    // Default: enabled for Pro and Premium, disabled for Free
     whatsappEnabled = plan === 'pro' || plan === 'premium';
   }
 
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         enabled: false,
         configured: false,
-        message: 'Integracao WhatsApp nao esta disponivel no momento',
+        message: 'Integração WhatsApp não está disponível no momento',
       });
     }
 

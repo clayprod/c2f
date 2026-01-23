@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
         configured: false,
         connected: false,
         enabled: false,
-        message: 'Credenciais Pluggy nao configuradas',
+        message: 'Credenciais Pluggy não configuradas',
       });
     }
 

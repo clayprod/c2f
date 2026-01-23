@@ -21,11 +21,11 @@ async function checkWhatsAppAccess(userId: string): Promise<{ allowed: boolean; 
   // Default: WhatsApp is enabled for Pro and Premium plans
   // Only check settings if explicitly configured
   let whatsappEnabled: boolean;
-  if (planFeatures?.whatsapp_integration?.enabled !== undefined) {
-    // Use explicit configuration if set
+  if (planFeatures?.integrations?.enabled !== undefined) {
+    whatsappEnabled = planFeatures.integrations.enabled;
+  } else if (planFeatures?.whatsapp_integration?.enabled !== undefined) {
     whatsappEnabled = planFeatures.whatsapp_integration.enabled;
   } else {
-    // Default: enabled for Pro and Premium, disabled for Free
     whatsappEnabled = plan === 'pro' || plan === 'premium';
   }
 
@@ -83,14 +83,14 @@ export async function POST(request: NextRequest) {
 
     if (!code) {
       return NextResponse.json({
-        error: 'Codigo de verificacao obrigatorio',
+        error: 'Código de verificação obrigatório',
       }, { status: 400 });
     }
 
     // Validate code format (6 digits)
     if (!/^\d{6}$/.test(code)) {
       return NextResponse.json({
-        error: 'Codigo deve ter 6 digitos',
+        error: 'Código deve ter 6 dígitos',
       }, { status: 400 });
     }
 
@@ -99,18 +99,18 @@ export async function POST(request: NextRequest) {
 
     if (!result.success) {
       return NextResponse.json({
-        error: result.error || 'Codigo invalido',
+        error: result.error || 'Código inválido',
       }, { status: 400 });
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Numero verificado com sucesso!',
+      message: 'Número verificado com sucesso!',
     });
   } catch (error: any) {
     console.error('[WhatsApp Verify] Error:', error);
     return NextResponse.json({
-      error: error.message || 'Erro ao verificar codigo',
+      error: error.message || 'Erro ao verificar código',
     }, { status: 500 });
   }
 }

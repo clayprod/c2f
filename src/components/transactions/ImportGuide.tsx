@@ -1,10 +1,58 @@
 'use client';
 
 interface ImportGuideProps {
-  type: 'csv' | 'ofx';
+  type: 'csv' | 'ofx' | 'openfinance';
 }
 
 export default function ImportGuide({ type }: ImportGuideProps) {
+  if (type === 'openfinance') {
+    return (
+      <div className="space-y-4 text-sm">
+        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+          <div className="flex items-start gap-3">
+            <i className='bx bx-link text-emerald-500 text-xl mt-0.5'></i>
+            <div>
+              <h4 className="font-medium text-emerald-500 mb-1">Open Finance</h4>
+              <p className="text-muted-foreground">
+                Importe transações diretamente das suas contas bancárias vinculadas via Open Finance.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <h4 className="font-medium">Como funciona:</h4>
+          <ol className="list-decimal list-inside space-y-1 text-muted-foreground pl-2">
+            <li>Selecione a conta vinculada ou "Todas as contas"</li>
+            <li>Escolha quantas transações deseja carregar (25, 50 ou 100)</li>
+            <li>Revise e categorize as transações com ajuda da IA</li>
+            <li>Selecione quais transações importar</li>
+          </ol>
+        </div>
+
+        <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+          <div className="flex items-start gap-2">
+            <i className='bx bx-brain text-primary'></i>
+            <p className="text-muted-foreground text-xs">
+              <strong>Categorização automática:</strong> A IA irá sugerir categorias
+              baseadas na descrição de cada transação.
+            </p>
+          </div>
+        </div>
+
+        <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+          <div className="flex items-start gap-2">
+            <i className='bx bx-bulb text-yellow-500'></i>
+            <p className="text-muted-foreground text-xs">
+              <strong>Dica:</strong> Transações já importadas são automaticamente
+              ignoradas para evitar duplicações.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (type === 'csv') {
     return (
       <div className="space-y-4 text-sm">

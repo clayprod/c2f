@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('[Admin WhatsApp Settings] Error:', error);
-    return NextResponse.json({ error: 'Erro ao carregar configuracoes' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro ao carregar configurações' }, { status: 500 });
   }
 }
 
@@ -98,6 +98,6 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('[Admin WhatsApp Settings] Error updating:', error);
-    return NextResponse.json({ error: 'Erro ao salvar configuracoes' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro ao salvar configurações' }, { status: 500 });
   }
 }

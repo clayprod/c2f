@@ -1,9 +1,9 @@
 -- ============================================
--- SET ADMIN: Dar permissoes de admin ao usuario
+-- SET ADMIN: Dar permissões de admin ao usuário
 -- ============================================
 -- Execute este SQL no Supabase Dashboard -> SQL Editor
 
--- 1. Verificar se o usuario existe
+-- 1. Verificar se o usuário existe
 SELECT id, email, role FROM public.profiles WHERE email = 'clayton@tenryu.com';
 
 -- 2. Atualizar role para admin

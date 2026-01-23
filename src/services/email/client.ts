@@ -133,14 +133,14 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       ) {
         let portHint = '';
         if (port === 588) {
-          portHint = ' A porta 588 nao e uma porta SMTP padrao. Tente usar 587 (STARTTLS) ou 465 (SSL/TLS).';
+          portHint = ' A porta 588 não é uma porta SMTP padrão. Tente usar 587 (STARTTLS) ou 465 (SSL/TLS).';
         } else if (![25, 465, 587].includes(port)) {
-          portHint = ` A porta ${port} pode nao ser suportada. Portas SMTP comuns sao: 587 (STARTTLS) ou 465 (SSL/TLS).`;
+          portHint = ` A porta ${port} pode não ser suportada. Portas SMTP comuns são: 587 (STARTTLS) ou 465 (SSL/TLS).`;
         }
         
         throw new Error(
-          `Nao foi possivel conectar ao servidor SMTP (${host}:${port}).${portHint} ` +
-          'Verifique as configuracoes de host e porta no painel administrativo.'
+          `Não foi possível conectar ao servidor SMTP (${host}:${port}).${portHint} ` +
+          'Verifique as configurações de host e porta no painel administrativo.'
         );
       }
       
@@ -150,7 +150,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
         errorMessage.includes('535') ||
         errorMessage.includes('535-5.7.8')
       ) {
-        throw new Error('Autenticacao SMTP falhou. Verifique usuario e senha nas configuracoes do painel administrativo.');
+        throw new Error('Autenticação SMTP falhou. Verifique usuário e senha nas configurações do painel administrativo.');
       }
       
       if (
@@ -158,11 +158,11 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
         errorMessage.includes('UNABLE_TO_VERIFY_LEAF_SIGNATURE') ||
         errorMessage.includes('CERT_HAS_EXPIRED')
       ) {
-        throw new Error('Certificado SSL invalido ou expirado. Verifique as configuracoes de seguranca SMTP ou entre em contato com o provedor de email.');
+        throw new Error('Certificado SSL inválido ou expirado. Verifique as configurações de segurança SMTP ou entre em contato com o provedor de email.');
       }
       
       if (errorMessage.includes('EHLO') || errorMessage.includes('HELO')) {
-        throw new Error(`Erro na comunicacao com o servidor SMTP (${host}:${port}). O servidor pode estar rejeitando conexoes ou a porta pode estar incorreta.`);
+        throw new Error(`Erro na comunicação com o servidor SMTP (${host}:${port}). O servidor pode estar rejeitando conexões ou a porta pode estar incorreta.`);
       }
     }
     

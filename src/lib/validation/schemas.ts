@@ -442,7 +442,7 @@ export const exportReportSchema = z.object({
 
 // Credit Card schemas
 export const creditCardSchema = z.object({
-  name: z.string().min(1, 'Nome do cartao e obrigatorio'),
+  name: z.string().min(1, 'Nome do cartão é obrigatório'),
   institution: z.string().nullable().optional(),
   last_four_digits: z.union([
     z.string().regex(/^\d{4}$/, 'Ultimos 4 digitos invalidos'),
@@ -471,7 +471,7 @@ export const creditCardSchema = z.object({
 export const creditCardUpdateSchema = creditCardSchema.partial();
 
 export const creditCardBillSchema = z.object({
-  account_id: z.string().uuid('ID do cartao invalido'),
+  account_id: z.string().uuid('ID do cartão inválido'),
   reference_month: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Mes de referencia invalido'),
   closing_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data de fechamento invalida'),
   due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data de vencimento invalida'),

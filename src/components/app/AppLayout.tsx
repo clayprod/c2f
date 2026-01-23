@@ -10,6 +10,8 @@ import AdvisorDialog from './AdvisorDialog';
 import { NotificationDropdown } from './NotificationDropdown';
 import { useTheme } from '@/hooks/useTheme';
 import { useAccountContext } from '@/hooks/useAccountContext';
+import type { PlanFeatures } from '@/services/admin/globalSettings';
+import { PLAN_MODULES } from '@/lib/planFeatures';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,9 +56,17 @@ const menuItems = [
   { icon: 'bx-share', label: 'Integrações', path: '/app/integrations', minPlan: 'premium' },
 ];
 
+const moduleByRoute = PLAN_MODULES.reduce<Record<string, string>>((acc, module) => {
+  acc[module.route] = module.id;
+  return acc;
+}, {});
+
+const orderedModules = [...PLAN_MODULES].sort((a, b) => b.route.length - a.route.length);
+
 export default function AppLayout({ children }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [planFeatures, setPlanFeatures] = useState<PlanFeatures | null>(null);
   const [showScrollUp, setShowScrollUp] = useState(false);
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [advisorOpen, setAdvisorOpen] = useState(false);
@@ -173,13 +183,35 @@ export default function AppLayout({ children }: AppLayoutProps) {
       return hasPermission(resource, 'view');
     }
 
-    // Own account plan gating
+    if (planFeatures) {
+      const featureId = moduleByRoute[item.path];
+      if (featureId) {
+        const enabled = planFeatures[featureId]?.enabled;
+        if (enabled !== undefined) return enabled;
+      }
+    }
+
     if (!userProfile) return item.minPlan === 'free';
     if (item.minPlan === 'free') return true;
     if (item.minPlan === 'pro') return userProfile.plan === 'pro' || userProfile.plan === 'premium';
     if (item.minPlan === 'premium') return userProfile.plan === 'premium';
     return true;
   });
+
+  useEffect(() => {
+    if (isViewingSharedAccount || !planFeatures) return;
+
+    const currentPath = pathname ?? '';
+    const match = orderedModules.find((module) =>
+      currentPath === module.route || currentPath.startsWith(`${module.route}/`)
+    );
+
+    if (!match) return;
+    const enabled = planFeatures[match.id]?.enabled;
+    if (enabled === false && currentPath !== '/app') {
+      router.replace('/app');
+    }
+  }, [isViewingSharedAccount, planFeatures, pathname, router]);
 
   useEffect(() => {
     const checkScroll = () => {
@@ -231,10 +263,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
         const profile = profileResult.data;
         let plan: 'free' | 'pro' | 'premium' = 'free';
+        let fetchedFeatures: PlanFeatures | null = null;
         if (planResponse.ok) {
           const planData = await planResponse.json();
           plan = (planData?.plan || 'free') as 'free' | 'pro' | 'premium';
+          fetchedFeatures = (planData?.features as PlanFeatures) || null;
         }
+        setPlanFeatures(fetchedFeatures);
 
         if (profile) {
           setUserProfile({
@@ -282,7 +317,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   };
 
   return (
-    <div className="h-screen bg-background flex overflow-hidden max-w-full">
+    <div className="min-h-[100dvh] h-[100dvh] bg-background flex overflow-hidden max-w-full">
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden"
@@ -431,7 +466,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </aside>
 
       <div className="flex-1 flex flex-col h-full lg:ml-64 overflow-hidden max-w-full min-w-0">
-        <header className="h-14 md:h-16 border-b border-border flex items-center px-3 md:px-4 lg:px-6 bg-card/50 backdrop-blur-xl sticky top-0 z-40 min-w-0 max-w-full overflow-x-hidden">
+        <header className="min-h-14 md:min-h-16 border-b border-border flex items-center px-3 md:px-4 lg:px-6 bg-card/50 backdrop-blur-xl sticky top-0 z-40 min-w-0 max-w-full overflow-x-hidden pt-[env(safe-area-inset-top)]">
           <button
             onClick={() => setSidebarOpen(true)}
             className="lg:hidden p-1.5 md:p-2 text-foreground mr-2 md:mr-4 flex-shrink-0"
@@ -481,7 +516,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
-                      className="hidden sm:flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors"
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors"
                       title="Selecionar conta"
                       aria-label="Selecionar conta"
                     >
@@ -518,7 +553,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                           </>
                         );
                       })()}
-                      <span className="text-xs md:text-sm font-medium max-w-[180px] truncate">
+                      <span className="hidden sm:inline text-xs md:text-sm font-medium max-w-[180px] truncate">
                         {(() => {
                           if (!activeAccountId) return 'Minha conta';
                           if (activeAccountId === accountContext.currentUserId) return 'Minha conta';

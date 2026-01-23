@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGlobalSettings, getAllPlanFeatures, getPlanDisplayConfig } from '@/services/admin/globalSettings';
+import { buildPlanFeatureList, buildPlanFeatureListWithInheritance } from '@/lib/planFeatures';
 import { getStripeClient } from '@/services/stripe/client';
 
 export const dynamic = 'force-dynamic';
@@ -50,16 +51,40 @@ async function fetchPricingData(): Promise<PlanData[]> {
   const displayConfig = await getPlanDisplayConfig();
 
   const plans: PlanData[] = [];
+  const fallbackFeatureSets = {
+    free: [
+      { id: 'dashboard', text: 'Dashboard', enabled: true },
+      { id: 'transactions', text: 'Até 100 transações/mês', enabled: true },
+      { id: 'accounts', text: 'Contas', enabled: true },
+      { id: 'credit_cards', text: 'Cartões', enabled: true },
+      { id: 'categories', text: 'Categorias', enabled: true },
+    ],
+    pro: [
+      { id: 'all_free', text: 'Tudo do Free', enabled: true },
+      { id: 'transactions', text: 'Transações ilimitadas', enabled: true },
+      { id: 'budgets', text: 'Orçamentos', enabled: true },
+      { id: 'debts', text: 'Dívidas', enabled: true },
+      { id: 'investments', text: 'Investimentos', enabled: true },
+      { id: 'goals', text: 'Objetivos', enabled: true },
+      { id: 'ai_advisor', text: 'AI Advisor (10 consultas/mês)', enabled: true },
+    ],
+    premium: [
+      { id: 'all_pro', text: 'Tudo do Pro', enabled: true },
+            { id: 'reports', text: 'Relatórios', enabled: true },
+            { id: 'integrations', text: 'Integrações (Whatsapp + OpenFinance*)', enabled: true },
+            { id: 'assets', text: 'Patrimônio', enabled: true },
+      { id: 'ai_advisor', text: 'AI Advisor (100 consultas/mês)', enabled: true },
+    ],
+  };
 
   // Free Plan
   const freeConfig = displayConfig.free || {};
-  const freeFeatures: PlanFeature[] = Object.entries(allFeatures.free)
-    .filter(([_, feature]) => feature.enabled)
-    .map(([id, feature]) => ({
-      id,
-      text: feature.text,
-      enabled: true,
-    }));
+  const freeFeaturesList = await buildPlanFeatureList(allFeatures.free);
+  const freeFeatures: PlanFeature[] = freeFeaturesList.map((feature) => ({
+    id: feature.id,
+    text: feature.text,
+    enabled: true,
+  }));
 
   plans.push({
     id: 'free',
@@ -70,7 +95,7 @@ async function fetchPricingData(): Promise<PlanData[]> {
     description: freeConfig.description || 'Comece a organizar suas finanças',
     cta: freeConfig.cta || 'Começar agora',
     popular: freeConfig.popular || false,
-    features: freeFeatures,
+    features: freeFeatures.length ? freeFeatures : fallbackFeatureSets.free,
   });
 
   // Pro Plan
@@ -98,13 +123,16 @@ async function fetchPricingData(): Promise<PlanData[]> {
   }
 
   const proConfig = displayConfig.pro || {};
-  const proFeatures: PlanFeature[] = Object.entries(allFeatures.pro)
-    .filter(([_, feature]) => feature.enabled)
-    .map(([id, feature]) => ({
-      id,
-      text: feature.text,
-      enabled: true,
-    }));
+  const proFeaturesList = await buildPlanFeatureListWithInheritance(
+    allFeatures.pro,
+    allFeatures.free,
+    'Free'
+  );
+  const proFeatures: PlanFeature[] = proFeaturesList.map((feature) => ({
+    id: feature.id,
+    text: feature.text,
+    enabled: true,
+  }));
 
   plans.push({
     id: 'pro',
@@ -116,7 +144,7 @@ async function fetchPricingData(): Promise<PlanData[]> {
     cta: proConfig.cta || 'Assinar Pro',
     popular: proConfig.popular !== undefined ? proConfig.popular : true,
     stripePriceId: proStripePriceId || proPriceId || null,
-    features: proFeatures,
+    features: proFeatures.length ? proFeatures : fallbackFeatureSets.pro,
   });
 
   // Premium Plan
@@ -144,13 +172,16 @@ async function fetchPricingData(): Promise<PlanData[]> {
   }
 
   const premiumConfig = displayConfig.premium || {};
-  const premiumFeatures: PlanFeature[] = Object.entries(allFeatures.premium)
-    .filter(([_, feature]) => feature.enabled)
-    .map(([id, feature]) => ({
-      id,
-      text: feature.text,
-      enabled: true,
-    }));
+  const premiumFeaturesList = await buildPlanFeatureListWithInheritance(
+    allFeatures.premium,
+    allFeatures.pro,
+    'Pro'
+  );
+  const premiumFeatures: PlanFeature[] = premiumFeaturesList.map((feature) => ({
+    id: feature.id,
+    text: feature.text,
+    enabled: true,
+  }));
 
   plans.push({
     id: 'premium',
@@ -162,7 +193,7 @@ async function fetchPricingData(): Promise<PlanData[]> {
     cta: premiumConfig.cta || 'Assinar Premium',
     popular: premiumConfig.popular || false,
     stripePriceId: premiumStripePriceId || premiumPriceId || null,
-    features: premiumFeatures,
+    features: premiumFeatures.length ? premiumFeatures : fallbackFeatureSets.premium,
   });
 
   return plans;
@@ -207,8 +238,11 @@ export async function GET(request: NextRequest) {
           cta: 'Começar agora',
           popular: false,
           features: [
-            { id: 'transactions_limit', text: 'Até 100 transações/mês', enabled: true },
-            { id: 'csv_import', text: 'Importação CSV', enabled: true },
+            { id: 'dashboard', text: 'Dashboard', enabled: true },
+            { id: 'transactions', text: 'Até 100 transações/mês', enabled: true },
+            { id: 'accounts', text: 'Contas', enabled: true },
+            { id: 'credit_cards', text: 'Cartões', enabled: true },
+            { id: 'categories', text: 'Categorias', enabled: true },
           ],
         },
         {
@@ -221,9 +255,13 @@ export async function GET(request: NextRequest) {
           cta: 'Assinar Pro',
           popular: true,
           features: [
-            { id: 'transactions_unlimited', text: 'Transações ilimitadas', enabled: true },
+            { id: 'all_free', text: 'Tudo do Free', enabled: true },
+            { id: 'transactions', text: 'Transações ilimitadas', enabled: true },
+            { id: 'budgets', text: 'Orçamentos', enabled: true },
+            { id: 'debts', text: 'Dívidas', enabled: true },
+            { id: 'investments', text: 'Investimentos', enabled: true },
+            { id: 'goals', text: 'Objetivos', enabled: true },
             { id: 'ai_advisor', text: 'AI Advisor (10 consultas/mês)', enabled: true },
-            { id: 'ofx_import', text: 'Importação OFX', enabled: true },
           ],
         },
         {
@@ -236,9 +274,11 @@ export async function GET(request: NextRequest) {
           cta: 'Assinar Premium',
           popular: false,
           features: [
-            { id: 'transactions_unlimited', text: 'Transações ilimitadas', enabled: true },
+            { id: 'all_pro', text: 'Tudo do Pro', enabled: true },
+            { id: 'reports', text: 'Relatórios', enabled: true },
+            { id: 'integrations', text: 'Integrações (Whatsapp + OpenFinance*)', enabled: true },
+            { id: 'assets', text: 'Patrimônio', enabled: true },
             { id: 'ai_advisor', text: 'AI Advisor (100 consultas/mês)', enabled: true },
-            { id: 'pluggy_integration', text: 'Integração Bancária', enabled: true },
           ],
         },
       ],

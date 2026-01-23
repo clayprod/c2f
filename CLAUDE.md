@@ -73,7 +73,7 @@ Usar para:
 - Executar e monitorar automações
 - Consultar status de execuções
 
-### Configuracao do .mcp.json
+### Configuração do .mcp.json
 
 O arquivo `.mcp.json` na raiz do projeto configura os servidores MCP. O formato correto para Claude Code:
 
@@ -102,7 +102,7 @@ O arquivo `.mcp.json` na raiz do projeto configura os servidores MCP. O formato 
 }
 ```
 
-**IMPORTANTE:** Nao usar o campo `"type"`. O Claude Code detecta automaticamente:
+**IMPORTANTE:** Não usar o campo `"type"`. O Claude Code detecta automaticamente:
 - Se tem `url` -> servidor HTTP
 - Se tem `command` -> servidor local (stdio)
 

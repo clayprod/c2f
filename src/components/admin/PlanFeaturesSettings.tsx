@@ -5,10 +5,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import type { PlanFeatures, PlanDisplayConfig } from '@/services/admin/globalSettings';
+import type { PlanFeatures, PlanDisplayConfig, PlanFeature } from '@/services/admin/globalSettings';
+import {
+  PLAN_MODULES,
+  buildPlanFeatureListSync,
+  buildPlanFeatureListWithInheritanceSync,
+  formatFeatureTextSync,
+} from '@/lib/planFeatures';
 
 interface PlanFeaturesData {
   plan_features_free?: PlanFeatures;
@@ -17,91 +24,59 @@ interface PlanFeaturesData {
   plan_display_config?: PlanDisplayConfig;
 }
 
-// Feature categories for better organization
-const FEATURE_CATEGORIES: Record<string, { label: string; icon: string; features: string[] }> = {
-  basic: {
-    label: 'Recursos Básicos',
-    icon: 'bx-layer',
-    features: ['transactions_limit', 'transactions_unlimited', 'csv_import', 'ofx_import'],
-  },
-  panels: {
-    label: 'Painéis do App',
-    icon: 'bx-grid-alt',
-    features: ['budgets', 'investments', 'goals', 'reports'],
-  },
-  ai: {
-    label: 'Inteligência Artificial',
-    icon: 'bx-brain',
-    features: ['ai_advisor', 'ai_categorization', 'predictive_analysis'],
-  },
-  integrations: {
-    label: 'Integrações',
-    icon: 'bx-plug',
-    features: ['pluggy_integration', 'whatsapp_integration'],
-  },
-  support: {
-    label: 'Suporte',
-    icon: 'bx-support',
-    features: ['priority_support'],
-  },
-};
-
-// Map features to app panels for description
-const FEATURE_PANEL_MAP: Record<string, string> = {
-  budgets: '/app/budgets - Orçamentos',
-  investments: '/app/investments - Investimentos',
-  goals: '/app/goals - Objetivos',
-  reports: '/app/reports - Relatórios',
-  ai_advisor: '/app/advisor - AI Advisor',
-  pluggy_integration: '/app/integrations - Open Finance (Admin)',
-  whatsapp_integration: '/app/integrations - WhatsApp',
-};
+const LIMIT_CONFIG = [
+  { id: 'transactions', label: 'Transações/mês' },
+  { id: 'ai_advisor', label: 'Chats com AI Advisor/mês' },
+];
 
 const DEFAULT_FEATURES: Record<'free' | 'pro' | 'premium', PlanFeatures> = {
   free: {
-    transactions_limit: { enabled: true, text: 'Até 100 transações/mês' },
-    csv_import: { enabled: true, text: 'Importação CSV' },
-    ofx_import: { enabled: false, text: 'Importação OFX' },
-    ai_advisor: { enabled: false, text: 'AI Advisor' },
-    budgets: { enabled: false, text: 'Orçamentos e Projeções' },
-    investments: { enabled: false, text: 'Investimentos e Dívidas' },
-    goals: { enabled: false, text: 'Patrimônio e Objetivos' },
-    pluggy_integration: { enabled: false, text: 'Integração Bancária (Open Finance)' },
-    whatsapp_integration: { enabled: false, text: 'Integração WhatsApp' },
-    reports: { enabled: false, text: 'Relatórios Executivos' },
-    ai_categorization: { enabled: false, text: 'Categorização inteligente via IA' },
-    predictive_analysis: { enabled: false, text: 'Análise preditiva de gastos' },
-    priority_support: { enabled: false, text: 'Suporte prioritário' },
+    dashboard: { enabled: true },
+    transactions: { enabled: true, limit: 100 },
+    accounts: { enabled: true },
+    credit_cards: { enabled: true },
+    categories: { enabled: true },
+    budgets: { enabled: false },
+    debts: { enabled: false },
+    receivables: { enabled: false },
+    investments: { enabled: false },
+    assets: { enabled: false },
+    goals: { enabled: false },
+    reports: { enabled: false },
+    integrations: { enabled: false },
+    ai_advisor: { enabled: false, limit: 10 },
   },
   pro: {
-    transactions_unlimited: { enabled: true, text: 'Transações ilimitadas' },
-    csv_import: { enabled: true, text: 'Importação CSV' },
-    ofx_import: { enabled: true, text: 'Importação OFX' },
-    ai_advisor: { enabled: true, text: 'AI Advisor (10 consultas/mês)' },
-    budgets: { enabled: true, text: 'Orçamentos e Projeções' },
-    investments: { enabled: true, text: 'Investimentos e Dívidas' },
-    goals: { enabled: true, text: 'Patrimônio e Objetivos' },
-    pluggy_integration: { enabled: false, text: 'Integração Bancária (Open Finance)' },
-    whatsapp_integration: { enabled: true, text: 'Integração WhatsApp' },
-    reports: { enabled: true, text: 'Relatórios Executivos' },
-    ai_categorization: { enabled: false, text: 'Categorização inteligente via IA' },
-    predictive_analysis: { enabled: false, text: 'Análise preditiva de gastos' },
-    priority_support: { enabled: false, text: 'Suporte por email' },
+    dashboard: { enabled: true },
+    transactions: { enabled: true, unlimited: true },
+    accounts: { enabled: true },
+    credit_cards: { enabled: true },
+    categories: { enabled: true },
+    budgets: { enabled: true },
+    debts: { enabled: true },
+    receivables: { enabled: true },
+    investments: { enabled: true },
+    assets: { enabled: true },
+    goals: { enabled: true },
+    reports: { enabled: false },
+    integrations: { enabled: false },
+    ai_advisor: { enabled: true, limit: 10 },
   },
   premium: {
-    transactions_unlimited: { enabled: true, text: 'Transações ilimitadas' },
-    csv_import: { enabled: true, text: 'Importação CSV' },
-    ofx_import: { enabled: true, text: 'Importação OFX' },
-    ai_advisor: { enabled: true, text: 'AI Advisor (100 consultas/mês)' },
-    budgets: { enabled: true, text: 'Orçamentos e Projeções' },
-    investments: { enabled: true, text: 'Investimentos e Dívidas' },
-    goals: { enabled: true, text: 'Patrimônio e Objetivos' },
-    pluggy_integration: { enabled: true, text: 'Integração Bancária (Open Finance)' },
-    whatsapp_integration: { enabled: true, text: 'Integração WhatsApp' },
-    reports: { enabled: true, text: 'Relatórios Executivos' },
-    ai_categorization: { enabled: true, text: 'Categorização inteligente via IA' },
-    predictive_analysis: { enabled: true, text: 'Análise preditiva de gastos' },
-    priority_support: { enabled: true, text: 'Suporte prioritário via WhatsApp' },
+    dashboard: { enabled: true },
+    transactions: { enabled: true, unlimited: true },
+    accounts: { enabled: true },
+    credit_cards: { enabled: true },
+    categories: { enabled: true },
+    budgets: { enabled: true },
+    debts: { enabled: true },
+    receivables: { enabled: true },
+    investments: { enabled: true },
+    assets: { enabled: true },
+    goals: { enabled: true },
+    reports: { enabled: true },
+    integrations: { enabled: true },
+    ai_advisor: { enabled: true, limit: 100 },
   },
 };
 
@@ -113,6 +88,64 @@ export default function PlanFeaturesSettings() {
   const [features, setFeatures] = useState<PlanFeaturesData>({});
   const [displayConfig, setDisplayConfig] = useState<PlanDisplayConfig>({});
 
+  const parseLegacyLimit = (text?: string): number | undefined => {
+    if (!text) return undefined;
+    const match = text.match(/(\d+)/);
+    if (!match) return undefined;
+    const value = parseInt(match[1], 10);
+    return Number.isNaN(value) ? undefined : value;
+  };
+
+  const normalizePlanFeatures = (raw: PlanFeatures | undefined, defaults: PlanFeatures): PlanFeatures => {
+    // If we have raw data from database, use it as-is and only handle legacy formats
+    if (raw && Object.keys(raw).length > 0) {
+      const normalized: PlanFeatures = { ...raw };
+
+      // Handle legacy format: transactions_unlimited and transactions_limit
+      // These are old format fields that need to be converted to the new transactions format
+      if (raw.transactions_unlimited?.enabled && !normalized.transactions) {
+        normalized.transactions = {
+          enabled: true,
+          unlimited: true,
+          limit: undefined,
+        } as PlanFeature;
+      } else if (raw.transactions_limit?.enabled && !normalized.transactions) {
+        const legacyLimit = parseLegacyLimit(raw.transactions_limit.text);
+        normalized.transactions = {
+          enabled: true,
+          unlimited: false,
+          limit: legacyLimit ?? 100,
+        } as PlanFeature;
+      }
+
+      // Handle legacy format: ai_advisor with text field
+      if (raw.ai_advisor?.text && typeof raw.ai_advisor.limit !== 'number') {
+        const legacyAdvisorLimit = parseLegacyLimit(raw.ai_advisor.text);
+        if (legacyAdvisorLimit !== undefined) {
+          normalized.ai_advisor = {
+            ...(normalized.ai_advisor || {}),
+            enabled: normalized.ai_advisor?.enabled ?? raw.ai_advisor.enabled ?? false,
+            limit: legacyAdvisorLimit,
+          } as PlanFeature;
+        }
+      }
+
+      // Only add defaults for keys that don't exist in raw data at all
+      // This preserves ALL values that were saved to the database
+      Object.entries(defaults).forEach(([key, defaultValue]) => {
+        // Only add if the key doesn't exist - don't merge or override
+        if (!(key in normalized)) {
+          normalized[key] = defaultValue;
+        }
+      });
+
+      return normalized;
+    }
+
+    // If no raw data, return defaults
+    return { ...defaults };
+  };
+
   useEffect(() => {
     fetchSettings();
   }, []);
@@ -123,10 +156,20 @@ export default function PlanFeaturesSettings() {
       if (!res.ok) throw new Error('Failed to fetch settings');
       const data = await res.json();
       
+      console.log('[PlanFeaturesSettings] Raw data from API:', JSON.stringify(data, null, 2));
+      
+      const normalizedFree = normalizePlanFeatures(data.plan_features_free, DEFAULT_FEATURES.free);
+      const normalizedPro = normalizePlanFeatures(data.plan_features_pro, DEFAULT_FEATURES.pro);
+      const normalizedPremium = normalizePlanFeatures(data.plan_features_premium, DEFAULT_FEATURES.premium);
+      
+      console.log('[PlanFeaturesSettings] Normalized free:', JSON.stringify(normalizedFree, null, 2));
+      console.log('[PlanFeaturesSettings] Normalized pro:', JSON.stringify(normalizedPro, null, 2));
+      console.log('[PlanFeaturesSettings] Normalized premium:', JSON.stringify(normalizedPremium, null, 2));
+      
       setFeatures({
-        plan_features_free: data.plan_features_free || DEFAULT_FEATURES.free,
-        plan_features_pro: data.plan_features_pro || DEFAULT_FEATURES.pro,
-        plan_features_premium: data.plan_features_premium || DEFAULT_FEATURES.premium,
+        plan_features_free: normalizedFree,
+        plan_features_pro: normalizedPro,
+        plan_features_premium: normalizedPremium,
       });
       setDisplayConfig(data.plan_display_config || {});
     } catch (error) {
@@ -144,19 +187,27 @@ export default function PlanFeaturesSettings() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      const payload = {
+        ...features,
+        plan_display_config: displayConfig,
+      };
+      
+      console.log('[PlanFeaturesSettings] Saving payload:', JSON.stringify(payload, null, 2));
+      
       const res = await fetch('/api/admin/plan-features', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...features,
-          plan_display_config: displayConfig,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
         const errorData = await res.json();
+        console.error('[PlanFeaturesSettings] Save error response:', errorData);
         throw new Error(errorData.error || 'Failed to save settings');
       }
+
+      const responseData = await res.json();
+      console.log('[PlanFeaturesSettings] Save success response:', responseData);
 
       toast({
         title: 'Sucesso',
@@ -171,6 +222,7 @@ export default function PlanFeaturesSettings() {
       }
       
       await fetchSettings();
+      updateEnabledFeatures();
     } catch (error: any) {
       console.error('Error saving settings:', error);
       toast({
@@ -186,7 +238,7 @@ export default function PlanFeaturesSettings() {
   const updateFeature = (
     plan: 'free' | 'pro' | 'premium',
     featureId: string,
-    updates: Partial<{ enabled: boolean; text: string }>
+    updates: Partial<PlanFeature>
   ) => {
     const planKey = `plan_features_${plan}` as keyof PlanFeaturesData;
     const currentFeatures = (features[planKey] as PlanFeatures) || {};
@@ -196,9 +248,9 @@ export default function PlanFeaturesSettings() {
       [planKey]: {
         ...currentFeatures,
         [featureId]: {
-          ...currentFeatures[featureId],
+          ...(currentFeatures[featureId] || { enabled: false }),
           ...updates,
-        },
+        } as PlanFeature,
       },
     });
   };
@@ -208,69 +260,129 @@ export default function PlanFeaturesSettings() {
     return (features[planKey] as PlanFeatures) || DEFAULT_FEATURES[plan];
   };
 
-  const getEnabledFeatures = (plan: 'free' | 'pro' | 'premium') => {
-    const planFeatures = getCurrentPlanFeatures(plan);
-    return Object.entries(planFeatures)
-      .filter(([_, feature]) => feature.enabled)
-      .map(([id, feature]) => ({ id, text: feature.text }));
+  const [enabledFeatures, setEnabledFeatures] = useState<{
+    free: Array<{ id: string; text: string; enabled: boolean }>;
+    pro: Array<{ id: string; text: string; enabled: boolean }>;
+    premium: Array<{ id: string; text: string; enabled: boolean }>;
+  }>({
+    free: [],
+    pro: [],
+    premium: [],
+  });
+
+  const updateEnabledFeatures = () => {
+    const freeFeatures = buildPlanFeatureListSync(getCurrentPlanFeatures('free'));
+    const proFeatures = buildPlanFeatureListWithInheritanceSync(
+      getCurrentPlanFeatures('pro'),
+      getCurrentPlanFeatures('free'),
+      'Free'
+    );
+    const premiumFeatures = buildPlanFeatureListWithInheritanceSync(
+      getCurrentPlanFeatures('premium'),
+      getCurrentPlanFeatures('pro'),
+      'Pro'
+    );
+    setEnabledFeatures({
+      free: freeFeatures,
+      pro: proFeatures,
+      premium: premiumFeatures,
+    });
   };
 
-  const renderFeaturesByCategory = (plan: 'free' | 'pro' | 'premium') => {
+  useEffect(() => {
+    if (!loading) {
+      updateEnabledFeatures();
+    }
+  }, [features, loading]);
+
+  const getEnabledFeatures = (plan: 'free' | 'pro' | 'premium') => {
+    return enabledFeatures[plan];
+  };
+
+  const renderModuleList = (plan: 'free' | 'pro' | 'premium') => {
     const planFeatures = getCurrentPlanFeatures(plan);
-    
-    return Object.entries(FEATURE_CATEGORIES).map(([categoryId, category]) => {
-      const categoryFeatures = category.features
-        .filter(featureId => planFeatures[featureId])
-        .map(featureId => ({ id: featureId, ...planFeatures[featureId] }));
-      
-      if (categoryFeatures.length === 0) return null;
-      
-      return (
-        <div key={categoryId} className="space-y-3">
-          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground border-b pb-2">
-            <i className={`bx ${category.icon}`}></i>
-            <span>{category.label}</span>
-          </div>
-          <div className="space-y-2">
-            {categoryFeatures.map(feature => (
-              <div key={feature.id} className="flex items-center justify-between p-3 border rounded-lg bg-card hover:bg-accent/5 transition-colors">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor={`${plan}-${feature.id}-text`} className="text-sm font-medium">
-                      {feature.id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                    </Label>
-                    {FEATURE_PANEL_MAP[feature.id] && (
-                      <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                        {FEATURE_PANEL_MAP[feature.id]}
-                      </span>
-                    )}
+    return (
+      <div className="grid gap-3 sm:grid-cols-2">
+        {PLAN_MODULES.map((module) => {
+          const feature = planFeatures[module.id] || { enabled: false };
+          return (
+            <label
+              key={module.id}
+              htmlFor={`${plan}-${module.id}-enabled`}
+              className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2 text-sm hover:bg-accent/5"
+            >
+              <Checkbox
+                id={`${plan}-${module.id}-enabled`}
+                checked={feature.enabled}
+                onCheckedChange={(checked) => updateFeature(plan, module.id, { enabled: checked === true })}
+              />
+              <div className="flex-1">
+                <div className="font-medium text-foreground">{module.label}</div>
+                <div className="text-xs text-muted-foreground">{module.route}</div>
+              </div>
+            </label>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderLimitControls = (plan: 'free' | 'pro' | 'premium') => {
+    const planFeatures = getCurrentPlanFeatures(plan);
+    return (
+      <div className="space-y-4">
+        {LIMIT_CONFIG.map((limitItem) => {
+          const feature = planFeatures[limitItem.id] || { enabled: false };
+          const limitValue = typeof feature.limit === 'number' ? feature.limit : '';
+          const isDisabled = !feature.enabled;
+          return (
+            <div key={limitItem.id} className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-medium">{limitItem.label}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {formatFeatureTextSync(limitItem.id, feature)}
                   </div>
-                  <Input
-                    id={`${plan}-${feature.id}-text`}
-                    value={feature.text}
-                    onChange={(e) => updateFeature(plan, feature.id, { text: e.target.value })}
-                    className="mt-1 h-8 text-sm"
-                    placeholder="Texto que aparece na landing page"
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Ilimitado</span>
+                  <Switch
+                    checked={feature.unlimited || false}
+                    disabled={isDisabled}
+                    onCheckedChange={(checked) =>
+                      updateFeature(plan, limitItem.id, {
+                        unlimited: checked,
+                        limit: checked ? undefined : feature.limit,
+                      })
+                    }
                   />
                 </div>
-                <div className="ml-4 flex items-center gap-2">
-                  <div className="flex flex-col items-center">
-                    <Switch
-                      id={`${plan}-${feature.id}-enabled`}
-                      checked={feature.enabled}
-                      onCheckedChange={(checked) => updateFeature(plan, feature.id, { enabled: checked })}
-                    />
-                    <span className="text-xs text-muted-foreground mt-1">
-                      {feature.enabled ? 'Ativo' : 'Inativo'}
-                    </span>
-                  </div>
-                </div>
               </div>
-            ))}
-          </div>
-        </div>
-      );
-    });
+              <div className="flex items-center gap-3">
+                <Label htmlFor={`${plan}-${limitItem.id}-limit`} className="text-xs text-muted-foreground">
+                  Limite
+                </Label>
+                <Input
+                  id={`${plan}-${limitItem.id}-limit`}
+                  type="number"
+                  min={0}
+                  value={feature.unlimited ? '' : limitValue}
+                  disabled={feature.unlimited || isDisabled}
+                  onChange={(event) => {
+                    const parsed = parseInt(event.target.value, 10);
+                    updateFeature(plan, limitItem.id, {
+                      limit: Number.isNaN(parsed) ? undefined : parsed,
+                      unlimited: false,
+                    });
+                  }}
+                  className="h-8 w-32"
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   if (loading) {
@@ -299,7 +411,30 @@ export default function PlanFeaturesSettings() {
             <TabsContent value="free" className="mt-6">
               <div className="grid md:grid-cols-3 gap-6">
                 <div className="md:col-span-2 space-y-6">
-                  {renderFeaturesByCategory('free')}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <i className="bx bx-check-square"></i>
+                        Modulos liberados
+                      </CardTitle>
+                      <CardDescription>
+                        Ative ou bloqueie cada modulo para este plano.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>{renderModuleList('free')}</CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <i className="bx bx-slider"></i>
+                        Limites
+                      </CardTitle>
+                      <CardDescription>
+                        Defina limites mensais ou deixe ilimitado.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>{renderLimitControls('free')}</CardContent>
+                  </Card>
                 </div>
                 <div>
                   <Card className="sticky top-4">
@@ -337,7 +472,30 @@ export default function PlanFeaturesSettings() {
             <TabsContent value="pro" className="mt-6">
               <div className="grid md:grid-cols-3 gap-6">
                 <div className="md:col-span-2 space-y-6">
-                  {renderFeaturesByCategory('pro')}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <i className="bx bx-check-square"></i>
+                        Modulos liberados
+                      </CardTitle>
+                      <CardDescription>
+                        Ative ou bloqueie cada modulo para este plano.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>{renderModuleList('pro')}</CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <i className="bx bx-slider"></i>
+                        Limites
+                      </CardTitle>
+                      <CardDescription>
+                        Defina limites mensais ou deixe ilimitado.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>{renderLimitControls('pro')}</CardContent>
+                  </Card>
                 </div>
                 <div>
                   <Card className="sticky top-4">
@@ -375,7 +533,30 @@ export default function PlanFeaturesSettings() {
             <TabsContent value="premium" className="mt-6">
               <div className="grid md:grid-cols-3 gap-6">
                 <div className="md:col-span-2 space-y-6">
-                  {renderFeaturesByCategory('premium')}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <i className="bx bx-check-square"></i>
+                        Modulos liberados
+                      </CardTitle>
+                      <CardDescription>
+                        Ative ou bloqueie cada modulo para este plano.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>{renderModuleList('premium')}</CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <i className="bx bx-slider"></i>
+                        Limites
+                      </CardTitle>
+                      <CardDescription>
+                        Defina limites mensais ou deixe ilimitado.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>{renderLimitControls('premium')}</CardContent>
+                  </Card>
                 </div>
                 <div>
                   <Card className="sticky top-4">

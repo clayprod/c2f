@@ -357,12 +357,12 @@ export default function CreditCardsPage() {
 
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.error || 'Erro ao excluir cartao');
+        throw new Error(error.error || 'Erro ao excluir cartão');
       }
 
       toast({
         title: 'Sucesso',
-        description: 'Cartao excluido',
+        description: 'Cartão excluído',
       });
 
       fetchCards();
@@ -1040,14 +1040,14 @@ export default function CreditCardsPage() {
       ) : filteredCards.length === 0 ? (
         <div className="glass-card p-12 text-center">
           <i className='bx bx-credit-card text-6xl text-muted-foreground mb-4'></i>
-          <h3 className="text-lg font-medium mb-2">Nenhum cartao encontrado</h3>
+          <h3 className="text-lg font-medium mb-2">Nenhum cartão encontrado</h3>
           <p className="text-muted-foreground mb-4">
-            {searchTerm ? 'Tente ajustar sua busca' : 'Comece adicionando seu primeiro cartao de credito'}
+            {searchTerm ? 'Tente ajustar sua busca' : 'Comece adicionando seu primeiro cartão de crédito'}
           </p>
           {!searchTerm && (
             <Button onClick={openNewForm}>
               <i className='bx bx-plus mr-2'></i>
-              Adicionar Cartao
+              Adicionar Cartão
             </Button>
           )}
         </div>
@@ -1075,7 +1075,7 @@ export default function CreditCardsPage() {
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="text-white/70 text-xs">{card.institution || 'Cartao'}</p>
+                        <p className="text-white/70 text-xs">{card.institution || 'Cartão'}</p>
                         {isExpired && (
                           <span className="px-1.5 py-0.5 bg-red-500/80 text-white text-[10px] font-medium rounded">
                             Expirado
@@ -1409,9 +1409,9 @@ export default function CreditCardsPage() {
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Excluir Cartao</DialogTitle>
+            <DialogTitle>Excluir Cartão</DialogTitle>
             <DialogDescription>
-              Tem certeza que deseja excluir o cartao "{cardToDelete?.name}"?
+              Tem certeza que deseja excluir o cartão "{cardToDelete?.name}"?
               Esta ação não pode ser desfeita.
             </DialogDescription>
           </DialogHeader>

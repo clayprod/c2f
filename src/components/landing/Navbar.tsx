@@ -13,16 +13,17 @@ const Navbar = () => {
   useEffect(() => {
     const checkSession = async () => {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      setIsLoggedIn(!!session);
+      const { data: { user } } = await supabase.auth.getUser();
+      setIsLoggedIn(!!user);
     };
     checkSession();
   }, []);
 
   const navLinks = [
-    { label: 'Produto', href: '#features' },
+    { label: 'Recursos', href: '#features' },
+    { label: 'Depoimentos', href: '#testimonials' },
+    { label: 'Demo', href: '#demo' },
     { label: 'Preços', href: '#pricing' },
-    { label: 'Segurança', href: '#security' },
     { label: 'FAQ', href: '#faq' },
   ];
 

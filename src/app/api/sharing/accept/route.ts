@@ -4,6 +4,7 @@ import { getUserId } from '@/lib/auth';
 import { createErrorResponse } from '@/lib/errors';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendEmail, inviteAcceptedTemplate } from '@/services/email';
+import { MAX_SHARING_MEMBERS } from '../invites/route';
 
 // GET - Get invite details by token (for preview)
 export async function GET(request: NextRequest) {
@@ -51,14 +52,14 @@ export async function GET(request: NextRequest) {
         .single();
 
       if (error || !directInvite) {
-        return NextResponse.json({ error: 'Convite nao encontrado' }, { status: 404 });
+      return NextResponse.json({ error: 'Convite não encontrado' }, { status: 404 });
       }
 
       invite = directInvite;
     } else {
       if (!rpcData?.ok) {
         return NextResponse.json(
-          { error: rpcData?.error || 'Convite nao encontrado' },
+          { error: rpcData?.error || 'Convite não encontrado' },
           { status: Number(rpcData?.status) || 404 }
         );
       }
@@ -119,6 +120,30 @@ export async function POST(request: NextRequest) {
     }
 
     const { supabase } = createClientFromRequest(request);
+    const admin = createAdminClient();
+
+    // Pre-check: Get invite to verify owner's sharing limit
+    const { data: invitePreCheck } = await admin
+      .from('account_invites')
+      .select('owner_id, status')
+      .eq('token', token)
+      .single();
+
+    if (invitePreCheck && invitePreCheck.status === 'pending') {
+      const { count: currentMembersCount } = await admin
+        .from('account_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('owner_id', invitePreCheck.owner_id);
+
+      if ((currentMembersCount || 0) >= MAX_SHARING_MEMBERS) {
+        // Mark invite as expired since owner reached limit
+        await admin.from('account_invites').update({ status: 'expired' }).eq('token', token);
+        return NextResponse.json(
+          { error: `O proprietário da conta já atingiu o limite de ${MAX_SHARING_MEMBERS} membros compartilhados.` },
+          { status: 400 }
+        );
+      }
+    }
 
     // Prefer SECURITY DEFINER RPC. If migration isn't applied yet, fallback to service-role client.
     const { data: rpcData, error: rpcError } = await supabase.rpc('accept_account_invite', {
@@ -137,8 +162,6 @@ export async function POST(request: NextRequest) {
 
       if (!isMissingFn) throw rpcError;
 
-      const admin = createAdminClient();
-
       const { data: invite, error: inviteError } = await admin
         .from('account_invites')
         .select('*')
@@ -146,7 +169,7 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (inviteError || !invite) {
-        return NextResponse.json({ error: 'Convite nao encontrado' }, { status: 404 });
+        return NextResponse.json({ error: 'Convite não encontrado' }, { status: 404 });
       }
 
       if (invite.status !== 'pending') {
@@ -168,13 +191,28 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (profileError || !userProfile?.email) {
-        return NextResponse.json({ error: 'Perfil nao encontrado' }, { status: 400 });
+        return NextResponse.json({ error: 'Perfil não encontrado' }, { status: 400 });
       }
 
       if (userProfile.email.toLowerCase() !== String(invite.email).toLowerCase()) {
         return NextResponse.json(
           { error: 'Este convite foi enviado para outro email' },
           { status: 403 }
+        );
+      }
+
+      // Check sharing limit before accepting
+      const { count: membersCount } = await admin
+        .from('account_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('owner_id', invite.owner_id);
+
+      if ((membersCount || 0) >= MAX_SHARING_MEMBERS) {
+        // Mark invite as expired since owner reached limit
+        await admin.from('account_invites').update({ status: 'expired' }).eq('id', invite.id);
+        return NextResponse.json(
+          { error: `O proprietário da conta já atingiu o limite de ${MAX_SHARING_MEMBERS} membros compartilhados.` },
+          { status: 400 }
         );
       }
 
@@ -238,7 +276,7 @@ export async function POST(request: NextRequest) {
     if (ownerEmail && memberEmail) {
       try {
         const emailTemplate = inviteAcceptedTemplate({
-          memberName: memberName || 'Usuario',
+          memberName: memberName || 'Usuário',
           memberEmail,
         });
         await sendEmail({

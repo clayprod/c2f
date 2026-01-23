@@ -117,6 +117,9 @@ const Footer = () => {
             <span>Seus dados protegidos com criptografia de ponta</span>
           </div>
         </div>
+        <p className="mt-4 text-muted-foreground text-xs">
+          As marcas comerciais citadas são de propriedade de seus respectivos donos.
+        </p>
       </div>
     </footer>
   );

@@ -129,7 +129,7 @@ export default function CreditCardForm({
     if (!formData.name.trim()) {
       toast({
         title: 'Erro',
-        description: 'Nome do cartao e obrigatorio',
+        description: 'Nome do cartão é obrigatório',
         variant: 'destructive',
       });
       return;
@@ -138,7 +138,7 @@ export default function CreditCardForm({
     if (!formData.credit_limit || parseFloat(formData.credit_limit) <= 0) {
       toast({
         title: 'Erro',
-        description: 'Limite de credito e obrigatorio',
+        description: 'Limite de crédito é obrigatório',
         variant: 'destructive',
       });
       return;
@@ -206,12 +206,12 @@ export default function CreditCardForm({
 
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.error || 'Erro ao salvar cartao');
+        throw new Error(error.error || 'Erro ao salvar cartão');
       }
 
       toast({
         title: 'Sucesso',
-        description: card ? 'Cartao atualizado' : 'Cartao criado',
+        description: card ? 'Cartão atualizado' : 'Cartão criado',
       });
 
       onSuccess();
@@ -230,7 +230,7 @@ export default function CreditCardForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
-          <DialogTitle>{card ? 'Editar Cartao' : 'Novo Cartao de Credito'}</DialogTitle>
+          <DialogTitle>{card ? 'Editar Cartão' : 'Novo Cartão de Crédito'}</DialogTitle>
           <DialogDescription>
             {card ? 'Modifique os dados do cartão' : 'Adicione um novo cartão de crédito'}
           </DialogDescription>
@@ -240,7 +240,7 @@ export default function CreditCardForm({
           {/* Basic Info */}
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2 sm:col-span-1">
-              <Label htmlFor="name">Nome do Cartao *</Label>
+              <Label htmlFor="name">Nome do Cartão *</Label>
               <Input
                 id="name"
                 value={formData.name}
@@ -319,7 +319,7 @@ export default function CreditCardForm({
                 placeholder="10"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Dia do mes em que a fatura fecha
+                Dia do mês em que a fatura fecha
               </p>
             </div>
             <div>
@@ -334,7 +334,7 @@ export default function CreditCardForm({
                 placeholder="15"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Dia do mes para pagamento da fatura
+                Dia do mês para pagamento da fatura
               </p>
             </div>
           </div>
@@ -387,7 +387,7 @@ export default function CreditCardForm({
           {/* Customization */}
           <div className="space-y-4">
             <div>
-              <Label>Cor do Cartao</Label>
+              <Label>Cor do Cartão</Label>
               <div className="flex flex-wrap gap-2 mt-2">
                 {cardColors.map((color) => (
                   <button
@@ -407,7 +407,7 @@ export default function CreditCardForm({
 
           {/* Preview */}
           <div>
-            <Label>Preview do Cartao</Label>
+            <Label>Preview do Cartão</Label>
             <div
               className="mt-2 p-4 rounded-xl text-white relative overflow-hidden"
               style={{ backgroundColor: formData.color }}
@@ -419,7 +419,7 @@ export default function CreditCardForm({
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <p className="text-white/70 text-xs">{formData.institution || 'Instituicao'}</p>
-                    <p className="font-bold">{formData.name || 'Nome do Cartao'}</p>
+                    <p className="font-bold">{formData.name || 'Nome do Cartão'}</p>
                   </div>
                   <span className="text-2xl">{CARD_ICON}</span>
                 </div>
@@ -487,7 +487,7 @@ export default function CreditCardForm({
               onCheckedChange={(checked) => setFormData({ ...formData, is_default: checked === true })}
             />
             <Label htmlFor="is_default" className="cursor-pointer text-sm font-normal">
-              Definir como cartao padrao
+              Definir como cartão padrão
             </Label>
           </div>
         </div>
@@ -497,7 +497,7 @@ export default function CreditCardForm({
             Cancelar
           </Button>
           <Button onClick={handleSubmit} disabled={loading}>
-            {loading ? 'Salvando...' : card ? 'Atualizar' : 'Criar Cartao'}
+            {loading ? 'Salvando...' : card ? 'Atualizar' : 'Criar Cartão'}
           </Button>
         </DialogFooter>
       </DialogContent>

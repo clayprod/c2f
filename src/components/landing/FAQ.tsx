@@ -31,7 +31,7 @@ const faqs = [
   {
     question: "O que é considerado 'uso do Advisor'?",
     answer:
-      'Cada pergunta ou solicitação de análise feita ao AI Advisor conta como um uso. No plano Free você tem 3 consultas por mês. Nos planos pagos, o uso é ilimitado.',
+      'Cada pergunta ou solicitação de análise feita ao AI Advisor conta como um uso. O acesso depende do plano contratado e pode variar conforme a configuração.',
   },
 ];
 

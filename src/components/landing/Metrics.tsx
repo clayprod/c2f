@@ -31,7 +31,7 @@ const testimonials = [
 
 const Metrics = () => {
   return (
-    <section className="section-padding bg-muted/20 relative overflow-hidden">
+    <section id="testimonials" className="section-padding pt-10 md:pt-12 bg-muted/20 relative overflow-hidden">
       {/* Background Effects */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-primary/5 rounded-full blur-[120px]" />

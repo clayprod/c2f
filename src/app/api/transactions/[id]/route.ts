@@ -90,7 +90,7 @@ export async function PATCH(
     // Verify ownership
     const { data: existing } = await supabase
       .from('transactions')
-      .select('id')
+      .select('id, source, provider_tx_id')
       .eq('id', id)
       .eq('user_id', ownerId)
       .single();
@@ -186,6 +186,19 @@ export async function DELETE(
       .eq('user_id', ownerId);
 
     if (error) throw error;
+
+    if ((existing as any)?.source === 'pluggy') {
+      const { error: pluggyError } = await supabase
+        .from('pluggy_transactions')
+        .update({
+          imported_at: null,
+          imported_transaction_id: null,
+        })
+        .eq('user_id', ownerId)
+        .eq('imported_transaction_id', id);
+
+      if (pluggyError) throw pluggyError;
+    }
 
     projectionCache.invalidateUser(ownerId);
 

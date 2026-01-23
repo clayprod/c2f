@@ -684,7 +684,7 @@ export default function BillDetailModal({
                 ))}
               </select>
               <p className="text-xs text-muted-foreground mt-1">
-                Se selecionado, uma transacao sera criada na conta
+                Se selecionado, uma transação será criada na conta
               </p>
             </div>
           </div>

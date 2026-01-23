@@ -293,7 +293,7 @@ export default function TransactionsPage() {
         </div>
         <div className="flex gap-2">
           <Button onClick={handleImportCSV} variant="outline">
-            <i className='bx bx-upload'></i>
+            <i className='bx bx-file-plus mr-2'></i>
             Importar
           </Button>
           <Button onClick={handleNewTransaction} className="btn-primary">

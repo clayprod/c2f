@@ -1,4 +1,22 @@
+import Image from 'next/image';
+
 const features = [
+  {
+    icon: 'bx-sparkles',
+    title: 'AI Advisor',
+    description: 'Insights personalizados e ações sugeridas pela inteligência artificial.',
+  },
+  {
+    icon: 'bxl-whatsapp',
+    title: 'Whatsapp',
+    description: 'Receba alertas, consulte seu saldo e registre novas transações diretamente pelo WhatsApp.',
+  },
+  {
+    icon: 'openfinance',
+    title: 'Open Finance',
+    description: 'Conecte seus bancos via Open Finance (em breve).',
+    comingSoon: true,
+  },
   {
     icon: 'bx-trending-up',
     title: 'Dashboard Inteligente',
@@ -10,14 +28,19 @@ const features = [
     description: 'Importe extratos de qualquer banco nos formatos mais comuns.',
   },
   {
-    icon: 'bx-bullseye',
+    icon: 'bx-calculator',
     title: 'Orçamentos & Projeções',
     description: 'Defina metas de gastos e veja projeções baseadas no seu histórico.',
   },
   {
-    icon: 'bx-sparkles',
-    title: 'AI Advisor',
-    description: 'Insights personalizados e ações sugeridas pela inteligência artificial.',
+    icon: 'bx-pie-chart-alt-2',
+    title: 'Categorização automática',
+    description: 'Organize seus lançamentos com categorias inteligentes e automáticas.',
+  },
+  {
+    icon: 'bx-coin',
+    title: 'Rendimentos e juros',
+    description: 'Cálculo automático de rendimentos e juros da sua conta.',
   },
   {
     icon: 'bx-credit-card',
@@ -55,16 +78,6 @@ const features = [
     description: 'Compartilhe contas com familiares e tenha controle financeiro em conjunto.',
   },
   {
-    icon: 'bxl-whatsapp',
-    title: 'Notificações via WhatsApp',
-    description: 'Receba notificações importantes e interaja com seu Advisor pelo WhatsApp.',
-  },
-  {
-    icon: 'bx-share',
-    title: 'Integração Bancária',
-    description: 'Conecte seus bancos via Open Finance (opcional).',
-  },
-  {
     icon: 'bx-shield-alt',
     title: 'Segurança & LGPD',
     description: 'Seus dados criptografados e em conformidade com a LGPD.',
@@ -80,9 +93,9 @@ const Features = () => {
             <i className='bx bx-star'></i>
             Recursos
           </span>
-          <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
-            Tudo que você precisa para <span className="gradient-text">controlar</span>
-          </h2>
+            <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
+              Tudo que você precisa para <span className="gradient-text">ficar tranquilo</span>
+            </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
             Ferramentas poderosas para gestão financeira pessoal ou empresarial
           </p>
@@ -92,11 +105,29 @@ const Features = () => {
           {features.map((feature, index) => (
             <div
               key={feature.title}
-              className="glass-card-hover p-6 group"
+              className="glass-card-hover p-6 group relative"
               style={{ animationDelay: `${index * 0.1}s` }}
             >
+              {feature.comingSoon && (
+                <div className="absolute top-4 right-4">
+                  <span className="badge-pill text-xs bg-primary/20 text-primary border-primary/30">
+                    <i className='bx bx-time-five mr-1'></i>
+                    Em breve
+                  </span>
+                </div>
+              )}
               <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
-                {feature.icon === 'bxl-whatsapp' ? (
+                {feature.icon === 'openfinance' ? (
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    <Image
+                      src="/assets/logos/openfinance-round.png"
+                      alt="Open Finance"
+                      width={28}
+                      height={28}
+                      className="object-contain"
+                    />
+                  </div>
+                ) : feature.icon === 'bxl-whatsapp' ? (
                   <svg 
                     className="w-6 h-6 text-primary" 
                     fill="currentColor" 

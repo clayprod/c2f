@@ -21,11 +21,11 @@ async function checkWhatsAppAccess(userId: string): Promise<{ allowed: boolean; 
   // Default: WhatsApp is enabled for Pro and Premium plans
   // Only check settings if explicitly configured
   let whatsappEnabled: boolean;
-  if (planFeatures?.whatsapp_integration?.enabled !== undefined) {
-    // Use explicit configuration if set
+  if (planFeatures?.integrations?.enabled !== undefined) {
+    whatsappEnabled = planFeatures.integrations.enabled;
+  } else if (planFeatures?.whatsapp_integration?.enabled !== undefined) {
     whatsappEnabled = planFeatures.whatsapp_integration.enabled;
   } else {
-    // Default: enabled for Pro and Premium, disabled for Free
     whatsappEnabled = plan === 'pro' || plan === 'premium';
   }
 
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
     // Check if WhatsApp is enabled
     if (!settings.whatsapp_enabled) {
       return NextResponse.json({
-        error: 'Integracao WhatsApp nao esta disponivel',
+        error: 'Integração WhatsApp não está disponível',
       }, { status: 400 });
     }
 
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
 
     if (!phone_number) {
       return NextResponse.json({
-        error: 'Numero de telefone obrigatorio',
+        error: 'Número de telefone obrigatório',
       }, { status: 400 });
     }
 
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
     const normalized = normalizePhoneNumber(phone_number);
     if (normalized.length < 10 || normalized.length > 15) {
       return NextResponse.json({
-        error: 'Numero de telefone invalido',
+        error: 'Número de telefone inválido',
       }, { status: 400 });
     }
 
@@ -109,18 +109,18 @@ export async function POST(request: NextRequest) {
 
     if (!result.success) {
       return NextResponse.json({
-        error: result.error || 'Erro ao enviar codigo de verificacao',
+        error: result.error || 'Erro ao enviar código de verificação',
       }, { status: 400 });
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Codigo de verificacao enviado para seu WhatsApp',
+      message: 'Código de verificação enviado para seu WhatsApp',
     });
   } catch (error: any) {
     console.error('[WhatsApp Register] Error:', error);
     return NextResponse.json({
-      error: error.message || 'Erro ao registrar numero',
+      error: error.message || 'Erro ao registrar número',
     }, { status: 500 });
   }
 }

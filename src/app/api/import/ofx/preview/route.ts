@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     const ofxData = parseOFX(ofx_content);
     if (!ofxData) {
       return NextResponse.json(
-        { error: 'Nao foi possivel processar o arquivo OFX. Verifique o formato.' },
+        { error: 'Não foi possível processar o arquivo OFX. Verifique o formato.' },
         { status: 400 }
       );
     }

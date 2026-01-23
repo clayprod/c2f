@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Error fetching Pluggy settings:', error);
     return NextResponse.json(
-      { error: error.message || 'Erro ao buscar configuracoes' },
+      { error: error.message || 'Erro ao buscar configurações' },
       { status: error.message?.includes('Unauthorized') ? 401 : 500 }
     );
   }
@@ -96,8 +96,8 @@ export async function PUT(request: NextRequest) {
     // Check if it's a column not found error
     const isColumnError = error.code === '42703' || error.message?.includes('column');
     const errorMessage = isColumnError 
-      ? 'Colunas do Pluggy nao encontradas. Execute a migration 050_add_pluggy_settings.sql'
-      : error.message || 'Erro ao salvar configuracoes';
+      ? 'Colunas do Pluggy não encontradas. Execute a migration 050_add_pluggy_settings.sql'
+      : error.message || 'Erro ao salvar configurações';
     
     return NextResponse.json(
       { error: errorMessage },

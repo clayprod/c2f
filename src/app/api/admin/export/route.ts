@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
     
     const groupByLabel = filters.groupBy === 'city' ? 'cidade' : 
                          filters.groupBy === 'state' ? 'estado' :
-                         filters.groupBy === 'category' ? 'categoria' : 'mes';
+                         filters.groupBy === 'category' ? 'categoria' : 'mês';
     
     const filename = `relatorio_admin_${groupByLabel}_${new Date().toISOString().split('T')[0]}.csv`;
 

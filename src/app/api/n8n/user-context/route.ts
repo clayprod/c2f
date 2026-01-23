@@ -47,9 +47,9 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({
         verified: false,
-        error: 'Numero nao encontrado ou nao verificado',
+        error: 'Número não encontrado ou não verificado',
         action_required: 'register',
-        message: 'Por favor, cadastre e verifique seu numero no aplicativo c2Finance em app.c2finance.com.br',
+        message: 'Por favor, cadastre e verifique seu número no aplicativo c2Finance em app.c2finance.com.br',
       }, { status: 404 });
     }
 
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     if (!context) {
       return NextResponse.json({
         verified: true,
-        error: 'Erro ao obter contexto do usuario',
+        error: 'Erro ao obter contexto do usuário',
       }, { status: 500 });
     }
 

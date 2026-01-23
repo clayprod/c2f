@@ -17,6 +17,8 @@ import {
   hashContext,
   ChatMessage,
 } from '@/services/advisor';
+import { getPlanFeatures } from '@/services/admin/globalSettings';
+import { resolvePlanLimit } from '@/lib/planFeatures';
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,10 +35,13 @@ export async function POST(request: NextRequest) {
     // Plan must be based on the active (owner) account, not the invitee.
     const userPlan = await getUserPlanAdmin(ownerId);
 
-    // FREE plan has NO access to AI Advisor
-    if (userPlan.plan === 'free') {
+    const planFeatures = await getPlanFeatures(userPlan.plan);
+    const aiFeature = planFeatures?.ai_advisor;
+    const fallbackEnabled = userPlan.plan !== 'free';
+
+    if (aiFeature?.enabled === false || (!aiFeature && !fallbackEnabled)) {
       return NextResponse.json(
-        { error: 'Acesso ao AI Advisor exige um plano Pro ou Premium. Explore nossos planos para desbloquear o poder da IA.' },
+        { error: 'Acesso ao AI Advisor não está habilitado no seu plano atual.' },
         { status: 403 }
       );
     }
@@ -45,9 +50,14 @@ export async function POST(request: NextRequest) {
     const { getGlobalSettings } = await import('@/services/admin/globalSettings');
     const settings = await getGlobalSettings();
 
-    const monthlyLimit = userPlan.plan === 'pro'
+    const defaultLimit = userPlan.plan === 'pro'
       ? (settings.advisor_limit_pro ?? 10)
       : (settings.advisor_limit_premium ?? 100);
+
+    const resolvedLimit = aiFeature
+      ? resolvePlanLimit(aiFeature, defaultLimit)
+      : { enabled: true, unlimited: false, limit: defaultLimit };
+    const { limit: monthlyLimit, unlimited } = resolvedLimit;
 
     const now = new Date();
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -59,7 +69,7 @@ export async function POST(request: NextRequest) {
       .eq('user_id', ownerId)
       .gte('created_at', firstDayOfMonth);
 
-    if (count !== null && count >= monthlyLimit) {
+    if (!unlimited && count !== null && count >= monthlyLimit) {
       return NextResponse.json(
         { error: `Limite mensal de ${monthlyLimit} consultas ao Advisor atingido no seu plano.` },
         { status: 403 }

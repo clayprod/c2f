@@ -74,7 +74,7 @@ export async function sendVerificationCode(
   if (existingVerification && existingVerification.status === 'verified') {
     return {
       success: false,
-      error: 'Este numero ja esta vinculado a outra conta',
+      error: 'Este número já está vinculado a outra conta',
     };
   }
 
@@ -104,7 +104,7 @@ export async function sendVerificationCode(
     console.error('[WhatsApp Verification] Error upserting verification:', upsertError);
     return {
       success: false,
-      error: 'Erro ao salvar codigo de verificacao',
+      error: 'Erro ao salvar código de verificação',
     };
   }
 
@@ -112,7 +112,7 @@ export async function sendVerificationCode(
   try {
     await sendWhatsAppMessage(
       normalizedPhone,
-      `Seu codigo de verificacao do c2Finance e: *${code}*\n\nEste codigo expira em 10 minutos.\n\nSe voce nao solicitou este codigo, ignore esta mensagem.`
+      `Seu código de verificação do c2Finance é: *${code}*\n\nEste código expira em 10 minutos.\n\nSe você não solicitou este código, ignore esta mensagem.`
     );
 
     return { success: true };
@@ -127,7 +127,7 @@ export async function sendVerificationCode(
 
     return {
       success: false,
-      error: 'Erro ao enviar codigo de verificacao. Verifique se o numero esta correto.',
+      error: 'Erro ao enviar código de verificação. Verifique se o número está correto.',
     };
   }
 }
@@ -152,7 +152,7 @@ export async function validateVerificationCode(
   if (fetchError || !verification) {
     return {
       success: false,
-      error: 'Nenhuma verificacao pendente encontrada',
+      error: 'Nenhuma verificação pendente encontrada',
     };
   }
 
@@ -165,7 +165,7 @@ export async function validateVerificationCode(
 
     return {
       success: false,
-      error: 'Codigo expirado. Solicite um novo codigo.',
+      error: 'Código expirado. Solicite um novo código.',
     };
   }
 
@@ -173,7 +173,7 @@ export async function validateVerificationCode(
   if (verification.verification_code !== code) {
     return {
       success: false,
-      error: 'Codigo incorreto',
+      error: 'Código incorreto',
     };
   }
 
@@ -192,7 +192,7 @@ export async function validateVerificationCode(
     console.error('[WhatsApp Verification] Error updating verification:', updateError);
     return {
       success: false,
-      error: 'Erro ao confirmar verificacao',
+      error: 'Erro ao confirmar verificação',
     };
   }
 
@@ -200,7 +200,7 @@ export async function validateVerificationCode(
   try {
     await sendWhatsAppMessage(
       verification.phone_number_normalized,
-      `Seu numero foi verificado com sucesso! Agora voce pode gerenciar suas transacoes enviando mensagens para este numero.\n\nExemplos:\n- "Gastei 50 reais no mercado"\n- "Recebi 1000 de salario"\n- "Quanto tenho na conta?"`
+      `Seu número foi verificado com sucesso! Agora você pode gerenciar suas transações enviando mensagens para este número.\n\nExemplos:\n- "Gastei 50 reais no mercado"\n- "Recebi 1000 de salário"\n- "Quanto tenho na conta?"`
     );
   } catch (error) {
     // Don't fail verification if confirmation message fails

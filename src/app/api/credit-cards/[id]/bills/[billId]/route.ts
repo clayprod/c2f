@@ -176,7 +176,7 @@ export async function PATCH(
             account_id: validated.from_account_id,
             category_id: category?.id,
             posted_at: validated.payment_date,
-            description: `Pagamento fatura ${card?.name || 'Cartao'}`,
+            description: `Pagamento fatura ${card?.name || 'Cartão'}`,
             amount: -validated.amount_cents / 100, // Negative because it's an expense, convert cents to NUMERIC
             currency: 'BRL',
             source: 'manual',

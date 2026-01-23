@@ -24,9 +24,14 @@ interface PluggyItem {
   }[];
 }
 
+interface PluggyLogos {
+  [itemId: string]: string | null;
+}
+
 interface UserPlan {
   plan: string;
   status: string;
+  features?: Record<string, { enabled?: boolean }>;
   limits?: {
     whatsapp_integration?: boolean;
     pluggy_integration?: boolean;
@@ -51,6 +56,7 @@ export default function IntegrationsPage() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [pluggyStatus, setPluggyStatus] = useState<PluggyStatus | null>(null);
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [pluggyLogos, setPluggyLogos] = useState<PluggyLogos>({});
   const { toast } = useToast();
   const { confirm, ConfirmDialog } = useConfirmDialog();
 
@@ -64,6 +70,7 @@ export default function IntegrationsPage() {
     if (userProfile?.role === 'admin') {
       fetchPluggyStatus();
       fetchItems();
+      fetchPluggyLogos();
     } else if (userProfile !== null) {
       // Non-admin users don't see Pluggy items
       setLoading(false);
@@ -111,6 +118,18 @@ export default function IntegrationsPage() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPluggyLogos = async () => {
+    try {
+      const res = await fetch('/api/pluggy/items-logos');
+      if (res.ok) {
+        const data = await res.json();
+        setPluggyLogos(data.logos || {});
+      }
+    } catch (error) {
+      console.error('Error fetching Pluggy logos:', error);
     }
   };
 
@@ -188,7 +207,10 @@ export default function IntegrationsPage() {
             });
             
             // Delay to allow background sync to start
-            setTimeout(fetchItems, 2000);
+            setTimeout(() => {
+              fetchItems();
+              fetchPluggyLogos();
+            }, 2000);
           } catch (err) {
             console.error('[Pluggy] Error in onSuccess:', err);
             toast({
@@ -238,7 +260,10 @@ export default function IntegrationsPage() {
       });
 
       // Refresh items after a delay
-      setTimeout(fetchItems, 3000);
+      setTimeout(() => {
+        fetchItems();
+        fetchPluggyLogos();
+      }, 3000);
     } catch (error: any) {
       toast({
         title: 'Erro',
@@ -275,10 +300,11 @@ export default function IntegrationsPage() {
 
       toast({
         title: 'Conta desconectada',
-        description: 'A integracao foi removida com sucesso',
+        description: 'A integração foi removida com sucesso',
       });
 
       fetchItems();
+      fetchPluggyLogos();
     } catch (error: any) {
       toast({
         title: 'Erro',
@@ -290,6 +316,7 @@ export default function IntegrationsPage() {
 
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { color: string; label: string }> = {
+      SUCCESS: { color: 'bg-green-500/10 text-green-500 border-green-500/20', label: 'Conectado' },
       UPDATED: { color: 'bg-green-500/10 text-green-500 border-green-500/20', label: 'Atualizado' },
       UPDATING: { color: 'bg-blue-500/10 text-blue-500 border-blue-500/20', label: 'Atualizando' },
       WAITING_USER_INPUT: { color: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20', label: 'Aguardando' },
@@ -316,7 +343,8 @@ export default function IntegrationsPage() {
   const isPluggyConfigured = pluggyStatus?.configured && pluggyStatus?.enabled;
   const canConnectPluggy = isAdmin && isPluggyConfigured;
   // WhatsApp is available for premium users OR based on plan features
-  const canConnectWhatsApp = userPlan?.plan === 'premium' || userPlan?.plan === 'pro' || userPlan?.limits?.whatsapp_integration === true;
+  const canConnectWhatsApp =
+    userPlan?.features?.integrations?.enabled === true || userPlan?.limits?.whatsapp_integration === true;
 
   // Debug log
   console.log('[Integrations] Render state:', {
@@ -369,12 +397,12 @@ export default function IntegrationsPage() {
 
       {canConnectPluggy && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
               <h2 className="font-display text-xl font-semibold">Open Finance</h2>
               <span className="text-xs bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded">Admin</span>
             </div>
-            <Button onClick={handleConnect} className="btn-primary">
+            <Button onClick={handleConnect} className="btn-primary w-full sm:w-auto">
               <i className='bx bx-plus'></i>
               Conectar Banco
             </Button>
@@ -402,16 +430,35 @@ export default function IntegrationsPage() {
             <div className="grid gap-4">
               {items.map((item) => {
                 const lastSync = item.pluggy_sync_logs?.[0];
+                const institutionLogo = pluggyLogos[item.item_id];
                 return (
                   <div key={item.id} className="glass-card p-6">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center overflow-hidden">
-                          <i className='bx bx-bank text-2xl text-muted-foreground'></i>
+                        <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center overflow-hidden flex-shrink-0">
+                          {institutionLogo ? (
+                            <img
+                              src={institutionLogo}
+                              alt={item.connector_name || 'Instituição'}
+                              className="w-full h-full object-contain p-1"
+                              onError={(e) => {
+                                // Fallback to icon if image fails to load
+                                (e.target as HTMLElement).style.display = 'none';
+                                const parent = (e.target as HTMLElement).parentElement;
+                                if (parent) {
+                                  const icon = document.createElement('i');
+                                  icon.className = 'bx bx-bank text-2xl text-muted-foreground';
+                                  parent.appendChild(icon);
+                                }
+                              }}
+                            />
+                          ) : (
+                            <i className='bx bx-bank text-2xl text-muted-foreground'></i>
+                          )}
                         </div>
                         <div>
                           <h3 className="font-semibold">{item.connector_name || 'Instituição'}</h3>
-                          <div className="flex items-center gap-2 mt-1">
+                          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2 mt-1">
                             {getStatusBadge(item.execution_status || item.status)}
                             <span className="text-xs text-muted-foreground">
                               Última atualização: {formatDate(item.updated_at)}
@@ -419,7 +466,7 @@ export default function IntegrationsPage() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap gap-2 w-full sm:w-auto sm:justify-end">
                         <Button
                           variant="outline"
                           size="sm"
@@ -445,7 +492,7 @@ export default function IntegrationsPage() {
                     </div>
 
                     {lastSync && (
-                      <div className="mt-4 pt-4 border-t border-border flex items-center gap-6 text-sm text-muted-foreground">
+                      <div className="mt-4 pt-4 border-t border-border flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:gap-6">
                         <div className="flex items-center gap-2">
                           <i className='bx bx-wallet'></i>
                           <span>{lastSync.accounts_synced || 0} contas</span>

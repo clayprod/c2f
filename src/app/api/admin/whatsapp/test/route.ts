@@ -41,15 +41,15 @@ export async function POST(request: NextRequest) {
     const { phone_number, message } = body;
 
     if (!phone_number) {
-      return NextResponse.json({ error: 'Numero de telefone obrigatorio' }, { status: 400 });
+      return NextResponse.json({ error: 'Número de telefone obrigatório' }, { status: 400 });
     }
 
     const normalizedPhone = normalizePhoneNumber(phone_number);
     if (normalizedPhone.length < 10 || normalizedPhone.length > 15) {
-      return NextResponse.json({ error: 'Numero de telefone invalido' }, { status: 400 });
+      return NextResponse.json({ error: 'Número de telefone inválido' }, { status: 400 });
     }
 
-    const testMessage = message || `Teste de integracao WhatsApp - c2Finance\n\nSe voce recebeu esta mensagem, a integracao esta funcionando corretamente.`;
+    const testMessage = message || `Teste de integração WhatsApp - c2Finance\n\nSe você recebeu esta mensagem, a integração está funcionando corretamente.`;
 
     const result = await sendWhatsAppMessage(normalizedPhone, testMessage);
 

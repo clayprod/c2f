@@ -51,7 +51,7 @@ export default function WhatsAppSettings() {
       toast({
         variant: 'destructive',
         title: 'Erro',
-        description: 'Nao foi possivel carregar as configuracoes',
+        description: 'Não foi possível carregar as configurações',
       });
     } finally {
       setLoading(false);
@@ -95,7 +95,7 @@ export default function WhatsAppSettings() {
 
       toast({
         title: 'Sucesso',
-        description: 'Configuracoes salvas com sucesso',
+        description: 'Configurações salvas com sucesso',
       });
 
       // Refresh status after save
@@ -105,7 +105,7 @@ export default function WhatsAppSettings() {
       toast({
         variant: 'destructive',
         title: 'Erro',
-        description: 'Nao foi possivel salvar as configuracoes',
+        description: 'Não foi possível salvar as configurações',
       });
     } finally {
       setSaving(false);
@@ -117,7 +117,7 @@ export default function WhatsAppSettings() {
       toast({
         variant: 'destructive',
         title: 'Erro',
-        description: 'Digite um numero de telefone para teste',
+        description: 'Digite um número de telefone para teste',
       });
       return;
     }
@@ -145,7 +145,7 @@ export default function WhatsAppSettings() {
       toast({
         variant: 'destructive',
         title: 'Erro',
-        description: error.message || 'Nao foi possivel enviar mensagem de teste',
+        description: error.message || 'Não foi possível enviar mensagem de teste',
       });
     } finally {
       setSendingTest(false);
@@ -153,7 +153,7 @@ export default function WhatsAppSettings() {
   };
 
   if (loading) {
-    return <div className="text-center py-8">Carregando configuracoes...</div>;
+    return <div className="text-center py-8">Carregando configurações...</div>;
   }
 
   return (
@@ -186,12 +186,12 @@ export default function WhatsAppSettings() {
                   ? 'Conectado'
                   : status?.configured
                   ? 'Desconectado'
-                  : 'Nao configurado'}
+                  : 'Não configurado'}
               </span>
             </div>
             {status?.phoneNumber && (
               <span className="text-sm text-muted-foreground">
-                Numero: {status.phoneNumber}
+                Número: {status.phoneNumber}
               </span>
             )}
             {status?.instanceName && (
@@ -222,9 +222,9 @@ export default function WhatsAppSettings() {
       {/* Evolution API Configuration */}
       <Card>
         <CardHeader>
-          <CardTitle>Configuracao Evolution API</CardTitle>
+          <CardTitle>Configuração Evolution API</CardTitle>
           <CardDescription>
-            Configure a conexao com a Evolution API para integracao WhatsApp
+            Configure a conexão com a Evolution API para integração WhatsApp
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -232,7 +232,7 @@ export default function WhatsAppSettings() {
             <div>
               <Label>Habilitar WhatsApp</Label>
               <p className="text-sm text-muted-foreground">
-                Ativar integracao WhatsApp para usuarios premium
+                Ativar integração WhatsApp para usuários premium
               </p>
             </div>
             <Switch
@@ -311,7 +311,7 @@ export default function WhatsAppSettings() {
       {/* n8n API Key */}
       <Card>
         <CardHeader>
-          <CardTitle>Integracao n8n</CardTitle>
+          <CardTitle>Integração n8n</CardTitle>
           <CardDescription>
             Chave de API para autenticar chamadas do workflow n8n
           </CardDescription>
@@ -338,9 +338,9 @@ export default function WhatsAppSettings() {
       {/* Test Message */}
       <Card>
         <CardHeader>
-          <CardTitle>Testar Integracao</CardTitle>
+          <CardTitle>Testar Integração</CardTitle>
           <CardDescription>
-            Envie uma mensagem de teste para verificar se a integracao esta funcionando
+            Envie uma mensagem de teste para verificar se a integração está funcionando
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -375,7 +375,7 @@ export default function WhatsAppSettings() {
       {/* Save Button */}
       <div className="flex justify-end">
         <Button onClick={handleSave} disabled={saving}>
-          {saving ? 'Salvando...' : 'Salvar Configuracoes'}
+          {saving ? 'Salvando...' : 'Salvar Configurações'}
         </Button>
       </div>
     </div>

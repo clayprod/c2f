@@ -28,6 +28,7 @@ import {
   Area,
   AreaChart,
   ReferenceArea,
+  ComposedChart,
 } from 'recharts';
 import DateRangeFilter from '@/components/ui/DateRangeFilter';
 import { formatMonthYear, formatCurrency } from '@/lib/utils';
@@ -273,7 +274,7 @@ export default function ReportsPage() {
       const result = await res.json();
 
       if (!res.ok) {
-        throw new Error(result.error || 'Erro ao carregar relatorio');
+        throw new Error(result.error || 'Erro ao carregar relatório');
       }
 
       switch (activeTab) {
@@ -346,7 +347,7 @@ export default function ReportsPage() {
 
       toast({
         title: 'Sucesso',
-        description: 'Relatorio exportado com sucesso',
+        description: 'Relatório exportado com sucesso',
       });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Erro desconhecido';
@@ -762,7 +763,7 @@ export default function ReportsPage() {
                       </ResponsiveContainer>
                     </div>
                   ) : (
-                    <p className="text-center text-muted-foreground py-8">Nenhuma receita no periodo</p>
+                    <p className="text-center text-muted-foreground py-8">Nenhuma receita no período</p>
                   )}
                   <div className="space-y-2 mt-4">
                     {categoriesData.income.categories.slice(0, 5).map((cat, i) => (
@@ -825,7 +826,7 @@ export default function ReportsPage() {
                       </ResponsiveContainer>
                     </div>
                   ) : (
-                    <p className="text-center text-muted-foreground py-8">Nenhuma despesa no periodo</p>
+                    <p className="text-center text-muted-foreground py-8">Nenhuma despesa no período</p>
                   )}
                   <div className="space-y-2 mt-4">
                     {categoriesData.expense.categories.slice(0, 5).map((cat, i) => (
@@ -905,7 +906,7 @@ export default function ReportsPage() {
                 <div className="glass-card p-6">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-display font-semibold text-lg">Orcamento vs Gasto por Categoria</h3>
+                      <h3 className="font-display font-semibold text-lg">Orçamento vs Gasto por Categoria</h3>
                       <InfoIcon
                         content={
                           <div className="space-y-2">
@@ -962,7 +963,7 @@ export default function ReportsPage() {
                       </ResponsiveContainer>
                     </div>
                   ) : (
-                    <p className="text-center text-muted-foreground py-8">Nenhum orcamento no periodo</p>
+                    <p className="text-center text-muted-foreground py-8">Nenhum orçamento no período</p>
                   )}
                 </div>
 
@@ -1107,7 +1108,7 @@ export default function ReportsPage() {
                               <span>| {goal.days_remaining} dias restantes</span>
                             )}
                             {goal.monthly_needed_cents !== null && goal.monthly_needed_cents > 0 && (
-                              <span>| {formatCurrency(goal.monthly_needed_cents)}/mes necessario</span>
+                              <span>| {formatCurrency(goal.monthly_needed_cents)}/mês necessário</span>
                             )}
                           </div>
                           <div className="w-full bg-muted rounded-full h-3">
@@ -1457,26 +1458,95 @@ export default function ReportsPage() {
                       {(() => {
                         const reorganized = reorganizeDataForChart(cashflowData.periods);
                         return (
-                          <AreaChart data={reorganized.data}>
+                          <ComposedChart data={reorganized.data} barGap={0} barCategoryGap="20%">
                             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                             <XAxis
                               dataKey="period"
                               tickFormatter={(value, index) => formatPeriodLabel(value, index, reorganized.data)}
                               stroke="hsl(var(--muted-foreground))"
                               fontSize={12}
+                              angle={-45}
+                              textAnchor="end"
+                              height={100}
+                              tick={(props: any) => {
+                                const { x, y, payload } = props;
+                                const isCurrentMonth = reorganized.currentMonthIndex >= 0 && 
+                                  reorganized.data[reorganized.currentMonthIndex]?.period === payload.value;
+                                return (
+                                  <g transform={`translate(${x},${y})`}>
+                                    <text
+                                      x={0}
+                                      y={0}
+                                      dy={16}
+                                      textAnchor="end"
+                                      fill={isCurrentMonth ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))'}
+                                      fontSize={12}
+                                      fontWeight={isCurrentMonth ? 'bold' : 'normal'}
+                                      transform="rotate(-45)"
+                                    >
+                                      {formatPeriodLabel(payload.value)}
+                                    </text>
+                                  </g>
+                                );
+                              }}
                             />
-                            {reorganized.currentMonthIndex >= 0 && reorganized.currentMonthIndex < reorganized.data.length && (
-                              <ReferenceArea
-                                x1={reorganized.data[reorganized.currentMonthIndex]?.period}
-                                x2={reorganized.data[reorganized.currentMonthIndex]?.period}
-                                y1="dataMin"
-                                y2="dataMax"
-                                fill="hsl(var(--primary))"
-                                fillOpacity={0.1}
-                                stroke="none"
-                                ifOverflow="extendDomain"
-                              />
-                            )}
+                            {reorganized.currentMonthIndex >= 0 && reorganized.currentMonthIndex < reorganized.data.length && (() => {
+                              const currentMonthValue = reorganized.data[reorganized.currentMonthIndex]?.period;
+                              if (!currentMonthValue) return null;
+                              const prevIndex = reorganized.currentMonthIndex > 0 ? reorganized.currentMonthIndex - 1 : reorganized.currentMonthIndex;
+                              const nextIndex = reorganized.currentMonthIndex < reorganized.data.length - 1 ? reorganized.currentMonthIndex + 1 : reorganized.currentMonthIndex;
+                              if (prevIndex < reorganized.currentMonthIndex && nextIndex > reorganized.currentMonthIndex) {
+                                const prevValue = reorganized.data[prevIndex]?.period;
+                                const nextValue = reorganized.data[nextIndex]?.period;
+                                return (
+                                  <ReferenceArea
+                                    x1={prevValue}
+                                    x2={nextValue}
+                                    y1="dataMin"
+                                    y2="dataMax"
+                                    fill="hsl(var(--primary))"
+                                    fillOpacity={0.25}
+                                    stroke="hsl(var(--primary))"
+                                    strokeOpacity={0.7}
+                                    strokeWidth={3}
+                                    strokeDasharray="0"
+                                    label={{
+                                      value: '◆ MÊS ATUAL ◆',
+                                      position: 'top',
+                                      fill: 'hsl(var(--primary))',
+                                      fontSize: 14,
+                                      fontWeight: 'bold',
+                                      offset: 15
+                                    }}
+                                    ifOverflow="extendDomain"
+                                  />
+                                );
+                              } else {
+                                return (
+                                  <ReferenceArea
+                                    x1={currentMonthValue}
+                                    x2={currentMonthValue}
+                                    y1="dataMin"
+                                    y2="dataMax"
+                                    fill="hsl(var(--primary))"
+                                    fillOpacity={0.25}
+                                    stroke="hsl(var(--primary))"
+                                    strokeOpacity={0.7}
+                                    strokeWidth={3}
+                                    strokeDasharray="0"
+                                    label={{
+                                      value: '◆ MÊS ATUAL ◆',
+                                      position: 'top',
+                                      fill: 'hsl(var(--primary))',
+                                      fontSize: 14,
+                                      fontWeight: 'bold',
+                                      offset: 15
+                                    }}
+                                    ifOverflow="extendDomain"
+                                  />
+                                );
+                              }
+                            })()}
                             <YAxis
                               tickFormatter={(v) => `R$${(v / 100).toFixed(0)}`}
                               stroke="hsl(var(--muted-foreground))"
@@ -1492,37 +1562,54 @@ export default function ReportsPage() {
                               }}
                             />
                             <Legend />
-                            <Area
-                              type="monotone"
-                              dataKey="income_cents"
-                              name="Receitas"
-                              stroke="#10b981"
-                              fill="#10b981"
-                              fillOpacity={0.3}
-                            />
-                            <Area
-                              type="monotone"
+                            {/* Despesas Reais - escuro, opacidade 100% (base da pilha) */}
+                            <Bar
                               dataKey="expense_cents"
                               name="Despesas"
-                              stroke="#ef4444"
-                              fill="#ef4444"
-                              fillOpacity={0.3}
+                              fill="hsl(0, 84%, 50%)"
+                              radius={[0, 0, 0, 0]}
+                              stackId="cashflow"
                             />
+                            {/* Receitas Reais - escuro, opacidade 100% (sobre as despesas) */}
+                            <Bar
+                              dataKey="income_cents"
+                              name="Receitas"
+                              fill="hsl(142, 71%, 35%)"
+                              radius={[4, 4, 0, 0]}
+                              stackId="cashflow"
+                            />
+                            {/* Saldo Acumulado - linha */}
                             <Line
                               type="monotone"
                               dataKey="cumulative_balance_cents"
                               name="Saldo Acumulado"
-                              stroke="#8b5cf6"
-                              strokeWidth={3}
-                              dot={false}
+                              stroke="hsl(var(--primary))"
+                              strokeWidth={2}
+                              dot={(props: any) => {
+                                const { payload } = props;
+                                if (!payload || payload.cumulative_balance_cents === null || payload.cumulative_balance_cents === undefined) {
+                                  return <g key={`dot-empty-${props.index}`} />;
+                                }
+                                return (
+                                  <circle
+                                    key={`dot-${props.index}`}
+                                    cx={props.cx}
+                                    cy={props.cy}
+                                    r={4}
+                                    fill="hsl(var(--primary))"
+                                  />
+                                );
+                              }}
+                              activeDot={{ r: 6 }}
+                              connectNulls={true}
                             />
-                          </AreaChart>
+                          </ComposedChart>
                         );
                       })()}
                     </ResponsiveContainer>
                   </div>
                 ) : (
-                  <p className="text-center text-muted-foreground py-8">Nenhuma transacao no periodo</p>
+                  <p className="text-center text-muted-foreground py-8">Nenhuma transação no período</p>
                 )}
               </div>
             )}

@@ -41,7 +41,7 @@ BEGIN
   WHERE token = p_token;
 
   IF NOT FOUND THEN
-    RETURN jsonb_build_object('ok', FALSE, 'status', 404, 'error', 'Convite nao encontrado');
+    RETURN jsonb_build_object('ok', FALSE, 'status', 404, 'error', 'Convite não encontrado');
   END IF;
 
   SELECT p.full_name, p.email, p.avatar_url
@@ -96,7 +96,7 @@ BEGIN
   WHERE token = p_token;
 
   IF NOT FOUND THEN
-    RETURN jsonb_build_object('ok', FALSE, 'status', 404, 'error', 'Convite nao encontrado');
+    RETURN jsonb_build_object('ok', FALSE, 'status', 404, 'error', 'Convite não encontrado');
   END IF;
 
   IF v_invite.status <> 'pending' THEN
@@ -121,7 +121,7 @@ BEGIN
   WHERE p.id = v_user_id;
 
   IF v_user_email IS NULL THEN
-    RETURN jsonb_build_object('ok', FALSE, 'status', 400, 'error', 'Perfil nao encontrado');
+    RETURN jsonb_build_object('ok', FALSE, 'status', 400, 'error', 'Perfil não encontrado');
   END IF;
 
   IF lower(v_user_email) <> lower(v_invite.email) THEN
