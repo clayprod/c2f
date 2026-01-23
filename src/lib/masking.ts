@@ -58,7 +58,7 @@ export function maskCPF(cpf: string | null | undefined): string {
 
 /**
  * Mask CNPJ (Brazilian company tax ID)
- * Example: 12345678000190 -> 12.***.***/****-90
+ * Example: 12345678000190 -> 12.***.*** / ****-90
  */
 export function maskCNPJ(cnpj: string | null | undefined): string {
   if (!cnpj || cnpj === '') {
