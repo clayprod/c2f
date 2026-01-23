@@ -153,7 +153,7 @@ export async function getGlobalSettings(forceRefresh = false): Promise<GlobalSet
         ? decrypt(data.smtp_password_encrypted) 
         : data.smtp_password;
       settings.smtp_from_email = data.smtp_from_email;
-      settings.smtp_secure = data.smtp_secure;
+      settings.smtp_secure = (data as any)?.smtp_secure;
       settings.groq_api_key = data.groq_api_key_encrypted 
         ? decrypt(data.groq_api_key_encrypted) 
         : data.groq_api_key;

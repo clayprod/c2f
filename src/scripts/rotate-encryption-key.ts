@@ -63,10 +63,11 @@ async function rotateTableData(
     // Process each row
     for (const row of rows) {
       try {
+        const rowData = row as Record<string, any>;
         const updates: Record<string, string | null> = {};
 
         for (const column of encryptedColumns) {
-          const encryptedValue = row[column] as string | null;
+          const encryptedValue = rowData[column] as string | null;
 
           if (encryptedValue) {
             try {
@@ -82,7 +83,7 @@ async function rotateTableData(
               // If decryption fails, might already be encrypted with new key
               // Skip this column
               console.warn(
-                `[Rotation] Could not decrypt ${tableName}.${column} for id ${row[idColumn]}, skipping`
+                 `[Rotation] Could not decrypt ${tableName}.${column} for id ${rowData[idColumn]}, skipping`
               );
             }
           }
@@ -93,11 +94,11 @@ async function rotateTableData(
           const { error: updateError } = await supabase
             .from(tableName)
             .update(updates)
-            .eq(idColumn, row[idColumn]);
+            .eq(idColumn, rowData[idColumn]);
 
           if (updateError) {
             console.error(
-              `[Rotation] Error updating ${tableName} id ${row[idColumn]}:`,
+              `[Rotation] Error updating ${tableName} id ${rowData[idColumn]}:`,
               updateError
             );
             errors++;
