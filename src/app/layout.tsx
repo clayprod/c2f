@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Sora } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
@@ -7,7 +7,16 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { Providers } from './providers';
 import CookieBanner from '@/components/landing/CookieBanner';
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+});
+const sora = Sora({
+  subsets: ['latin'],
+  variable: '--font-sora',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'c2Finance - Controle Financeiro Inteligente',
@@ -33,8 +42,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR" className="overflow-x-hidden">
-      <body className={`${inter.className} overflow-x-hidden`}>
+    <html lang="pt-BR" className={`${inter.variable} ${sora.variable} overflow-x-hidden`}>
+      <body className="overflow-x-hidden">
         <Providers>
           {children}
           <Toaster />
