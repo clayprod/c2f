@@ -1,9 +1,20 @@
-'use client';
-
+import type { Metadata } from 'next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TopBanner from '@/components/landing/TopBanner';
 import Navbar from '@/components/landing/Navbar';
 import Footer from '@/components/landing/Footer';
+
+export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'Política de Privacidade | c2Finance',
+  description: 'Política de Privacidade da c2Finance - Como coletamos, usamos e protegemos seus dados pessoais em conformidade com a LGPD.',
+  openGraph: {
+    title: 'Política de Privacidade | c2Finance',
+    description: 'Saiba como a c2Finance protege seus dados pessoais em conformidade com a LGPD.',
+    type: 'website',
+  },
+};
 
 export default function PublicPrivacyPolicyPage() {
   return (

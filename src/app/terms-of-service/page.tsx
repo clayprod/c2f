@@ -1,9 +1,20 @@
-'use client';
-
+import type { Metadata } from 'next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TopBanner from '@/components/landing/TopBanner';
 import Navbar from '@/components/landing/Navbar';
 import Footer from '@/components/landing/Footer';
+
+export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'Termos de Uso | c2Finance',
+  description: 'Termos de Uso da c2Finance - Condições para utilização da plataforma de gestão financeira pessoal e empresarial.',
+  openGraph: {
+    title: 'Termos de Uso | c2Finance',
+    description: 'Leia os Termos de Uso da c2Finance antes de utilizar nossos serviços.',
+    type: 'website',
+  },
+};
 
 export default function PublicTermsOfServicePage() {
   return (
