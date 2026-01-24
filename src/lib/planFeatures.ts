@@ -50,8 +50,8 @@ export const PLAN_MODULES: Array<{ id: PlanModuleId; label: string; route: strin
   { id: 'ai_advisor', label: 'AI Advisor (chat)', route: '/app/advisor' },
 ];
 
-const MODULE_LABELS = PLAN_MODULES.reduce<Record<string, string>>((acc, module) => {
-  acc[module.id] = module.label;
+const MODULE_LABELS = PLAN_MODULES.reduce<Record<string, string>>((acc, planModule) => {
+  acc[planModule.id] = planModule.label;
   return acc;
 }, {});
 
@@ -146,12 +146,12 @@ function isLimitUpgrade(current: PlanFeature | undefined, previous: PlanFeature 
 }
 
 export function planIncludesAllFeatures(current: PlanFeatures, previous: PlanFeatures): boolean {
-  return PLAN_MODULES.every((module) => {
-    const currentFeature = current?.[module.id];
-    const previousFeature = previous?.[module.id];
+  return PLAN_MODULES.every((planModule) => {
+    const currentFeature = current?.[planModule.id];
+    const previousFeature = previous?.[planModule.id];
 
     if (!previousFeature?.enabled) return true;
-    if (module.id === 'transactions' || module.id === 'ai_advisor') {
+    if (planModule.id === 'transactions' || planModule.id === 'ai_advisor') {
       const currentResolved = resolveFeatureLimit(currentFeature);
       const previousResolved = resolveFeatureLimit(previousFeature);
 
@@ -172,12 +172,12 @@ export function buildPlanFeatureListSync(
   features: PlanFeatures
 ): Array<{ id: PlanModuleId; text: string; enabled: boolean }> {
   const items: Array<{ id: PlanModuleId; text: string; enabled: boolean }> = [];
-  PLAN_MODULES.forEach((module) => {
-    const feature = features?.[module.id];
+  PLAN_MODULES.forEach((planModule) => {
+    const feature = features?.[planModule.id];
     if (!feature?.enabled) return;
     items.push({
-      id: module.id,
-      text: formatFeatureTextSync(module.id, feature),
+      id: planModule.id,
+      text: formatFeatureTextSync(planModule.id, feature),
       enabled: true,
     });
   });
@@ -191,12 +191,12 @@ export async function buildPlanFeatureList(
   features: PlanFeatures
 ): Promise<Array<{ id: PlanModuleId; text: string; enabled: boolean }>> {
   const items: Array<{ id: PlanModuleId; text: string; enabled: boolean }> = [];
-  for (const module of PLAN_MODULES) {
-    const feature = features?.[module.id];
+  for (const planModule of PLAN_MODULES) {
+    const feature = features?.[planModule.id];
     if (!feature?.enabled) continue;
-    const text = await formatFeatureText(module.id, feature);
+    const text = await formatFeatureText(planModule.id, feature);
     items.push({
-      id: module.id,
+      id: planModule.id,
       text,
       enabled: true,
     });
@@ -224,25 +224,25 @@ export function buildPlanFeatureListWithInheritanceSync(
 
   const additionalItems: Array<{ id: string; text: string; enabled: boolean }> = [];
 
-  PLAN_MODULES.forEach((module) => {
-    const currentFeature = current?.[module.id];
-    const previousFeature = previous?.[module.id];
+  PLAN_MODULES.forEach((planModule) => {
+    const currentFeature = current?.[planModule.id];
+    const previousFeature = previous?.[planModule.id];
 
     if (!currentFeature?.enabled) return;
     if (!previousFeature?.enabled) {
       additionalItems.push({
-        id: module.id,
-        text: formatFeatureTextSync(module.id, currentFeature),
+        id: planModule.id,
+        text: formatFeatureTextSync(planModule.id, currentFeature),
         enabled: true,
       });
       return;
     }
 
-    if (module.id === 'transactions' || module.id === 'ai_advisor') {
+    if (planModule.id === 'transactions' || planModule.id === 'ai_advisor') {
       if (isLimitUpgrade(currentFeature, previousFeature)) {
         additionalItems.push({
-          id: module.id,
-          text: formatFeatureTextSync(module.id, currentFeature),
+          id: planModule.id,
+          text: formatFeatureTextSync(planModule.id, currentFeature),
           enabled: true,
         });
       }
@@ -279,26 +279,26 @@ export async function buildPlanFeatureListWithInheritance(
 
   const additionalItems: Array<{ id: string; text: string; enabled: boolean }> = [];
 
-  for (const module of PLAN_MODULES) {
-    const currentFeature = current?.[module.id];
-    const previousFeature = previous?.[module.id];
+  for (const planModule of PLAN_MODULES) {
+    const currentFeature = current?.[planModule.id];
+    const previousFeature = previous?.[planModule.id];
 
     if (!currentFeature?.enabled) continue;
     if (!previousFeature?.enabled) {
-      const text = await formatFeatureText(module.id, currentFeature);
+      const text = await formatFeatureText(planModule.id, currentFeature);
       additionalItems.push({
-        id: module.id,
+        id: planModule.id,
         text,
         enabled: true,
       });
       continue;
     }
 
-    if (module.id === 'transactions' || module.id === 'ai_advisor') {
+    if (planModule.id === 'transactions' || planModule.id === 'ai_advisor') {
       if (isLimitUpgrade(currentFeature, previousFeature)) {
-        const text = await formatFeatureText(module.id, currentFeature);
+        const text = await formatFeatureText(planModule.id, currentFeature);
         additionalItems.push({
-          id: module.id,
+          id: planModule.id,
           text,
           enabled: true,
         });
