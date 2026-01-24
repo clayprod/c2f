@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { pluggyClient } from '@/services/pluggy/client';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Debug endpoint to see raw Pluggy API response for accounts
  * This helps identify if the connector info is available

@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server';
 import { getInstitutionLogoUrl } from '@/services/pluggy/bankMapping';
 import { pluggyClient } from '@/services/pluggy/client';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Get Pluggy links with institution logos for accounts
  * Returns a map of account_id -> institution_logo

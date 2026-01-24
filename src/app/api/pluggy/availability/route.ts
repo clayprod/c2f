@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server';
 import { isPluggyEnabled } from '@/services/pluggy/client';
 import { isAdmin } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Check if Open Finance import is available for the current user
  * Currently restricted to admins only when Pluggy is enabled
