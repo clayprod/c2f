@@ -48,7 +48,7 @@ export default function CookieBanner() {
             <p className="text-sm text-muted-foreground">
               Utilizamos cookies para melhorar sua experiência, analisar o uso do site e personalizar conteúdo. 
               Ao continuar navegando, você concorda com nossa{' '}
-              <Link href="/privacy" className="text-primary hover:underline">
+              <Link href="/privacy-policy" className="text-primary hover:underline">
                 Política de Privacidade
               </Link>
               .
