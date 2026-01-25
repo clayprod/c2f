@@ -80,8 +80,7 @@ export async function syncItem(
     let transactionsSynced = 0;
 
     for (const pluggyAccount of pluggyAccounts) {
-      // Check if this is a credit card account - skip transaction sync for credit cards
-      // Credit cards are managed via bills/invoices, not individual transactions
+      // Check if this is a credit card account - will be imported as bill items instead of transactions
       const isCreditCardAccount = pluggyAccount.type === 'CREDIT' || pluggyAccount.subtype === 'credit_card';
       
       // Upsert account - balance can be number or object depending on API version
@@ -125,11 +124,10 @@ export async function syncItem(
 
       accountsSynced++;
 
-      // Skip transaction sync for credit card accounts
-      // Credit cards are managed via bills/invoices in c2Finance
+      // Note: Credit card transactions are now synced to staging table (pluggy_transactions)
+      // They will be imported as credit_card_bill_items with installment expansion during import
       if (isCreditCardAccount) {
-        console.log(`[Pluggy Sync] Skipping transactions for credit card account: ${pluggyAccount.name}`);
-        continue;
+        console.log(`[Pluggy Sync] Syncing credit card transactions for account: ${pluggyAccount.name}`);
       }
 
       // Sync transactions for this account

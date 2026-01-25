@@ -185,7 +185,8 @@ export async function createTransactionFromWhatsApp(
 
   // Determine transaction type based on amount
   const type = input.amountCents >= 0 ? 'income' : 'expense';
-  const absoluteAmount = Math.abs(input.amountCents);
+  // Convert from centavos to reais (database stores in reais)
+  const absoluteAmountReais = Math.abs(input.amountCents) / 100;
 
   // Find or get account
   let accountId: string | null = null;
@@ -217,7 +218,7 @@ export async function createTransactionFromWhatsApp(
       account_id: accountId,
       category_id: categoryId,
       description: input.description,
-      amount: type === 'expense' ? -absoluteAmount : absoluteAmount,
+      amount: type === 'expense' ? -absoluteAmountReais : absoluteAmountReais,
       posted_at: input.postedAt,
       notes: input.notes ? `${input.notes}\n\n[Via WhatsApp]` : '[Via WhatsApp]',
       source: 'manual',
@@ -232,8 +233,7 @@ export async function createTransactionFromWhatsApp(
       account_id: accountId,
       category_id: categoryId,
       description: input.description,
-      amount: type === 'expense' ? -absoluteAmount : absoluteAmount,
-      type,
+      amount: type === 'expense' ? -absoluteAmountReais : absoluteAmountReais,
       posted_at: input.postedAt,
     });
     return {
@@ -242,8 +242,8 @@ export async function createTransactionFromWhatsApp(
     };
   }
 
-  // Update account balance
-  const balanceChange = type === 'expense' ? -absoluteAmount : absoluteAmount;
+  // Update account balance (in reais)
+  const balanceChange = type === 'expense' ? -absoluteAmountReais : absoluteAmountReais;
   await supabase.rpc('update_account_balance', {
     account_id: accountId,
     amount_change: balanceChange,
@@ -473,8 +473,8 @@ export async function createInstallmentTransactionsFromWhatsApp(
 ): Promise<InstallmentResult> {
   const supabase = createAdminClient();
 
-  // Calculate per-installment amount (in cents)
-  const installmentAmountCents = Math.round(input.totalAmountCents / input.installmentTotal);
+  // Calculate per-installment amount (convert from cents to reais, database stores in reais)
+  const installmentAmountReais = Math.round((input.totalAmountCents / input.installmentTotal)) / 100;
 
   // Find account (prioritize by name if provided)
   let accountId: string | null = null;
@@ -541,7 +541,7 @@ export async function createInstallmentTransactionsFromWhatsApp(
         bill_id: creditCardBillId,
         category_id: categoryId,
         description: `${input.description} (${i}/${input.installmentTotal})`,
-        amount_cents: Math.abs(installmentAmountCents),
+        amount_cents: Math.abs(installmentAmountReais),
         currency: 'BRL',
         posted_at: installmentDate.toISOString().split('T')[0],
         notes: input.notes
@@ -575,7 +575,7 @@ export async function createInstallmentTransactionsFromWhatsApp(
         account_id: accountId,
         category_id: categoryId,
         description: `${input.description} (${i}/${input.installmentTotal})`,
-        amount: -installmentAmountCents,
+        amount: -installmentAmountReais,
         posted_at: installmentDate.toISOString().split('T')[0],
         notes: input.notes
           ? `${input.notes}\n\n[Via WhatsApp - Parcelado ${i}/${input.installmentTotal}]`
@@ -615,7 +615,7 @@ export async function createInstallmentTransactionsFromWhatsApp(
       });
     }
   } else {
-    const balanceChange = -installmentAmountCents;
+    const balanceChange = -installmentAmountReais;
     await supabase.rpc('update_account_balance', {
       account_id: accountId,
       amount_change: balanceChange,

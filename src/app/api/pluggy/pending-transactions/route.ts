@@ -8,6 +8,7 @@ interface LinkInfo {
   pluggy_account_db_id: string;  // UUID from pluggy_accounts.id (used to filter pluggy_transactions.account_id)
   pluggy_account_id: string;     // TEXT from Pluggy API
   internal_account_id: string;
+  is_credit_card: boolean;       // True if this is a credit card account
 }
 
 /**
@@ -99,23 +100,16 @@ async function fetchFromSingleLink(
     return NextResponse.json({ error: 'Link not found' }, { status: 404 });
   }
 
-  // Check if internal account is a credit card - reject if so
-  const internalAccount = link.accounts as any;
-  if (internalAccount.type === 'credit_card' || internalAccount.type === 'credit') {
-    return NextResponse.json({
-      error: 'Contas de cartão de crédito não suportam importação de transações via Open Finance. Use o gerenciamento de faturas.',
-    }, { status: 400 });
-  }
-
   // Extract Pluggy account from link
   const pluggyAccount = link.pluggy_accounts as any;
+  const internalAccount = link.accounts as any;
 
-  // Also check if Pluggy account is a credit card
-  if (pluggyAccount.type === 'CREDIT' || pluggyAccount.subtype === 'credit_card') {
-    return NextResponse.json({
-      error: 'Contas de cartão de crédito do Open Finance não podem ter transações importadas. Use o gerenciamento de faturas.',
-    }, { status: 400 });
-  }
+  // Check if this is a credit card account (will be imported as bill items with installment expansion)
+  const isCreditCard = 
+    internalAccount.type === 'credit_card' || 
+    internalAccount.type === 'credit' ||
+    pluggyAccount.type === 'CREDIT' || 
+    pluggyAccount.subtype === 'credit_card';
 
   const pluggyAccountDbId = pluggyAccount.id;  // UUID used for filtering pluggy_transactions.account_id
   const accountName = pluggyAccount.name;
@@ -142,17 +136,20 @@ async function fetchFromSingleLink(
     link_id: linkId,
     account_name: accountName,
     institution_name: institutionName,
+    is_credit_card: isCreditCard,
   }));
 
   return NextResponse.json({
     transactions: transactionsWithMeta,
     total: count || 0,
     internal_account_id: link.internal_account_id,
+    is_credit_card: isCreditCard,
     links: [{
       id: linkId,
       name: accountName,
       institution_name: institutionName,
       pending_count: count || 0,
+      is_credit_card: isCreditCard,
     }],
   });
 }
@@ -203,38 +200,23 @@ async function fetchFromAllLinks(
     });
   }
 
-  // Filter out credit card accounts (both internal and Pluggy)
-  // Credit cards are managed via bills/invoices, not individual transactions
-  const validLinks = links.filter((link: any) => {
-    const internalAccount = link.accounts as any;
-    const pluggyAccount = link.pluggy_accounts as any;
-    
-    // Exclude internal credit card accounts
-    if (internalAccount.type === 'credit_card' || internalAccount.type === 'credit') {
-      return false;
-    }
-    
-    // Exclude Pluggy credit card accounts
-    if (pluggyAccount.type === 'CREDIT' || pluggyAccount.subtype === 'credit_card') {
-      return false;
-    }
-    
-    return true;
-  });
-
-  if (validLinks.length === 0) {
-    return NextResponse.json({
-      transactions: [],
-      total: 0,
-      links: [],
-    });
-  }
+  // All links are now valid - credit cards will be imported as bill items with installment expansion
+  const validLinks = links;
 
   // Build a map of pluggy_accounts.id (UUID) to link info
   // This is the key used in pluggy_transactions.account_id
   const linkMap = new Map<string, LinkInfo>();
   for (const link of validLinks) {
     const pluggyAccount = link.pluggy_accounts as any;
+    const internalAccount = link.accounts as any;
+    
+    // Detect if this is a credit card account
+    const isCreditCard = 
+      internalAccount.type === 'credit_card' || 
+      internalAccount.type === 'credit' ||
+      pluggyAccount.type === 'CREDIT' || 
+      pluggyAccount.subtype === 'credit_card';
+
     linkMap.set(pluggyAccount.id, {  // Use pluggy_accounts.id (UUID) as key
       id: link.id,
       name: pluggyAccount.name,
@@ -242,6 +224,7 @@ async function fetchFromAllLinks(
       pluggy_account_db_id: pluggyAccount.id,
       pluggy_account_id: pluggyAccount.pluggy_account_id,
       internal_account_id: link.internal_account_id,
+      is_credit_card: isCreditCard,
     });
   }
 
@@ -286,6 +269,7 @@ async function fetchFromAllLinks(
       link_id: linkInfo?.id || null,
       account_name: linkInfo?.name || 'Conta desconhecida',
       institution_name: linkInfo?.institution_name || 'Open Finance',
+      is_credit_card: linkInfo?.is_credit_card || false,
     };
   });
 
@@ -295,6 +279,7 @@ async function fetchFromAllLinks(
     name: link.name,
     institution_name: link.institution_name,
     pending_count: pendingCountByAccount.get(link.pluggy_account_db_id) || 0,  // Use UUID
+    is_credit_card: link.is_credit_card,
   }));
 
   return NextResponse.json({
