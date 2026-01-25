@@ -1,6 +1,12 @@
 import { MetadataRoute } from 'next';
 import { createClient } from '@/lib/supabase/server';
 
+// Revalidate every hour to pick up new blog posts
+export const revalidate = 3600;
+
+// Ensure this runs dynamically, not at build time only
+export const dynamic = 'force-dynamic';
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const supabase = await createClient();
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://c2finance.com';

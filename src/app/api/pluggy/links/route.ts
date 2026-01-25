@@ -137,28 +137,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify pluggy account belongs to user
-    const { data: pluggyAccount, error: pluggyError } = await supabase
-      .from('pluggy_accounts')
-      .select('id')
-      .eq('id', pluggy_account_id)
-      .eq('user_id', user.id)
-      .single();
-
-    if (pluggyError || !pluggyAccount) {
-      return NextResponse.json({ error: 'Pluggy account not found' }, { status: 404 });
-    }
-
-    // Verify internal account belongs to user
+    // Verify internal account belongs to user and is not a credit card
     const { data: internalAccount, error: internalError } = await supabase
       .from('accounts')
-      .select('id')
+      .select('id, type')
       .eq('id', internal_account_id)
       .eq('user_id', user.id)
       .single();
 
     if (internalError || !internalAccount) {
       return NextResponse.json({ error: 'Internal account not found' }, { status: 404 });
+    }
+
+    // Block linking credit card accounts - they are managed via bills/invoices
+    if (internalAccount.type === 'credit_card' || internalAccount.type === 'credit') {
+      return NextResponse.json({
+        error: 'Contas de cartão de crédito não podem ser vinculadas para importação de transações. Cartões são gerenciados via faturas.',
+      }, { status: 400 });
+    }
+
+    // Also verify Pluggy account is not a credit card
+    const { data: pluggyAccountData, error: pluggyTypeError } = await supabase
+      .from('pluggy_accounts')
+      .select('id, type, subtype')
+      .eq('id', pluggy_account_id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (pluggyTypeError || !pluggyAccountData) {
+      return NextResponse.json({ error: 'Pluggy account not found' }, { status: 404 });
+    }
+
+    if (pluggyAccountData.type === 'CREDIT' || pluggyAccountData.subtype === 'credit_card') {
+      return NextResponse.json({
+        error: 'Contas de cartão de crédito do Open Finance não podem ser vinculadas para importação de transações.',
+      }, { status: 400 });
     }
 
     // Create the link

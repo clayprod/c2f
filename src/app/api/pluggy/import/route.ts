@@ -33,15 +33,41 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the link to find the internal account
+    // Include account type to validate it's not a credit card
     const { data: link, error: linkError } = await supabase
       .from('account_links')
-      .select('internal_account_id')
+      .select(`
+        internal_account_id,
+        pluggy_accounts!inner (
+          type,
+          subtype
+        ),
+        accounts!inner (
+          type
+        )
+      `)
       .eq('id', link_id)
       .eq('user_id', user.id)
       .single();
 
     if (linkError || !link) {
       return NextResponse.json({ error: 'Link not found' }, { status: 404 });
+    }
+
+    // Validate that internal account is not a credit card
+    const internalAccount = link.accounts as any;
+    if (internalAccount.type === 'credit_card' || internalAccount.type === 'credit') {
+      return NextResponse.json({
+        error: 'Não é possível importar transações para contas de cartão de crédito. Use o gerenciamento de faturas.',
+      }, { status: 400 });
+    }
+
+    // Validate that Pluggy account is not a credit card
+    const pluggyAccount = link.pluggy_accounts as any;
+    if (pluggyAccount.type === 'CREDIT' || pluggyAccount.subtype === 'credit_card') {
+      return NextResponse.json({
+        error: 'Contas de cartão de crédito do Open Finance não suportam importação de transações.',
+      }, { status: 400 });
     }
 
     const internalAccountId = link.internal_account_id;

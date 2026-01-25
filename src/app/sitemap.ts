@@ -1,5 +1,8 @@
 import { MetadataRoute } from 'next';
 
+// Revalidate every hour
+export const revalidate = 3600;
+
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://c2finance.com';
 
