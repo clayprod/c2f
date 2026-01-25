@@ -1,10 +1,18 @@
 /**
  * AI Transaction Categorization Service
  * Uses LLM to categorize transactions based on their descriptions
+ * Now with history-based suggestions for better accuracy and lower costs
  */
 
 import { callLLM, getAPIConfig } from '@/services/advisor/llm';
 import { getGlobalSettings } from '@/services/admin/globalSettings';
+import { SupabaseClient } from '@supabase/supabase-js';
+import {
+  suggestFromHistory,
+  clearPatternCache,
+  type TransactionToSuggest,
+  type HistoryMatch,
+} from '@/services/categorization/historySuggester';
 
 export interface TransactionToCategorize {
   id: string;
@@ -234,3 +242,102 @@ export async function categorizeLargeSet(
     error: hasError ? errorMessage : undefined,
   };
 }
+
+/**
+ * Smart categorization: uses history-based suggestions first, then AI for unmatched
+ * This is the recommended entry point for categorization
+ */
+export async function categorizeWithHistory(
+  transactions: TransactionToCategorize[],
+  userCategories: Category[],
+  userId: string,
+  supabase: SupabaseClient,
+  options: { skipHistory?: boolean } = {}
+): Promise<CategorizationResult> {
+  if (transactions.length === 0) {
+    return { transactions: [], success: true };
+  }
+
+  // If skipHistory is true, go straight to AI
+  if (options.skipHistory) {
+    return transactions.length > 20
+      ? categorizeLargeSet(transactions, userCategories, userId)
+      : categorizeTransactions(transactions, userCategories, userId);
+  }
+
+  try {
+    // Step 1: Try to match from user's transaction history
+    const historyResult = await suggestFromHistory(
+      transactions as TransactionToSuggest[],
+      userId,
+      supabase
+    );
+
+    // Build category name to ID map for converting history matches
+    const categoryMap = new Map(userCategories.map(c => [c.name.toLowerCase(), c]));
+
+    // Convert history matches to CategorizedTransaction format
+    const matchedFromHistory: CategorizedTransaction[] = historyResult.matched.map(match => ({
+      id: match.id,
+      category: match.category_name,
+      confidence: match.confidence,
+    }));
+
+    // Step 2: Use AI for unmatched transactions
+    let aiResults: CategorizedTransaction[] = [];
+    let aiSuccess = true;
+    let aiError: string | undefined;
+
+    if (historyResult.unmatched.length > 0) {
+      console.log(`[Categorization] ${historyResult.unmatched.length} transactions need AI categorization`);
+      
+      const aiResult = historyResult.unmatched.length > 20
+        ? await categorizeLargeSet(historyResult.unmatched, userCategories, userId)
+        : await categorizeTransactions(historyResult.unmatched, userCategories, userId);
+      
+      aiResults = aiResult.transactions;
+      aiSuccess = aiResult.success;
+      aiError = aiResult.error;
+    }
+
+    // Step 3: Combine results preserving original order
+    const allResults = new Map<string, CategorizedTransaction>();
+    
+    for (const tx of matchedFromHistory) {
+      allResults.set(tx.id, tx);
+    }
+    
+    for (const tx of aiResults) {
+      allResults.set(tx.id, tx);
+    }
+
+    // Rebuild in original order
+    const orderedResults = transactions.map(tx => 
+      allResults.get(tx.id) || { id: tx.id, category: 'Outros', confidence: 'low' as const }
+    );
+
+    const historyMatchCount = matchedFromHistory.length;
+    const aiMatchCount = aiResults.length;
+    
+    console.log(`[Categorization] Complete: ${historyMatchCount} from history, ${aiMatchCount} from AI`);
+
+    return {
+      transactions: orderedResults,
+      success: aiSuccess,
+      error: aiError,
+    };
+  } catch (error: any) {
+    console.error('[categorizeWithHistory] Error:', error);
+    
+    // Fallback to pure AI categorization
+    return transactions.length > 20
+      ? categorizeLargeSet(transactions, userCategories, userId)
+      : categorizeTransactions(transactions, userCategories, userId);
+  }
+}
+
+/**
+ * Clear the history pattern cache for a user
+ * Call this after importing transactions to refresh patterns
+ */
+export { clearPatternCache };

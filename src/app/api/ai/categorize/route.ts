@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { categorizeTransactions, categorizeLargeSet } from '@/services/ai/categorization';
+import { categorizeWithHistory } from '@/services/ai/categorization';
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,13 +12,14 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { transactions } = body as {
+    const { transactions, skipHistory } = body as {
       transactions: Array<{
         id: string;
         description: string;
         amount: number;
         date: string;
       }>;
+      skipHistory?: boolean;
     };
 
     if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
@@ -51,10 +52,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use large set categorization for bigger batches
-    const result = transactions.length > 20
-      ? await categorizeLargeSet(transactions, categories || [], user.id)
-      : await categorizeTransactions(transactions, categories || [], user.id);
+    // Use smart categorization with history-based suggestions first, then AI
+    const result = await categorizeWithHistory(
+      transactions,
+      categories || [],
+      user.id,
+      supabase,
+      { skipHistory: skipHistory || false }
+    );
 
     return NextResponse.json({
       transactions: result.transactions,

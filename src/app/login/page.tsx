@@ -167,7 +167,15 @@ function LoginForm() {
   const handleGoogleLogin = async () => {
     try {
       const supabase = createClient();
-      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
+      
+      // Use NEXT_PUBLIC_APP_URL if available, otherwise fallback to window.location.origin
+      // Replace 0.0.0.0 with localhost to avoid OAuth redirect issues
+      let origin = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+      if (origin.includes('0.0.0.0')) {
+        origin = origin.replace('0.0.0.0', 'localhost');
+      }
+      
+      const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(next)}`;
       
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
