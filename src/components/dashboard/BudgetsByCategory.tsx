@@ -233,13 +233,12 @@ export function BudgetsByCategory() {
             const budgetCard = (
               <div
                 className={cn(
-                  "group relative p-2.5 md:p-3 lg:p-4 rounded-xl border border-border/50 bg-card/30",
+                  "group relative p-2.5 md:p-3 lg:p-4 rounded-xl border border-border bg-card/30",
                   "hover:bg-card/50 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-pointer",
-                  isOver && "border-red-500/20 bg-red-500/[0.02] hover:bg-red-500/[0.04] hover:border-red-500/40",
-                  isWarning && "border-amber-500/20 bg-amber-500/[0.02] hover:bg-amber-500/[0.04] hover:border-amber-500/40",
+                  isOver && "border-red-500/30 bg-red-500/[0.02] hover:bg-red-500/[0.04] hover:border-red-500/40",
+                  isWarning && "border-amber-500/30 bg-amber-500/[0.02] hover:bg-amber-500/[0.04] hover:border-amber-500/40",
                   showEstimates && !isMobile && !isAutomatic && "hover:ring-2 hover:ring-primary/20"
                 )}
-                style={!isOver && !isWarning ? { borderLeft: `3px solid ${categoryColor}` } : undefined}
               >
                 <div className="flex items-start justify-between mb-2 md:mb-3 lg:mb-4 gap-1.5 md:gap-2">
                   <div className="flex items-center gap-1.5 md:gap-2 min-w-0 flex-1">

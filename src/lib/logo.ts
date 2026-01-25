@@ -25,6 +25,9 @@ export const logoConfig = {
 /**
  * Get logo based on theme
  * Returns appropriate logo for the theme or fallback
+ * 
+ * IMPORTANT: For components that need to react to theme changes,
+ * use the useLogo() hook from '@/hooks/useLogo' instead.
  */
 export function getLogo(theme: 'light' | 'dark' | 'auto' = 'auto'): string {
   if (theme === 'auto') {
@@ -40,5 +43,14 @@ export function getLogo(theme: 'light' | 'dark' | 'auto' = 'auto'): string {
 
   // For dark theme, use light logo (for dark backgrounds)
   return logoConfig.light;
+
+}
+
+/**
+ * Get logo for a specific theme (without auto detection)
+ * Use this for static/server-side rendering where theme is known
+ */
+export function getLogoForTheme(theme: 'light' | 'dark'): string {
+  return theme === 'light' ? logoConfig.dark : logoConfig.light;
 }
 

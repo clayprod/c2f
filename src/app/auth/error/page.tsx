@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { getLogo } from '@/lib/logo';
+import { useLogo } from '@/hooks/useLogo';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
@@ -54,6 +54,8 @@ function ErrorFallback() {
 }
 
 export default function AuthErrorPage() {
+  const logo = useLogo();
+  
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">
@@ -64,7 +66,7 @@ export default function AuthErrorPage() {
       <div className="w-full max-w-md relative z-10">
         <Link href="/" className="flex items-center justify-center mb-8">
           <Image
-            src={getLogo('auto')}
+            src={logo}
             alt="c2Finance"
             width={120}
             height={40}

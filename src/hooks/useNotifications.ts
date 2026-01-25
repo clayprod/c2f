@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 export interface Notification {
@@ -14,13 +14,50 @@ export interface Notification {
     created_at: string;
 }
 
+// Session storage key to track when we last checked notifications
+const LAST_CHECK_KEY = 'c2f_notifications_last_check';
+const CHECK_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+
 export function useNotifications() {
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [loading, setLoading] = useState(true);
     const [unreadCount, setUnreadCount] = useState(0);
+    const hasTriggeredCheck = useRef(false);
 
     // Get a stable reference to the supabase client
     const [supabase] = useState(() => createClient());
+
+    // Trigger background check for new notifications
+    const triggerNotificationCheck = useCallback(async () => {
+        // Only check once per session/interval
+        if (hasTriggeredCheck.current) return;
+
+        try {
+            const lastCheck = sessionStorage.getItem(LAST_CHECK_KEY);
+            const now = Date.now();
+
+            if (lastCheck) {
+                const lastCheckTime = parseInt(lastCheck, 10);
+                if (now - lastCheckTime < CHECK_INTERVAL_MS) {
+                    hasTriggeredCheck.current = true;
+                    return;
+                }
+            }
+
+            hasTriggeredCheck.current = true;
+            sessionStorage.setItem(LAST_CHECK_KEY, now.toString());
+
+            // Fire and forget - don't await, let it run in background
+            fetch('/api/notifications/check', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            }).catch(() => {
+                // Silently ignore errors - cron will handle it eventually
+            });
+        } catch {
+            // Session storage might not be available
+        }
+    }, []);
 
     const fetchNotifications = useCallback(async () => {
         setLoading(true);
@@ -43,12 +80,15 @@ export function useNotifications() {
 
             setNotifications(data || []);
             setUnreadCount(data?.filter(n => !n.read).length || 0);
+
+            // Trigger background check for new notifications
+            triggerNotificationCheck();
         } catch (error) {
             console.error('Error fetching notifications:', error);
         } finally {
             setLoading(false);
         }
-    }, [supabase]);
+    }, [supabase, triggerNotificationCheck]);
 
 
     const markAsRead = async (id: string) => {

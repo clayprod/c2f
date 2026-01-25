@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { getLogo } from '@/lib/logo';
+import { useLogo } from '@/hooks/useLogo';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 
@@ -12,6 +12,7 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const { toast } = useToast();
+  const logo = useLogo();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +52,7 @@ export default function ForgotPasswordPage() {
       <div className="w-full max-w-md relative z-10">
         <Link href="/" className="flex items-center justify-center mb-8">
           <Image
-            src={getLogo('auto')}
+            src={logo}
             alt="c2Finance"
             width={120}
             height={40}

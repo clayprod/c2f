@@ -102,8 +102,17 @@ export default function PublicTermsOfServicePage() {
 
               <div>
                 <h2 className="text-xl font-semibold mb-2">9. Limitação de Responsabilidade</h2>
-                <p className="text-gray-700">
+                <p className="text-gray-700 mb-2">
                   A Tenryu não se responsabiliza por decisões financeiras tomadas pelo Usuário com base nas informações ou recomendações fornecidas pelo Serviço. As recomendações automatizadas não constituem aconselhamento financeiro profissional. O Serviço é fornecido "como está", sem garantias de qualquer natureza. A Tenryu não será responsável por quaisquer danos diretos, indiretos, incidentais, especiais ou consequenciais decorrentes do uso do Serviço.
+                </p>
+                <p className="text-gray-700 mb-2">
+                  <strong>Disponibilidade do Serviço:</strong> A Tenryu não garante a disponibilidade contínua e ininterrupta do Serviço. O Serviço pode sofrer interrupções, quedas, manutenções programadas ou não programadas, falhas técnicas ou outros eventos que resultem em indisponibilidade temporária ou prolongada. A Tenryu não será responsável por quaisquer danos, prejuízos ou perdas decorrentes da indisponibilidade do Serviço.
+                </p>
+                <p className="text-gray-700 mb-2">
+                  <strong>Perda de Dados:</strong> A Tenryu não se responsabiliza por perda, corrupção, alteração ou exclusão de dados do Usuário, seja por falhas técnicas, ataques cibernéticos, erros humanos, caso fortuito ou força maior. É responsabilidade do Usuário manter cópias de segurança (backups) de seus dados e informações importantes.
+                </p>
+                <p className="text-gray-700">
+                  <strong>Serviços de Terceiros:</strong> A Tenryu não se responsabiliza por falhas, interrupções, quedas ou indisponibilidade de serviços de terceiros integrados ou correlatos ao Serviço, incluindo, mas não se limitando a: provedores de infraestrutura em nuvem, instituições financeiras, serviços de Open Banking, processadores de pagamento, APIs externas e quaisquer outros serviços fornecidos por terceiros. A indisponibilidade ou mau funcionamento desses serviços pode afetar o funcionamento do c2Finance, e a Tenryu não terá qualquer responsabilidade sobre tais ocorrências.
                 </p>
               </div>
 
@@ -122,7 +131,7 @@ export default function PublicTermsOfServicePage() {
               </div>
 
               <div className="pt-4">
-                <p className="text-gray-700">Data de vigência: 23/01/2026</p>
+                <p className="text-gray-700">Data de vigência: 25/01/2026</p>
               </div>
             </CardContent>
           </Card>

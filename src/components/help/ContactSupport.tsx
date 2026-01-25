@@ -125,17 +125,6 @@ export function ContactSupport() {
                 </div>
               </Button>
             )}
-            <div className="pt-2 border-t border-border">
-              <Button
-                onClick={fetchContacts}
-                variant="ghost"
-                size="sm"
-                className="w-full text-xs text-muted-foreground hover:text-foreground"
-              >
-                <i className="bx bx-repeat mr-1"></i>
-                Atualizar contatos
-              </Button>
-            </div>
           </div>
         ) : (
           <div className="text-center py-4">

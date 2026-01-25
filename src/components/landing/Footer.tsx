@@ -1,6 +1,8 @@
+'use client';
+
 import Link from 'next/link';
 import Image from 'next/image';
-import { getLogo } from '@/lib/logo';
+import { useLogo } from '@/hooks/useLogo';
 
 const footerLinks = {
   produto: [
@@ -22,6 +24,8 @@ const footerLinks = {
 };
 
 const Footer = () => {
+  const logo = useLogo();
+  
   return (
     <footer className="border-t border-border/50 bg-card/30">
       <div className="container-custom py-12 md:py-16">
@@ -30,7 +34,7 @@ const Footer = () => {
           <div className="col-span-2 md:col-span-1">
             <Link href="/" className="flex items-center mb-4">
               <Image
-                src={getLogo('auto')}
+                src={logo}
                 alt="c2Finance" 
                 width={120}
                 height={40}

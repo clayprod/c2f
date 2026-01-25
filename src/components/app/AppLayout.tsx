@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { getLogo } from '@/lib/logo';
+import { useLogo } from '@/hooks/useLogo';
 import Image from 'next/image';
 import AdvisorDialog from './AdvisorDialog';
 import { NotificationDropdown } from './NotificationDropdown';
@@ -74,6 +74,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
+  const logo = useLogo();
   const { context: accountContext, activeAccountId, setActiveAccountId, isViewingSharedAccount, hasPermission } = useAccountContext();
 
   const persistActiveAccountNow = (id: string | null) => {
@@ -334,7 +335,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <div className="h-16 border-b border-border flex items-center px-6">
             <Link href="/app" onClick={() => setSidebarOpen(false)} className="flex items-center">
               <Image
-                src={getLogo(theme)}
+                src={logo}
                 alt="c2Finance"
                 width={150}
                 height={40}

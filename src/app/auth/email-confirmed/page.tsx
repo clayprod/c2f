@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { getLogo } from '@/lib/logo';
+import { useLogo } from '@/hooks/useLogo';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 export default function EmailConfirmedPage() {
   const router = useRouter();
   const [countdown, setCountdown] = useState(5);
+  const logo = useLogo();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -35,7 +36,7 @@ export default function EmailConfirmedPage() {
       <div className="w-full max-w-md relative z-10">
         <Link href="/" className="flex items-center justify-center mb-8">
           <Image
-            src={getLogo('auto')}
+            src={logo}
             alt="c2Finance"
             width={120}
             height={40}

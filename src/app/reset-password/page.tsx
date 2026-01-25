@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { getLogo } from '@/lib/logo';
+import { useLogo } from '@/hooks/useLogo';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 
@@ -244,6 +244,8 @@ function ResetPasswordFallback() {
 }
 
 export default function ResetPasswordPage() {
+  const logo = useLogo();
+  
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">
@@ -254,7 +256,7 @@ export default function ResetPasswordPage() {
       <div className="w-full max-w-md relative z-10">
         <Link href="/" className="flex items-center justify-center mb-8">
           <Image
-            src={getLogo('auto')}
+            src={logo}
             alt="c2Finance"
             width={120}
             height={40}

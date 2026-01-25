@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getLogo } from '@/lib/logo';
+import { useLogo } from '@/hooks/useLogo';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const logo = useLogo();
 
   useEffect(() => {
     const checkSession = async () => {
@@ -35,7 +36,7 @@ const Navbar = () => {
           {/* Logo */}
           <Link href={isLoggedIn ? "/app" : "/"} className="flex items-center">
             <Image
-              src={getLogo('auto')}
+              src={logo}
               alt="c2Finance"
               width={120}
               height={40}

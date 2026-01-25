@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { getLogo } from '@/lib/logo';
+import { useLogo } from '@/hooks/useLogo';
 import Image from 'next/image';
 import {
   Select,
@@ -39,6 +39,7 @@ export default function CompleteProfilePage() {
   const router = useRouter();
   const { toast } = useToast();
   const [hasAutoFilledFromCep, setHasAutoFilledFromCep] = useState(false);
+  const logo = useLogo();
 
   // Verificar se usuário está autenticado
   useEffect(() => {
@@ -315,7 +316,7 @@ export default function CompleteProfilePage() {
       <div className="w-full max-w-md relative z-10">
         <div className="flex items-center justify-center mb-8">
           <Image
-            src={getLogo('auto')}
+            src={logo}
             alt="c2Finance"
             width={120}
             height={40}

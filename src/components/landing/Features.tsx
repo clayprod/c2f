@@ -8,7 +8,7 @@ const features = [
   },
   {
     icon: 'bxl-whatsapp',
-    title: 'Whatsapp',
+    title: 'WhatsApp',
     description: 'Receba alertas, consulte seu saldo e registre novas transações diretamente pelo WhatsApp.',
   },
   {
