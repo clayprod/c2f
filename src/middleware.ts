@@ -70,6 +70,10 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  if (request.nextUrl.pathname === '/' && user) {
+    return NextResponse.redirect(new URL('/app', request.url));
+  }
+
   // Rotas protegidas
   const protectedRoutes = ['/app'];
   // Exceções para páginas que podem ser acessadas sem autenticação
@@ -146,4 +150,3 @@ export const config = {
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };
-

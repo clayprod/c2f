@@ -221,15 +221,25 @@ export async function createTransactionFromWhatsApp(
       type,
       posted_at: input.postedAt,
       notes: input.notes ? `${input.notes}\n\n[Via WhatsApp]` : '[Via WhatsApp]',
+      source: 'manual',
     })
     .select('id')
     .single();
 
   if (error) {
     console.error('[WhatsApp Transactions] Error creating transaction:', error);
+    console.error('[WhatsApp Transactions] Insert data:', {
+      user_id: input.userId,
+      account_id: accountId,
+      category_id: categoryId,
+      description: input.description,
+      amount: type === 'expense' ? -absoluteAmount : absoluteAmount,
+      type,
+      posted_at: input.postedAt,
+    });
     return {
       success: false,
-      error: 'Erro ao criar transação',
+      error: `Erro ao criar transação: ${error.message || error.code || 'unknown'}`,
     };
   }
 

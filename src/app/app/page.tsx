@@ -414,6 +414,23 @@ export default function DashboardPage() {
     return Array.from(groupedData.values());
   }, [cashFlowData, groupBy]);
 
+  const projectedBalance = useMemo(() => {
+    if (!data) return 0;
+
+    const today = new Date();
+    const brazilDate = new Date(today.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    const monthKey = `${brazilDate.getFullYear()}-${String(brazilDate.getMonth() + 1).padStart(2, '0')}`;
+    const totals = cashFlowData[monthKey];
+
+    if (!totals) return data.totalBalance;
+
+    const plannedNet = (totals.planned_income || 0) - (totals.planned_expenses || 0);
+    const actualNet = (totals.actual_income || 0) - (totals.actual_expenses || 0);
+    const remainingNet = plannedNet - actualNet;
+
+    return data.totalBalance + remainingNet / 100;
+  }, [cashFlowData, data]);
+
   if (loading || profileLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -429,7 +446,7 @@ export default function DashboardPage() {
         <p className="text-muted-foreground text-sm md:text-base">Visão geral das suas finanças</p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 max-w-full">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 max-w-full">
         <div className="glass-card p-3 md:p-5">
           <div className="flex items-center justify-between mb-2 md:mb-3">
             <div className="flex items-center gap-2 md:gap-3">
@@ -453,6 +470,38 @@ export default function DashboardPage() {
           </div>
           <p className="font-display text-lg md:text-2xl font-bold">
             {data ? formatCurrency(data.totalBalance) : 'R$ 0,00'}
+          </p>
+        </div>
+
+        <div className="glass-card p-3 md:p-5">
+          <div className="flex items-center justify-between mb-2 md:mb-3">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2 md:gap-3">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-blue-500/10 flex items-center justify-center">
+                  <i className='bx bx-bar-chart text-lg md:text-xl text-blue-500'></i>
+                </div>
+                <span className="text-xs md:text-sm text-muted-foreground">Saldo Projetado</span>
+              </div>
+              <span className="text-[10px] md:text-xs text-primary font-medium ml-1 flex items-center gap-1">
+                <i className='bx bx-calendar text-xs'></i>
+                Mês Atual ({currentMonthName})
+              </span>
+            </div>
+            <InfoIcon
+              content={
+                <div className="space-y-2">
+                  <p className="font-semibold">Sobre este valor:</p>
+                  <ul className="space-y-1.5 text-xs list-disc list-inside">
+                    <li>Projeta o saldo total ao final do <strong>mês atual ({currentMonthName})</strong>.</li>
+                    <li>Considera receitas e despesas planejadas restantes do mês.</li>
+                    <li>Se não houver projeções, mostra o saldo atual.</li>
+                  </ul>
+                </div>
+              }
+            />
+          </div>
+          <p className="font-display text-lg md:text-2xl font-bold text-blue-500">
+            {data ? formatCurrency(projectedBalance) : 'R$ 0,00'}
           </p>
         </div>
 
