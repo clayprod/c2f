@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import AssetCard from '@/components/assets/AssetCard';
 import {
@@ -11,6 +11,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PlanGuard } from '@/components/app/PlanGuard';
+import { useAccountContext } from '@/hooks/useAccountContext';
+import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
 import { formatCurrency } from '@/lib/utils';
 
 interface Asset {
@@ -33,12 +35,10 @@ export default function AssetsPage() {
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const { context: accountContext, activeAccountId } = useAccountContext();
+  const ownerId = activeAccountId || accountContext?.currentUserId || null;
 
-  useEffect(() => {
-    fetchAssets();
-  }, [typeFilter, statusFilter]);
-
-  const fetchAssets = async () => {
+  const fetchAssets = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
@@ -59,7 +59,18 @@ export default function AssetsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter, typeFilter]);
+
+  useEffect(() => {
+    fetchAssets();
+  }, [fetchAssets]);
+
+  useRealtimeCashflowUpdates({
+    ownerId,
+    onRefresh: fetchAssets,
+    tables: ['assets', 'asset_valuations'],
+    events: ['INSERT', 'UPDATE', 'DELETE'],
+  });
 
   const activeAssets = assets.filter(a => a.status === 'active');
   const totalPatrimony = activeAssets.reduce((sum, a) => sum + (a.current_value_cents || a.purchase_price_cents), 0);
@@ -183,5 +194,3 @@ export default function AssetsPage() {
     </PlanGuard>
   );
 }
-
-

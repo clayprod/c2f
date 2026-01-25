@@ -17,6 +17,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import { formatCurrency } from '@/lib/utils';
+import { useAccountContext } from '@/hooks/useAccountContext';
+import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
 
 interface Asset {
   id: string;
@@ -59,6 +61,8 @@ export default function AssetDetailPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { confirm, ConfirmDialog } = useConfirmDialog();
+  const { context: accountContext, activeAccountId } = useAccountContext();
+  const ownerId = activeAccountId || accountContext?.currentUserId || null;
   const [asset, setAsset] = useState<Asset | null>(null);
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -73,6 +77,16 @@ export default function AssetDetailPage() {
       fetchData();
     }
   }, [params]);
+
+  useRealtimeCashflowUpdates({
+    ownerId,
+    onRefresh: () => {
+      fetchAsset();
+      fetchData();
+    },
+    tables: ['assets', 'asset_valuations', 'accounts', 'categories'],
+    events: ['INSERT', 'UPDATE', 'DELETE'],
+  });
 
   const fetchAsset = async () => {
     if (!params || !params.id) {
@@ -633,6 +647,3 @@ export default function AssetDetailPage() {
     </div>
   );
 }
-
-
-

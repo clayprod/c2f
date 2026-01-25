@@ -12,6 +12,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useAccountContext } from '@/hooks/useAccountContext';
+import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
 import { formatCurrencyValue, formatCurrencyInput } from '@/lib/utils';
 
 interface Account {
@@ -84,6 +86,8 @@ export default function AccountsPage() {
   const [cdiRate, setCdiRate] = useState<CdiRateInfo | null>(null);
   const [loadingCdi, setLoadingCdi] = useState(false);
   const { toast } = useToast();
+  const { context: accountContext, activeAccountId } = useAccountContext();
+  const ownerId = activeAccountId || accountContext?.currentUserId || null;
 
   // Fetch CDI rate when dialog opens with yield enabled
   const fetchCdiRate = async () => {
@@ -106,6 +110,16 @@ export default function AccountsPage() {
     fetchAccounts();
     fetchPluggyLogos();
   }, []);
+
+  useRealtimeCashflowUpdates({
+    ownerId,
+    onRefresh: () => {
+      fetchAccounts();
+      fetchPluggyLogos();
+    },
+    tables: ['accounts'],
+    events: ['INSERT', 'UPDATE', 'DELETE'],
+  });
 
   const fetchPluggyLogos = async () => {
     try {

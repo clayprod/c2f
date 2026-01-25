@@ -15,6 +15,8 @@ import { useToast } from '@/hooks/use-toast';
 import { PlanGuard } from '@/components/app/PlanGuard';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import { formatCurrency } from '@/lib/utils';
+import { useAccountContext } from '@/hooks/useAccountContext';
+import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
 
 interface Investment {
   id: string;
@@ -45,10 +47,21 @@ export default function InvestmentsPage() {
   const [sellLoading, setSellLoading] = useState(false);
   const { toast } = useToast();
   const { confirm, ConfirmDialog } = useConfirmDialog();
+  const { context: accountContext, activeAccountId } = useAccountContext();
+  const ownerId = activeAccountId || accountContext?.currentUserId || null;
 
   useEffect(() => {
     fetchInvestments();
   }, []);
+
+  useRealtimeCashflowUpdates({
+    ownerId,
+    onRefresh: () => {
+      fetchInvestments();
+    },
+    tables: ['investments', 'investment_transactions'],
+    events: ['INSERT', 'UPDATE', 'DELETE'],
+  });
 
   useEffect(() => {
     if (showSellDialog) {

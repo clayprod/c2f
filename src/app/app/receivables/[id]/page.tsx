@@ -11,6 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import { useMembers } from '@/hooks/useMembers';
 import { formatCurrency } from '@/lib/utils';
+import { useAccountContext } from '@/hooks/useAccountContext';
+import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
 
 interface Receivable {
   id: string;
@@ -46,6 +48,8 @@ export default function ReceivableDetailPage() {
   const { toast } = useToast();
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const { members, loading: loadingMembers } = useMembers();
+  const { context: accountContext, activeAccountId } = useAccountContext();
+  const ownerId = activeAccountId || accountContext?.currentUserId || null;
 
   const [loading, setLoading] = useState(true);
   const [assignedTo, setAssignedTo] = useState<string>('');
@@ -82,6 +86,15 @@ export default function ReceivableDetailPage() {
       fetchReceivable();
     }
   }, [receivableId]);
+
+  useRealtimeCashflowUpdates({
+    ownerId,
+    onRefresh: () => {
+      fetchReceivable();
+    },
+    tables: ['receivables', 'receivable_payments'],
+    events: ['INSERT', 'UPDATE', 'DELETE'],
+  });
 
   const fetchReceivable = async () => {
     try {

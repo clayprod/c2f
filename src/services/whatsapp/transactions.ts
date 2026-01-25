@@ -661,10 +661,10 @@ export async function getRecentTransactions(
       fromDate = monthAgo.toISOString().split('T')[0];
   }
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('transactions')
     .select(`
-      id, description, amount, posted_at, type,
+      id, description, amount, posted_at,
       categories(name),
       accounts(name)
     `)
@@ -673,6 +673,11 @@ export async function getRecentTransactions(
     .lte('posted_at', toDate)
     .order('posted_at', { ascending: false })
     .limit(limit);
+
+  if (error) {
+    console.error('[WhatsApp] Error fetching transactions:', error);
+    return [];
+  }
 
   return data || [];
 }
@@ -861,10 +866,10 @@ export async function deleteTransaction(
 export async function getLastTransaction(userId: string): Promise<any | null> {
   const supabase = createAdminClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('transactions')
     .select(`
-      id, description, amount, posted_at, type,
+      id, description, amount, posted_at,
       categories(name),
       accounts(name)
     `)
@@ -873,5 +878,180 @@ export async function getLastTransaction(userId: string): Promise<any | null> {
     .limit(1)
     .single();
 
+  if (error) {
+    console.error('[WhatsApp] Error fetching last transaction:', error);
+    return null;
+  }
+
   return data;
+}
+
+export interface UpdateTransactionInput {
+  userId: string;
+  transactionId?: string;
+  searchDescription?: string;
+  updateLast?: boolean;
+  updates: {
+    description?: string;
+    amountCents?: number;
+    postedAt?: string;
+    categoryName?: string;
+    accountName?: string;
+    notes?: string;
+  };
+}
+
+export interface UpdateTransactionResult {
+  success: boolean;
+  updatedTransaction?: {
+    id: string;
+    description: string;
+    amount: number;
+    postedAt: string;
+  };
+  error?: string;
+}
+
+/**
+ * Update transaction by ID, description search, or latest
+ */
+export async function updateTransaction(
+  input: UpdateTransactionInput
+): Promise<UpdateTransactionResult> {
+  const supabase = createAdminClient();
+
+  let txToUpdate: { id: string; description: string; amount: number; account_id: string; posted_at: string } | null = null;
+
+  if (input.transactionId) {
+    const { data } = await supabase
+      .from('transactions')
+      .select('id, description, amount, account_id, posted_at')
+      .eq('id', input.transactionId)
+      .eq('user_id', input.userId)
+      .single();
+    txToUpdate = data;
+  } else if (input.searchDescription) {
+    const { data } = await supabase
+      .from('transactions')
+      .select('id, description, amount, account_id, posted_at')
+      .eq('user_id', input.userId)
+      .ilike('description', `%${input.searchDescription}%`)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    txToUpdate = data;
+  } else if (input.updateLast) {
+    const { data } = await supabase
+      .from('transactions')
+      .select('id, description, amount, account_id, posted_at')
+      .eq('user_id', input.userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    txToUpdate = data;
+  } else {
+    return {
+      success: false,
+      error: 'Informe o ID, descrição ou use update_last para atualizar a última transação',
+    };
+  }
+
+  if (!txToUpdate) {
+    return {
+      success: false,
+      error: 'Transação não encontrada',
+    };
+  }
+
+  // Build update object
+  const updateData: Record<string, any> = {};
+  const updates = input.updates;
+
+  if (updates.description !== undefined) {
+    updateData.description = updates.description;
+  }
+
+  if (updates.amountCents !== undefined) {
+    // Determine type and convert from cents to reais
+    const type = updates.amountCents >= 0 ? 'income' : 'expense';
+    const absoluteAmountReais = Math.abs(updates.amountCents) / 100;
+    updateData.amount = type === 'expense' ? -absoluteAmountReais : absoluteAmountReais;
+
+    // Calculate balance adjustment (reverse old amount, apply new)
+    const balanceChange = updateData.amount - txToUpdate.amount;
+    if (balanceChange !== 0) {
+      await supabase.rpc('update_account_balance', {
+        account_id: txToUpdate.account_id,
+        amount_change: balanceChange,
+      });
+    }
+  }
+
+  if (updates.postedAt !== undefined) {
+    updateData.posted_at = updates.postedAt;
+  }
+
+  if (updates.categoryName !== undefined) {
+    const type = (updates.amountCents ?? txToUpdate.amount * 100) >= 0 ? 'income' : 'expense';
+    const categoryId = await findOrCreateCategory(input.userId, updates.categoryName, type);
+    if (categoryId) {
+      updateData.category_id = categoryId;
+    }
+  }
+
+  if (updates.accountName !== undefined) {
+    const accountId = await findAccountByName(input.userId, updates.accountName);
+    if (accountId) {
+      // If changing accounts, need to adjust balances
+      if (accountId !== txToUpdate.account_id) {
+        const amount = updateData.amount ?? txToUpdate.amount;
+        // Remove from old account
+        await supabase.rpc('update_account_balance', {
+          account_id: txToUpdate.account_id,
+          amount_change: -txToUpdate.amount,
+        });
+        // Add to new account
+        await supabase.rpc('update_account_balance', {
+          account_id: accountId,
+          amount_change: amount,
+        });
+      }
+      updateData.account_id = accountId;
+    }
+  }
+
+  if (updates.notes !== undefined) {
+    updateData.notes = updates.notes;
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    return {
+      success: false,
+      error: 'Nenhum campo para atualizar',
+    };
+  }
+
+  // Update transaction
+  const { error } = await supabase
+    .from('transactions')
+    .update(updateData)
+    .eq('id', txToUpdate.id);
+
+  if (error) {
+    console.error('[WhatsApp] Error updating transaction:', error);
+    return {
+      success: false,
+      error: 'Erro ao atualizar transação',
+    };
+  }
+
+  return {
+    success: true,
+    updatedTransaction: {
+      id: txToUpdate.id,
+      description: updateData.description ?? txToUpdate.description,
+      amount: updateData.amount ?? txToUpdate.amount,
+      postedAt: updateData.posted_at ?? txToUpdate.posted_at,
+    },
+  };
 }

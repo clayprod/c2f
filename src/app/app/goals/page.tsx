@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
 import { PlanGuard } from '@/components/app/PlanGuard';
 import { formatCurrency } from '@/lib/utils';
+import { useAccountContext } from '@/hooks/useAccountContext';
+import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
 
 interface Goal {
   id: string;
@@ -32,10 +34,21 @@ export default function GoalsPage() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCompleted, setShowCompleted] = useState(true);
+  const { context: accountContext, activeAccountId } = useAccountContext();
+  const ownerId = activeAccountId || accountContext?.currentUserId || null;
 
   useEffect(() => {
     fetchGoals();
   }, []);
+
+  useRealtimeCashflowUpdates({
+    ownerId,
+    onRefresh: () => {
+      fetchGoals();
+    },
+    tables: ['goals', 'goal_contributions'],
+    events: ['INSERT', 'UPDATE', 'DELETE'],
+  });
 
   const fetchGoals = async () => {
     try {

@@ -27,6 +27,8 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { PlanGuard } from '@/components/app/PlanGuard';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
+import { useAccountContext } from '@/hooks/useAccountContext';
+import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
 import { formatCurrencyValue, formatCurrency } from '@/lib/utils';
 
 interface Category {
@@ -81,6 +83,8 @@ export default function BudgetsPage() {
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const { toast } = useToast();
   const { confirm, ConfirmDialog } = useConfirmDialog();
+  const { context: accountContext, activeAccountId } = useAccountContext();
+  const ownerId = activeAccountId || accountContext?.currentUserId || null;
   const missingAlertSessionKey = 'budgets_missing_alert_shown_session';
 
   // Reset scroll imediatamente no mount e quando loading terminar
@@ -119,6 +123,29 @@ export default function BudgetsPage() {
   useEffect(() => {
     fetchBudgets();
   }, [selectedMonth]);
+
+  useRealtimeCashflowUpdates({
+    ownerId,
+    onRefresh: () => {
+      fetchBudgets();
+      fetchCategories();
+    },
+    tables: [
+      'budgets',
+      'transactions',
+      'categories',
+      'credit_card_bills',
+      'goal_contributions',
+      'goals',
+      'debt_payments',
+      'debts',
+      'investment_transactions',
+      'investments',
+      'receivable_payments',
+      'receivables',
+    ],
+    events: ['INSERT', 'UPDATE', 'DELETE'],
+  });
 
   // Check for missing budgets alert on mount and when budgets/categories change
   useEffect(() => {

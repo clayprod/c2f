@@ -19,6 +19,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { MonthYearPicker } from '@/components/ui/month-year-picker';
 import { formatMonthYear, formatCurrency } from '@/lib/utils';
 import { InfoIcon } from '@/components/ui/InfoIcon';
+import { useAccountContext } from '@/hooks/useAccountContext';
+import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
 
 interface CreditCard {
   id: string;
@@ -112,10 +114,21 @@ export default function CreditCardsPage() {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const { toast } = useToast();
+  const { context: accountContext, activeAccountId } = useAccountContext();
+  const ownerId = activeAccountId || accountContext?.currentUserId || null;
 
   useEffect(() => {
     fetchCards();
   }, []);
+
+  useRealtimeCashflowUpdates({
+    ownerId,
+    onRefresh: () => {
+      fetchCards();
+    },
+    tables: ['accounts', 'credit_card_bills', 'transactions'],
+    events: ['INSERT', 'UPDATE', 'DELETE'],
+  });
 
   useEffect(() => {
     if (cards.length > 0) {

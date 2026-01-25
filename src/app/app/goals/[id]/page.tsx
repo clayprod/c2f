@@ -10,6 +10,8 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { useMembers } from '@/hooks/useMembers';
+import { useAccountContext } from '@/hooks/useAccountContext';
+import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
 
 const categoryColors = [
   '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
@@ -54,6 +56,8 @@ export default function EditGoalPage({ params }: { params: { id: string } }) {
   const [isDraggingImage, setIsDraggingImage] = useState(false);
   const { toast } = useToast();
   const { members, loading: loadingMembers } = useMembers();
+  const { context: accountContext, activeAccountId } = useAccountContext();
+  const ownerId = activeAccountId || accountContext?.currentUserId || null;
   const [assignedTo, setAssignedTo] = useState<string>('');
   const [formData, setFormData] = useState({
     name: '',
@@ -249,6 +253,15 @@ export default function EditGoalPage({ params }: { params: { id: string } }) {
   useEffect(() => {
     fetchGoal();
   }, []);
+
+  useRealtimeCashflowUpdates({
+    ownerId,
+    onRefresh: () => {
+      fetchGoal();
+    },
+    tables: ['goals', 'goal_contributions'],
+    events: ['INSERT', 'UPDATE', 'DELETE'],
+  });
 
   const fetchGoal = async () => {
     try {

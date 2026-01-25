@@ -11,6 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useMembers } from '@/hooks/useMembers';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import { formatCurrency } from '@/lib/utils';
+import { useAccountContext } from '@/hooks/useAccountContext';
+import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
 
 interface Investment {
   id: string;
@@ -45,6 +47,8 @@ export default function InvestmentDetailPage() {
   const { toast } = useToast();
   const { members, loading: loadingMembers } = useMembers();
   const { confirm, ConfirmDialog } = useConfirmDialog();
+  const { context: accountContext, activeAccountId } = useAccountContext();
+  const ownerId = activeAccountId || accountContext?.currentUserId || null;
 
   const [loading, setLoading] = useState(true);
   const [assignedTo, setAssignedTo] = useState<string>('');
@@ -78,6 +82,15 @@ export default function InvestmentDetailPage() {
       fetchInvestment();
     }
   }, [investmentId]);
+
+  useRealtimeCashflowUpdates({
+    ownerId,
+    onRefresh: () => {
+      fetchInvestment();
+    },
+    tables: ['investments', 'investment_transactions'],
+    events: ['INSERT', 'UPDATE', 'DELETE'],
+  });
 
   const fetchInvestment = async () => {
     try {

@@ -12,6 +12,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useAccountContext } from '@/hooks/useAccountContext';
+import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
 import { Switch } from '@/components/ui/switch';
 import { CategoryMigrationModal } from '@/components/categories/CategoryMigrationModal';
 
@@ -60,6 +62,8 @@ export default function CategoriesPage() {
     color: '#3b82f6',
   });
   const { toast } = useToast();
+  const { context: accountContext, activeAccountId } = useAccountContext();
+  const ownerId = activeAccountId || accountContext?.currentUserId || null;
 
   // Reset scroll imediatamente no mount e quando loading terminar
   useEffect(() => {
@@ -98,6 +102,16 @@ export default function CategoriesPage() {
   useEffect(() => {
     fetchCategories();
   }, [showInactive]);
+
+  useRealtimeCashflowUpdates({
+    ownerId,
+    onRefresh: () => {
+      fetchCategories();
+      fetchCategoriesWithTransactions();
+    },
+    tables: ['categories', 'transactions'],
+    events: ['INSERT', 'UPDATE', 'DELETE'],
+  });
 
   const fetchCategories = async () => {
     try {

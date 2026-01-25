@@ -10,6 +10,8 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useMembers } from '@/hooks/useMembers';
 import { formatCurrency } from '@/lib/utils';
+import { useAccountContext } from '@/hooks/useAccountContext';
+import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
 
 interface Debt {
   id: string;
@@ -43,6 +45,8 @@ export default function DebtDetailPage() {
   const debtId = params?.id as string;
   const { toast } = useToast();
   const { members, loading: loadingMembers } = useMembers();
+  const { context: accountContext, activeAccountId } = useAccountContext();
+  const ownerId = activeAccountId || accountContext?.currentUserId || null;
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -76,6 +80,15 @@ export default function DebtDetailPage() {
       fetchDebt();
     }
   }, [debtId]);
+
+  useRealtimeCashflowUpdates({
+    ownerId,
+    onRefresh: () => {
+      fetchDebt();
+    },
+    tables: ['debts', 'debt_payments'],
+    events: ['INSERT', 'UPDATE', 'DELETE'],
+  });
 
   const fetchDebt = async () => {
     try {
@@ -742,6 +755,5 @@ export default function DebtDetailPage() {
     </div>
   );
 }
-
 
 

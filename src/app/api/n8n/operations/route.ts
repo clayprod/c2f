@@ -27,6 +27,7 @@ import {
   formatBalanceInfo,
   formatTransactionsList,
   deleteTransaction,
+  updateTransaction,
 } from '@/services/whatsapp/transactions';
 import {
   suggestFromHistory,
@@ -379,6 +380,51 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      case 'update_transaction': {
+        const updateData = body.data;
+        if (!updateData) {
+          return NextResponse.json({ error: 'Missing update data' }, { status: 400 });
+        }
+
+        const result = await updateTransaction({
+          userId: user.userId,
+          transactionId: updateData.id,
+          searchDescription: updateData.search_description,
+          updateLast: updateData.update_last === true,
+          updates: {
+            description: updateData.description,
+            amountCents: updateData.amount_cents,
+            postedAt: updateData.posted_at,
+            categoryName: updateData.category_name,
+            accountName: updateData.account_name,
+            notes: updateData.notes,
+          },
+        });
+
+        await logWhatsAppMessage(user.userId, normalizedPhone, 'incoming', 'text', {
+          contentSummary: `Atualizar: ${result.updatedTransaction?.description || updateData.id || 'última'}`,
+          transactionId: result.updatedTransaction?.id,
+          actionType: 'update',
+          status: result.success ? 'processed' : 'failed',
+          errorMessage: result.error,
+        });
+
+        if (!result.success) {
+          return NextResponse.json({
+            success: false,
+            error: result.error,
+          }, { status: result.error?.includes('não encontrada') ? 404 : 400 });
+        }
+
+        projectionCache.invalidateUser(user.userId);
+
+        return NextResponse.json({
+          success: true,
+          updated_transaction: result.updatedTransaction,
+          message: `Transação "${result.updatedTransaction?.description}" atualizada com sucesso`,
+        });
+      }
+
       case 'query_balance': {
         const context = await getUserContextForAI(user.userId);
         if (!context) {
@@ -418,15 +464,15 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
           success: true,
-          data: transactions.map((t) => ({
+          data: transactions.map((t: any) => ({
             id: t.id,
             description: t.description,
-            amount_cents: t.amount,
-            amount_formatted: formatCurrency(t.amount),
+            amount_cents: Math.round(t.amount * 100), // Convert from reais to cents for response
+            amount_formatted: formatCurrency(Math.round(t.amount * 100)),
             type: t.amount >= 0 ? 'income' : 'expense',
-            date: t.postedAt,
-            category: t.categoryName,
-            account: t.accountName,
+            date: t.posted_at,
+            category: t.categories?.name || null,
+            account: t.accounts?.name || null,
           })),
           count: transactions.length,
           message: formattedList,
@@ -1092,7 +1138,7 @@ export async function POST(request: NextRequest) {
           valid_operations: [
             'buffer_message', 'get_buffered_messages',
             'categorize',
-            'create_transaction', 'delete_transaction', 'query_balance', 'list_transactions',
+            'create_transaction', 'update_transaction', 'delete_transaction', 'query_balance', 'list_transactions',
             'query_budgets', 'update_budget',
             'query_goals', 'create_goal', 'contribute_goal',
             'query_debts', 'create_debt', 'pay_debt',

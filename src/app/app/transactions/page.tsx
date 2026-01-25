@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { useMembers } from '@/hooks/useMembers';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
+import { useAccountContext } from '@/hooks/useAccountContext';
+import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
 
 interface Account {
   id: string;
@@ -58,6 +60,8 @@ export default function TransactionsPage() {
   const [editingTransaction, setEditingTransaction] = useState<TransactionFormType | undefined>();
   const { toast } = useToast();
   const { confirm, ConfirmDialog } = useConfirmDialog();
+  const { context: accountContext, activeAccountId } = useAccountContext();
+  const ownerId = activeAccountId || accountContext?.currentUserId || null;
 
   useEffect(() => {
     fetchAccounts();
@@ -68,6 +72,18 @@ export default function TransactionsPage() {
   useEffect(() => {
     fetchTransactions();
   }, [filters, pagination.offset, pagination.limit, sorting]);
+
+  useRealtimeCashflowUpdates({
+    ownerId,
+    onRefresh: () => {
+      fetchTransactions();
+      fetchAccounts();
+      fetchCreditCards();
+      fetchCategories();
+    },
+    tables: ['transactions', 'accounts', 'categories'],
+    events: ['INSERT', 'UPDATE', 'DELETE'],
+  });
 
   // Reset offset when sorting changes
   const handleSortChange = (newSorting: { sortBy: 'posted_at' | 'amount'; sortOrder: 'asc' | 'desc' }) => {

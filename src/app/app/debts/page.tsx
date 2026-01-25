@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { PlanGuard } from '@/components/app/PlanGuard';
 import { formatCurrency } from '@/lib/utils';
+import { useAccountContext } from '@/hooks/useAccountContext';
+import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
 
 interface Debt {
   id: string;
@@ -33,10 +35,21 @@ export default function DebtsPage() {
   const [sortBy, setSortBy] = useState<string>('created_at');
   const [sortOrder, setSortOrder] = useState<string>('desc');
   const router = useRouter();
+  const { context: accountContext, activeAccountId } = useAccountContext();
+  const ownerId = activeAccountId || accountContext?.currentUserId || null;
 
   useEffect(() => {
     fetchDebts();
   }, [statusFilter, priorityFilter, sortBy, sortOrder]);
+
+  useRealtimeCashflowUpdates({
+    ownerId,
+    onRefresh: () => {
+      fetchDebts();
+    },
+    tables: ['debts', 'debt_payments'],
+    events: ['INSERT', 'UPDATE', 'DELETE'],
+  });
 
   const fetchDebts = async () => {
     try {
@@ -323,4 +336,3 @@ export default function DebtsPage() {
     </PlanGuard>
   );
 }
-
