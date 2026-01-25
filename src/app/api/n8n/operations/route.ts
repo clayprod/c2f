@@ -1063,6 +1063,11 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({
           success: true,
+          verified: true, // User is verified if we reached this point
+          user: {
+            id: user.userId,
+            name: context.profile?.full_name || 'Usuário',
+          },
           ...context,
           goals: (goals || []).map(g => ({
             id: g.id,
