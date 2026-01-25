@@ -1066,7 +1066,7 @@ export async function POST(request: NextRequest) {
           verified: true, // User is verified if we reached this point
           user: {
             id: user.userId,
-            name: context.profile?.full_name || 'Usuário',
+            name: user.fullName || 'Usuário',
           },
           ...context,
           goals: (goals || []).map(g => ({
