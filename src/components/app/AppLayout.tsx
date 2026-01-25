@@ -296,8 +296,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const handleLogout = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.push('/login');
-    router.refresh();
+    // Use window.location instead of router to ensure a clean navigation
+    // without triggering React Server Component refreshes that cause 401 errors
+    window.location.href = '/login';
   };
 
   const scrollMenu = (direction: 'up' | 'down') => {
@@ -624,7 +625,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
               )}
               <button
                 onClick={toggleTheme}
-                className="p-1.5 md:p-2 text-muted-foreground hover:text-foreground transition-colors"
+                className="flex items-center justify-center p-1.5 md:p-2 text-muted-foreground hover:text-foreground transition-colors"
                 title={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
                 aria-label="Alternar tema"
               >
@@ -632,7 +633,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </button>
               <Link
                 href="/app/help"
-                className="hidden sm:flex p-1.5 md:p-2 text-muted-foreground hover:text-foreground transition-colors relative"
+                className="hidden sm:flex items-center justify-center p-1.5 md:p-2 text-muted-foreground hover:text-foreground transition-colors relative"
                 title="Central de Ajuda"
               >
                 <i className='bx bx-help-circle text-lg md:text-xl'></i>
@@ -642,7 +643,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
             <Link
               href="/app/settings"
-              className="p-1.5 md:p-2 text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center justify-center p-1.5 md:p-2 text-muted-foreground hover:text-foreground transition-colors"
               title="Configurações"
             >
               <i className='bx bx-cog text-lg md:text-xl'></i>

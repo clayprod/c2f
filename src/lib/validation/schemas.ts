@@ -437,6 +437,10 @@ export const exportReportSchema = z.object({
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data final inválida').optional(),
   accountIds: z.array(z.string().uuid()).optional(),
   categoryIds: z.array(z.string().uuid()).optional(),
+  search: z.string().optional(),
+  type: z.enum(['income', 'expense']).optional(),
+  isInstallment: z.boolean().optional(),
+  assignedTo: z.string().uuid().optional().or(z.literal('')).transform(val => val || undefined),
   format: z.enum(['csv']).default('csv'),
 });
 
@@ -603,3 +607,23 @@ export const assetValuationSchema = z.object({
   notes: z.string().optional(),
 });
 
+// Blog schemas
+export const blogPostSchema = z.object({
+  title: z.string().min(1, 'Titulo e obrigatorio').max(200, 'Titulo muito longo'),
+  slug: z.string()
+    .regex(/^[a-z0-9-]+$/, 'Slug deve conter apenas letras minusculas, numeros e hifens')
+    .max(200)
+    .optional()
+    .or(z.literal('')),
+  excerpt: z.string().min(1, 'Resumo e obrigatorio').max(500, 'Resumo muito longo'),
+  content: z.string().min(1, 'Conteudo e obrigatorio'),
+  cover_image: z.string().url('URL da imagem invalida').optional().or(z.literal('')),
+  published: z.boolean().default(false),
+  featured: z.boolean().default(false),
+  category: z.string().max(100).optional().or(z.literal('')),
+  tags: z.array(z.string()).default([]),
+  meta_title: z.string().max(70, 'Meta title muito longo (max 70 chars)').optional().or(z.literal('')),
+  meta_description: z.string().max(160, 'Meta description muito longa (max 160 chars)').optional().or(z.literal('')),
+});
+
+export const blogPostUpdateSchema = blogPostSchema.partial();

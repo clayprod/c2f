@@ -23,12 +23,7 @@ import {
   PieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
-  Area,
-  AreaChart,
   ReferenceArea,
-  ComposedChart,
 } from 'recharts';
 import DateRangeFilter from '@/components/ui/DateRangeFilter';
 import { formatMonthYear, formatCurrency } from '@/lib/utils';
@@ -216,10 +211,6 @@ export default function ReportsPage() {
     investments: InvestmentData[];
   } | null>(null);
 
-  const [cashflowData, setCashflowData] = useState<{
-    periods: (PeriodData & { cumulative_balance_cents: number })[];
-  } | null>(null);
-
   const { toast } = useToast();
 
   useEffect(() => {
@@ -295,9 +286,6 @@ export default function ReportsPage() {
           break;
         case 'investments':
           setInvestmentsData(result.data);
-          break;
-        case 'cashflow':
-          setCashflowData(result.data);
           break;
       }
     } catch (error: unknown) {
@@ -561,7 +549,6 @@ export default function ReportsPage() {
             <TabsTrigger value="goals" className="flex-1 min-w-[100px]">Objetivos</TabsTrigger>
             <TabsTrigger value="debts" className="flex-1 min-w-[100px]">Dívidas</TabsTrigger>
             <TabsTrigger value="investments" className="flex-1 min-w-[100px]">Investimentos</TabsTrigger>
-            <TabsTrigger value="cashflow" className="flex-1 min-w-[100px]">Fluxo de Caixa</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -1420,200 +1407,6 @@ export default function ReportsPage() {
             )}
           </TabsContent>
 
-          {/* Cashflow Tab */}
-          <TabsContent value="cashflow" className="space-y-6">
-            {cashflowData && (
-              <div className="glass-card p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-display font-semibold text-lg">Fluxo de Caixa Acumulado</h3>
-                    <InfoIcon
-                      content={
-                        <div className="space-y-2">
-                          <p className="font-semibold">Sobre este gráfico:</p>
-                          <ul className="space-y-1.5 text-xs list-disc list-inside">
-                            <li><strong>Receitas:</strong> Área verde mostra valores recebidos ao longo do tempo.</li>
-                            <li><strong>Despesas:</strong> Área vermelha mostra valores gastos ao longo do tempo.</li>
-                            <li><strong>Saldo Acumulado:</strong> Linha roxa mostra a soma acumulada (receitas - despesas).</li>
-                            <li><strong>Barra azul:</strong> Destaca o mês/período corrente.</li>
-                            <li>O período corrente está sempre centralizado quando aplicável.</li>
-                            <li>Valores positivos indicam saldo positivo, negativos indicam saldo negativo.</li>
-                          </ul>
-                        </div>
-                      }
-                    />
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleExport('transactions')}
-                    disabled={exporting}
-                  >
-                    <i className='bx bx-download mr-1'></i> CSV
-                  </Button>
-                </div>
-                {cashflowData.periods.length > 0 ? (
-                  <div className="h-96">
-                    <ResponsiveContainer width="100%" height="100%">
-                      {(() => {
-                        const reorganized = reorganizeDataForChart(cashflowData.periods);
-                        return (
-                          <ComposedChart data={reorganized.data} barGap={0} barCategoryGap="20%">
-                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                            <XAxis
-                              dataKey="period"
-                              tickFormatter={(value, index) => formatPeriodLabel(value, index, reorganized.data)}
-                              stroke="hsl(var(--muted-foreground))"
-                              fontSize={12}
-                              angle={-45}
-                              textAnchor="end"
-                              height={100}
-                              tick={(props: any) => {
-                                const { x, y, payload } = props;
-                                const isCurrentMonth = reorganized.currentMonthIndex >= 0 && 
-                                  reorganized.data[reorganized.currentMonthIndex]?.period === payload.value;
-                                return (
-                                  <g transform={`translate(${x},${y})`}>
-                                    <text
-                                      x={0}
-                                      y={0}
-                                      dy={16}
-                                      textAnchor="end"
-                                      fill={isCurrentMonth ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))'}
-                                      fontSize={12}
-                                      fontWeight={isCurrentMonth ? 'bold' : 'normal'}
-                                      transform="rotate(-45)"
-                                    >
-                                      {formatPeriodLabel(payload.value)}
-                                    </text>
-                                  </g>
-                                );
-                              }}
-                            />
-                            {reorganized.currentMonthIndex >= 0 && reorganized.currentMonthIndex < reorganized.data.length && (() => {
-                              const currentMonthValue = reorganized.data[reorganized.currentMonthIndex]?.period;
-                              if (!currentMonthValue) return null;
-                              const prevIndex = reorganized.currentMonthIndex > 0 ? reorganized.currentMonthIndex - 1 : reorganized.currentMonthIndex;
-                              const nextIndex = reorganized.currentMonthIndex < reorganized.data.length - 1 ? reorganized.currentMonthIndex + 1 : reorganized.currentMonthIndex;
-                              if (prevIndex < reorganized.currentMonthIndex && nextIndex > reorganized.currentMonthIndex) {
-                                const prevValue = reorganized.data[prevIndex]?.period;
-                                const nextValue = reorganized.data[nextIndex]?.period;
-                                return (
-                                  <ReferenceArea
-                                    x1={prevValue}
-                                    x2={nextValue}
-                                    y1="dataMin"
-                                    y2="dataMax"
-                                    fill="hsl(var(--primary))"
-                                    fillOpacity={0.25}
-                                    stroke="hsl(var(--primary))"
-                                    strokeOpacity={0.7}
-                                    strokeWidth={3}
-                                    strokeDasharray="0"
-                                    label={{
-                                      value: '◆ MÊS ATUAL ◆',
-                                      position: 'top',
-                                      fill: 'hsl(var(--primary))',
-                                      fontSize: 14,
-                                      fontWeight: 'bold',
-                                      offset: 15
-                                    }}
-                                    ifOverflow="extendDomain"
-                                  />
-                                );
-                              } else {
-                                return (
-                                  <ReferenceArea
-                                    x1={currentMonthValue}
-                                    x2={currentMonthValue}
-                                    y1="dataMin"
-                                    y2="dataMax"
-                                    fill="hsl(var(--primary))"
-                                    fillOpacity={0.25}
-                                    stroke="hsl(var(--primary))"
-                                    strokeOpacity={0.7}
-                                    strokeWidth={3}
-                                    strokeDasharray="0"
-                                    label={{
-                                      value: '◆ MÊS ATUAL ◆',
-                                      position: 'top',
-                                      fill: 'hsl(var(--primary))',
-                                      fontSize: 14,
-                                      fontWeight: 'bold',
-                                      offset: 15
-                                    }}
-                                    ifOverflow="extendDomain"
-                                  />
-                                );
-                              }
-                            })()}
-                            <YAxis
-                              tickFormatter={(v) => `R$${(v / 100).toFixed(0)}`}
-                              stroke="hsl(var(--muted-foreground))"
-                              fontSize={12}
-                            />
-                            <Tooltip
-                              formatter={(value: number) => formatCurrency(value)}
-                              labelFormatter={formatTooltipLabel}
-                              contentStyle={{
-                                backgroundColor: 'hsl(var(--card))',
-                                border: '1px solid hsl(var(--border))',
-                                borderRadius: '8px',
-                              }}
-                            />
-                            <Legend />
-                            {/* Despesas Reais - escuro, opacidade 100% (base da pilha) */}
-                            <Bar
-                              dataKey="expense_cents"
-                              name="Despesas"
-                              fill="hsl(0, 84%, 50%)"
-                              radius={[0, 0, 0, 0]}
-                              stackId="cashflow"
-                            />
-                            {/* Receitas Reais - escuro, opacidade 100% (sobre as despesas) */}
-                            <Bar
-                              dataKey="income_cents"
-                              name="Receitas"
-                              fill="hsl(142, 71%, 35%)"
-                              radius={[4, 4, 0, 0]}
-                              stackId="cashflow"
-                            />
-                            {/* Saldo Acumulado - linha */}
-                            <Line
-                              type="monotone"
-                              dataKey="cumulative_balance_cents"
-                              name="Saldo Acumulado"
-                              stroke="hsl(var(--primary))"
-                              strokeWidth={2}
-                              dot={(props: any) => {
-                                const { payload } = props;
-                                if (!payload || payload.cumulative_balance_cents === null || payload.cumulative_balance_cents === undefined) {
-                                  return <g key={`dot-empty-${props.index}`} />;
-                                }
-                                return (
-                                  <circle
-                                    key={`dot-${props.index}`}
-                                    cx={props.cx}
-                                    cy={props.cy}
-                                    r={4}
-                                    fill="hsl(var(--primary))"
-                                  />
-                                );
-                              }}
-                              activeDot={{ r: 6 }}
-                              connectNulls={true}
-                            />
-                          </ComposedChart>
-                        );
-                      })()}
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <p className="text-center text-muted-foreground py-8">Nenhuma transação no período</p>
-                )}
-              </div>
-            )}
-          </TabsContent>
         </Tabs>
       </div>
     </PlanGuard>

@@ -1,6 +1,3 @@
-@import url('/boxicons.min.css');
-@import url('/boxicons-brands.min.css');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -61,6 +58,13 @@
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 222 30% 18%;
     --sidebar-ring: 175 80% 50%;
+
+    /* Chart colors */
+    --chart-income: 142 71% 45%;
+    --chart-income-projected: 158 64% 52%;
+    --chart-expense: 0 84% 60%;
+    --chart-expense-projected: 0 45% 55%;
+    --chart-balance: 175 80% 50%;
   }
 
   :root[data-theme="light"] {
@@ -115,6 +119,13 @@
     --sidebar-accent-foreground: 222 47% 6%;
     --sidebar-border: 214 32% 91%;
     --sidebar-ring: 200 85% 42%;
+
+    /* Chart colors */
+    --chart-income: 142 71% 45%;
+    --chart-income-projected: 158 64% 52%;
+    --chart-expense: 0 84% 60%;
+    --chart-expense-projected: 0 45% 55%;
+    --chart-balance: 200 85% 42%;
   }
 }
 
@@ -256,6 +267,136 @@
   .text-balance {
     text-wrap: balance;
   }
+}
+
+/* Blog Content Styles - Ensure proper colors in both themes */
+.blog-content {
+  color: hsl(var(--foreground) / 0.9);
+}
+
+.blog-content h1,
+.blog-content h2,
+.blog-content h3,
+.blog-content h4,
+.blog-content h5,
+.blog-content h6 {
+  color: hsl(var(--foreground));
+  font-family: var(--font-sora), sans-serif;
+  margin-top: 2em;
+  margin-bottom: 0.75em;
+}
+
+.blog-content h2 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  border-bottom: 1px solid hsl(var(--border));
+  padding-bottom: 0.5rem;
+}
+
+.blog-content h3 {
+  font-size: 1.375rem;
+  font-weight: 600;
+}
+
+.blog-content p {
+  color: hsl(var(--foreground) / 0.85);
+  margin-bottom: 1.25em;
+  line-height: 1.8;
+}
+
+.blog-content strong,
+.blog-content b {
+  color: hsl(var(--foreground));
+  font-weight: 600;
+}
+
+.blog-content a {
+  color: hsl(var(--primary));
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.blog-content a:hover {
+  text-decoration: underline;
+  opacity: 0.8;
+}
+
+.blog-content ul,
+.blog-content ol {
+  color: hsl(var(--foreground) / 0.85);
+  margin: 1.25em 0;
+  padding-left: 1.5em;
+}
+
+.blog-content li {
+  margin: 0.5em 0;
+}
+
+.blog-content li::marker {
+  color: hsl(var(--primary));
+}
+
+.blog-content blockquote {
+  border-left: 4px solid hsl(var(--primary));
+  padding-left: 1.25em;
+  margin: 1.5em 0;
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+}
+
+.blog-content code {
+  color: hsl(var(--primary));
+  background-color: hsl(var(--muted));
+  padding: 0.125em 0.375em;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+}
+
+.blog-content pre {
+  background-color: hsl(var(--muted));
+  border-radius: 0.5rem;
+  padding: 1rem;
+  overflow-x: auto;
+  margin: 1.5em 0;
+}
+
+.blog-content pre code {
+  background: none;
+  padding: 0;
+  color: hsl(var(--foreground) / 0.9);
+}
+
+.blog-content img {
+  border-radius: 0.5rem;
+  margin: 1.5em 0;
+}
+
+.blog-content hr {
+  border-color: hsl(var(--border));
+  margin: 2em 0;
+}
+
+.blog-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+}
+
+.blog-content th,
+.blog-content td {
+  border: 1px solid hsl(var(--border));
+  padding: 0.75em;
+  text-align: left;
+}
+
+.blog-content th {
+  background-color: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  font-weight: 600;
+}
+
+.blog-content td {
+  color: hsl(var(--foreground) / 0.85);
 }
 
 /* Custom Scrollbar Styles - Padronizado para toda a aplicação */

@@ -36,13 +36,32 @@ interface MonthlyTotal {
   actual_expenses: number;
 }
 
-const PERIOD_OPTIONS = [
-  { label: '6 meses', months: 6 },
-  { label: '1 ano', months: 12 },
-  { label: '2 anos', months: 24 },
-  { label: '5 anos', months: 60 },
-  // 10 anos removed - max is 115 months forward (5 back + 115 forward = 120 total)
+type GroupByType = 'month' | 'quarter' | 'year';
+
+const GROUP_OPTIONS: { label: string; value: GroupByType }[] = [
+  { label: 'Mês', value: 'month' },
+  { label: 'Trimestre', value: 'quarter' },
+  { label: 'Ano', value: 'year' },
 ];
+
+const PERIOD_OPTIONS_BY_GROUP: Record<GroupByType, { label: string; periods: number }[]> = {
+  month: [
+    { label: '6 meses', periods: 6 },
+    { label: '1 ano', periods: 12 },
+    { label: '2 anos', periods: 24 },
+    { label: '5 anos', periods: 60 },
+  ],
+  quarter: [
+    { label: '4 trim.', periods: 4 },
+    { label: '8 trim.', periods: 8 },
+    { label: '12 trim.', periods: 12 },
+  ],
+  year: [
+    { label: '5 anos', periods: 5 },
+    { label: '10 anos', periods: 10 },
+    { label: '15 anos', periods: 15 },
+  ],
+};
 
 // Alias para manter compatibilidade com código existente
 const formatCurrency = formatCurrencyValue;
@@ -68,7 +87,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [cashFlowData, setCashFlowData] = useState<Record<string, MonthlyTotal>>({});
   const [cashFlowLoading, setCashFlowLoading] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState(12); // Default: 1 year
+  const [groupBy, setGroupBy] = useState<GroupByType>('month');
+  const [selectedPeriod, setSelectedPeriod] = useState(12); // Default: 1 year (or first option of group)
   const { isFree, loading: profileLoading } = useProfile();
   const { context: accountContext, activeAccountId } = useAccountContext();
   const maxVisibleItems = 9; // Número fixo de transações visíveis
@@ -189,10 +209,9 @@ export default function DashboardPage() {
       const currentYear = brazilDate.getFullYear();
       const currentMonth = brazilDate.getMonth();
 
-      // Calculate ranges prioritizing future
-      // We want to show current month, so available slots for others is selectedPeriod - 1
-      const monthsBack = Math.floor((selectedPeriod - 1) / 2);
-      const monthsForward = selectedPeriod - 1 - monthsBack;
+      // Buscar mais dados baseado no agrupamento
+      const monthsBack = groupBy === 'year' ? 180 : (groupBy === 'quarter' ? 48 : 24);
+      const monthsForward = groupBy === 'year' ? 180 : (groupBy === 'quarter' ? 48 : 24);
 
       // Start: monthsBack months back from current
       const startDate = new Date(currentYear, currentMonth - monthsBack, 1);
@@ -201,11 +220,6 @@ export default function DashboardPage() {
       const endDate = new Date(currentYear, currentMonth + monthsForward, 1);
       // Set to last day of that month
       endDate.setMonth(endDate.getMonth() + 1, 0);
-
-      // Limit check (max 10 years total)
-      if (selectedPeriod > 120) {
-        console.warn('Período excede 10 anos');
-      }
 
       const startMonth = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`;
       const endMonth = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}`;
@@ -227,7 +241,7 @@ export default function DashboardPage() {
     } finally {
       setCashFlowLoading(false);
     }
-  }, [selectedPeriod]);
+  }, [groupBy]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -238,10 +252,23 @@ export default function DashboardPage() {
     fetchCashFlowData();
   }, [fetchCashFlowData]);
 
+  // Reset selectedPeriod when groupBy changes
+  useEffect(() => {
+    const firstOption = PERIOD_OPTIONS_BY_GROUP[groupBy][0];
+    if (firstOption) {
+      setSelectedPeriod(firstOption.periods);
+    }
+  }, [groupBy]);
+
   useRealtimeCashflowUpdates({
     ownerId,
     onRefresh: fetchCashFlowData,
     enabled: true,
+    tables: ['transactions', 'budgets'],
+    events: ['INSERT', 'UPDATE', 'DELETE'],
+    pollingIntervalMs: 0,
+    refreshOnFocus: false,
+    refreshOnVisibility: false,
   });
 
   const chartData = useMemo(() => {
@@ -250,20 +277,19 @@ export default function DashboardPage() {
     const brazilDate = new Date(today.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
     const currentYear = brazilDate.getFullYear();
     const currentMonth = brazilDate.getMonth() + 1; // 1-12
+    const currentQuarter = Math.ceil(currentMonth / 3);
 
-    // Logic matching fetchCashFlowData
-    const monthsBack = Math.floor((selectedPeriod - 1) / 2);
-    const monthsForward = selectedPeriod - 1 - monthsBack;
+    // Buscar mais dados para permitir navegação
+    // Para anos, precisamos de mais dados
+    const totalMonthsBack = groupBy === 'year' ? 180 : (groupBy === 'quarter' ? 48 : 24);
+    const totalMonthsForward = groupBy === 'year' ? 180 : (groupBy === 'quarter' ? 48 : 24);
 
-    // currentMonth in calculation is 1-based (from brazildate.getMonth() + 1)
-    // Date constructor expects 0-based month.
-    // So currentMonth - 1 is the 0-based index of current month.
-    const startDate = new Date(currentYear, currentMonth - 1 - monthsBack, 1);
-
-    const endDate = new Date(currentYear, currentMonth - 1 + monthsForward, 1);
+    const startDate = new Date(currentYear, currentMonth - 1 - totalMonthsBack, 1);
+    const endDate = new Date(currentYear, currentMonth - 1 + totalMonthsForward, 1);
     endDate.setMonth(endDate.getMonth() + 1, 0);
 
-    const months: Array<{
+    // Primeiro, coletar todos os dados mensais
+    const monthlyData: Array<{
       month: string;
       monthLabel: string;
       income: number;
@@ -275,16 +301,19 @@ export default function DashboardPage() {
       income_planned: number;
       expenses_actual: number;
       expenses_planned: number;
+      year: number;
+      monthNum: number;
+      quarter: number;
     }> = [];
 
     let current = new Date(startDate);
-    // Safety break to prevent infinite loops if dates are messed up
     let safetyCounter = 0;
 
-    while (current <= endDate && safetyCounter < 150) {
+    while (current <= endDate && safetyCounter < 500) {
       safetyCounter++;
       const year = current.getFullYear();
       const month = current.getMonth() + 1;
+      const quarter = Math.ceil(month / 3);
       const monthKey = `${year}-${String(month).padStart(2, '0')}`;
       const totals = cashFlowData[monthKey] || {
         planned_income: 0,
@@ -293,49 +322,97 @@ export default function DashboardPage() {
         actual_expenses: 0,
       };
 
-      // Comparar usando timezone do Brasil
       const isCurrentMonth = year === currentYear && month === currentMonth;
       const isProjected = year > currentYear || (year === currentYear && month > currentMonth);
 
-      // Para mês corrente: usar valores reais se existirem, senão usar projetados
-      // Para meses passados: sempre usar valores reais
-      // Para meses futuros: sempre usar valores projetados
       let income: number;
       let expenses: number;
 
       if (isCurrentMonth) {
-        // Mês corrente: preferir valores reais, mas usar projetados se não houver reais
         income = totals.actual_income > 0 ? totals.actual_income : totals.planned_income;
         expenses = totals.actual_expenses > 0 ? totals.actual_expenses : totals.planned_expenses;
       } else if (isProjected) {
-        // Mês futuro: sempre projetado
         income = totals.planned_income;
         expenses = totals.planned_expenses;
       } else {
-        // Mês passado: sempre real
         income = totals.actual_income;
         expenses = totals.actual_expenses;
       }
 
-      months.push({
+      monthlyData.push({
         month: monthKey,
         monthLabel: current.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }),
-        income: income / 100, // Convert from cents
+        income: income / 100,
         expenses: expenses / 100,
         balance: (income - expenses) / 100,
         isCurrentMonth,
-        isProjected: isProjected && !isCurrentMonth, // Mês corrente não é projetado se tiver valores reais
+        isProjected: isProjected && !isCurrentMonth,
         income_actual: totals.actual_income / 100,
         income_planned: totals.planned_income / 100,
         expenses_actual: totals.actual_expenses / 100,
         expenses_planned: totals.planned_expenses / 100,
+        year,
+        monthNum: month,
+        quarter,
       });
 
       current.setMonth(current.getMonth() + 1);
     }
 
-    return months;
-  }, [cashFlowData, selectedPeriod]);
+    // Se agrupamento é por mês, retornar dados mensais diretamente
+    if (groupBy === 'month') {
+      return monthlyData;
+    }
+
+    // Agrupar por trimestre ou ano
+    const groupedData: Map<string, typeof monthlyData[0]> = new Map();
+
+    for (const item of monthlyData) {
+      let groupKey: string;
+      let groupLabel: string;
+
+      if (groupBy === 'quarter') {
+        groupKey = `${item.year}-Q${item.quarter}`;
+        groupLabel = `Q${item.quarter}/${String(item.year).slice(-2)}`;
+      } else {
+        // year
+        groupKey = `${item.year}`;
+        groupLabel = `${item.year}`;
+      }
+
+      const existing = groupedData.get(groupKey);
+      
+      if (existing) {
+        // Somar valores
+        existing.income += item.income;
+        existing.expenses += item.expenses;
+        existing.balance += item.balance;
+        existing.income_actual += item.income_actual;
+        existing.income_planned += item.income_planned;
+        existing.expenses_actual += item.expenses_actual;
+        existing.expenses_planned += item.expenses_planned;
+        // isCurrentMonth/isProjected: se qualquer mês no grupo for atual, o grupo é atual
+        if (item.isCurrentMonth) existing.isCurrentMonth = true;
+        // isProjected: só se TODOS os meses forem projetados
+        if (!item.isProjected && !item.isCurrentMonth) existing.isProjected = false;
+      } else {
+        groupedData.set(groupKey, {
+          ...item,
+          month: groupKey,
+          monthLabel: groupLabel,
+          // Para trimestre/ano atual
+          isCurrentMonth: groupBy === 'quarter' 
+            ? (item.year === currentYear && item.quarter === currentQuarter)
+            : (item.year === currentYear),
+          isProjected: groupBy === 'quarter'
+            ? (item.year > currentYear || (item.year === currentYear && item.quarter > currentQuarter))
+            : (item.year > currentYear),
+        });
+      }
+    }
+
+    return Array.from(groupedData.values());
+  }, [cashFlowData, groupBy]);
 
   if (loading || profileLoading) {
     return (
@@ -504,19 +581,45 @@ export default function DashboardPage() {
                 }
               />
             </div>
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
-              <span className="text-xs md:text-sm text-muted-foreground whitespace-nowrap flex-shrink-0">Período:</span>
-              {PERIOD_OPTIONS.map((option) => (
-                <Button
-                  key={option.months}
-                  variant={selectedPeriod === option.months ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setSelectedPeriod(option.months)}
-                  className="flex-shrink-0 text-xs md:text-sm px-2 md:px-3"
-                >
-                  {option.label}
-                </Button>
-              ))}
+            <div className="flex items-center gap-4 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
+              {/* Agrupar */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-xs md:text-sm text-muted-foreground whitespace-nowrap">Agrupar:</span>
+                {GROUP_OPTIONS.map((option) => (
+                  <Button
+                    key={option.value}
+                    variant={groupBy === option.value ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setGroupBy(option.value)}
+                    className={`flex-shrink-0 text-xs md:text-sm px-2 md:px-3 ${
+                      groupBy === option.value
+                        ? 'bg-muted text-foreground hover:bg-muted/80 hover:text-foreground'
+                        : 'bg-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground border-border'
+                    }`}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+              </div>
+              {/* Visualizar */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-xs md:text-sm text-muted-foreground whitespace-nowrap">Visualizar:</span>
+                {PERIOD_OPTIONS_BY_GROUP[groupBy].map((option) => (
+                  <Button
+                    key={option.periods}
+                    variant={selectedPeriod === option.periods ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setSelectedPeriod(option.periods)}
+                    className={`flex-shrink-0 text-xs md:text-sm px-2 md:px-3 ${
+                      selectedPeriod === option.periods
+                        ? 'bg-muted text-foreground hover:bg-muted/80 hover:text-foreground'
+                        : 'bg-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground border-border'
+                    }`}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
           {cashFlowLoading ? (
@@ -526,7 +629,8 @@ export default function DashboardPage() {
           ) : chartData.length > 0 ? (
             <CashFlowChart
               data={chartData}
-              periodMonths={isFree ? 0 : selectedPeriod}
+              periodCount={isFree ? 0 : selectedPeriod}
+              groupBy={groupBy}
             />
           ) : (
             <div className="h-64 flex items-center justify-center">

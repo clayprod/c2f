@@ -1,10 +1,8 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import {
-  BarChart,
   Bar,
-  LineChart,
   Line,
   XAxis,
   YAxis,
@@ -13,10 +11,10 @@ import {
   Legend,
   ResponsiveContainer,
   ComposedChart,
-  Cell,
   ReferenceArea,
 } from 'recharts';
-import { formatMonthYear, formatCurrencyValue } from '@/lib/utils';
+import { formatMonthYear } from '@/lib/utils';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 // Hook to detect mobile screen
 function useIsMobile(breakpoint: number = 768) {
@@ -35,13 +33,15 @@ function useIsMobile(breakpoint: number = 768) {
   return isMobile;
 }
 
-interface MonthlyData {
-  month: string;
-  monthLabel: string;
+type GroupByType = 'month' | 'quarter' | 'year';
+
+interface PeriodData {
+  month: string;        // period key (YYYY-MM, YYYY-QX, or YYYY)
+  monthLabel: string;   // formatted label
   income: number;
   expenses: number;
   balance: number;
-  isCurrentMonth: boolean;
+  isCurrentMonth: boolean;  // isCurrentPeriod
   isProjected: boolean;
   income_actual?: number;
   income_planned?: number;
@@ -50,22 +50,137 @@ interface MonthlyData {
 }
 
 interface CashFlowChartProps {
-  data: MonthlyData[];
-  periodMonths?: number;
+  data: PeriodData[];
+  periodCount?: number;
+  groupBy?: GroupByType;
 }
 
-export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
+export function CashFlowChart({ data, periodCount = 12, groupBy = 'month' }: CashFlowChartProps) {
   const isMobile = useIsMobile();
+  
+  // Estado para navegação por arraste
+  const [viewOffset, setViewOffset] = useState(0); // Offset em meses (negativo = passado, positivo = futuro)
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+  const dragStartX = useRef(0);
+  const dragStartOffset = useRef(0);
+  
+  // Cores usando variáveis CSS do tema
+  const chartIncomeColor = 'hsl(var(--chart-income))';
+  const chartExpenseColor = 'hsl(var(--chart-expense))';
+  const chartBalanceColor = 'hsl(var(--chart-balance))';
+  
+  // Calcular limites de navegação baseado nos dados históricos e projetados
+  const { minOffset, maxOffset } = useMemo(() => {
+    const currentMonthIdx = data.findIndex(d => d.isCurrentMonth);
+    if (currentMonthIdx < 0) {
+      return { minOffset: 0, maxOffset: 0 };
+    }
+    
+    const halfPeriod = Math.floor(periodCount / 2);
+    const historicalCount = currentMonthIdx; // meses antes do atual
+    const projectedCount = data.length - currentMonthIdx - 1; // meses depois do atual
+    
+    // minOffset: quanto pode ir para o passado (valor negativo)
+    // Se tiver mais histórico que metade do período, pode navegar para o passado
+    const canGoBack = Math.max(0, historicalCount - halfPeriod);
+    
+    // maxOffset: quanto pode ir para o futuro (valor positivo)
+    // Se tiver mais projeção que metade do período, pode navegar para o futuro
+    const canGoForward = Math.max(0, projectedCount - halfPeriod);
+    
+    return { 
+      minOffset: -canGoBack, 
+      maxOffset: canGoForward 
+    };
+  }, [data, periodCount]);
+  
+  // Handlers para navegação por arraste
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    isDragging.current = true;
+    dragStartX.current = e.clientX;
+    dragStartOffset.current = viewOffset;
+    if (containerRef.current) {
+      containerRef.current.style.cursor = 'grabbing';
+    }
+  }, [viewOffset]);
+  
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging.current) return;
+    
+    const deltaX = e.clientX - dragStartX.current;
+    const containerWidth = containerRef.current?.offsetWidth || 800;
+    const monthWidth = containerWidth / periodCount;
+    const monthsDelta = Math.round(-deltaX / monthWidth);
+    
+    const newOffset = Math.max(minOffset, Math.min(maxOffset, dragStartOffset.current + monthsDelta));
+    setViewOffset(newOffset);
+  }, [periodCount, minOffset, maxOffset]);
+  
+  const handleMouseUp = useCallback(() => {
+    isDragging.current = false;
+    if (containerRef.current) {
+      containerRef.current.style.cursor = 'grab';
+    }
+  }, []);
+  
+  const handleMouseLeave = useCallback(() => {
+    if (isDragging.current) {
+      isDragging.current = false;
+      if (containerRef.current) {
+        containerRef.current.style.cursor = 'grab';
+      }
+    }
+  }, []);
+  
+  // Handlers para touch (mobile)
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    isDragging.current = true;
+    dragStartX.current = e.touches[0].clientX;
+    dragStartOffset.current = viewOffset;
+  }, [viewOffset]);
+  
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isDragging.current) return;
+    
+    const deltaX = e.touches[0].clientX - dragStartX.current;
+    const containerWidth = containerRef.current?.offsetWidth || 800;
+    const monthWidth = containerWidth / periodCount;
+    const monthsDelta = Math.round(-deltaX / monthWidth);
+    
+    const newOffset = Math.max(minOffset, Math.min(maxOffset, dragStartOffset.current + monthsDelta));
+    setViewOffset(newOffset);
+  }, [periodCount, minOffset, maxOffset]);
+  
+  const handleTouchEnd = useCallback(() => {
+    isDragging.current = false;
+  }, []);
+  
+  // Navegação por botões
+  const navigateLeft = useCallback(() => {
+    setViewOffset(prev => Math.max(minOffset, prev - 1));
+  }, [minOffset]);
+  
+  const navigateRight = useCallback(() => {
+    setViewOffset(prev => Math.min(maxOffset, prev + 1));
+  }, [maxOffset]);
+  
+  // Resetar offset quando periodCount ou groupBy mudar
+  useEffect(() => {
+    setViewOffset(0);
+  }, [periodCount, groupBy]);
 
   const { chartData, currentMonthIndex } = useMemo(() => {
     // Primeiro, processar e formatar os dados
     let runningBalance = 0;
     const processedData = data.map((item, index) => {
       runningBalance += item.income - item.expenses;
-      // Formatar monthLabel usando formatMonthYear se ainda não estiver formatado
+      // Usar o monthLabel já formatado (vem da página)
+      // Só formatar com formatMonthYear se for formato de mês (YYYY-MM) e groupBy === 'month'
       let formattedMonthLabel = item.monthLabel;
       let isCurrentMonth = item.isCurrentMonth;
-      if (item.month) {
+      
+      if (groupBy === 'month' && item.month && /^\d{4}-\d{2}$/.test(item.month)) {
         // Se month está no formato YYYY-MM, formatar
         const monthInfoResult = formatMonthYear(item.month, { returnCurrentMonthInfo: true });
         formattedMonthLabel = typeof monthInfoResult === 'string' ? monthInfoResult : monthInfoResult.formatted;
@@ -77,10 +192,7 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
         monthLabel: formattedMonthLabel,
         isCurrentMonth,
         cumulativeBalance: runningBalance,
-        // Add opacity for projected vs actual
-        // Remove unused opacity props
         balanceDashArray: item.isProjected ? '5 5' : '0',
-
       };
     });
 
@@ -113,16 +225,20 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
       };
     }
 
-    // Reorganizar dados para centralizar mês corrente
+    // Reorganizar dados para centralizar mês corrente (com offset de navegação)
     // Dividir em histórico (antes do mês corrente) e projeção (depois)
     const historicalData = processedData.slice(0, finalCurrentMonthIndex);
     const currentMonthData = processedData[finalCurrentMonthIndex] ? [processedData[finalCurrentMonthIndex]] : [];
     const projectedData = processedData.slice(finalCurrentMonthIndex + 1);
 
     // Calcular quantos meses mostrar antes e depois do mês corrente
-    const halfPeriod = Math.floor(periodMonths / 2);
-    const monthsBefore = Math.min(halfPeriod, historicalData.length);
-    const monthsAfter = Math.min(halfPeriod, projectedData.length);
+    // viewOffset desloca a janela de visualização (positivo = mais futuro, negativo = mais passado)
+    const halfPeriod = Math.floor(periodCount / 2);
+    const adjustedMonthsBefore = Math.max(0, halfPeriod - viewOffset);
+    const adjustedMonthsAfter = Math.max(0, halfPeriod + viewOffset);
+    
+    const monthsBefore = Math.min(adjustedMonthsBefore, historicalData.length);
+    const monthsAfter = Math.min(adjustedMonthsAfter, projectedData.length);
 
     // Pegar últimos N meses históricos e primeiros N meses projetados
     const selectedHistorical = historicalData.slice(-monthsBefore);
@@ -136,7 +252,8 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
     ];
 
     // Recalcular saldo acumulado para manter continuidade
-    // A linha projetada deve PARTIR do saldo real atual (mês corrente)
+    // A linha projetada deve partir do saldo real do mês anterior
+    // somando o delta projetado do mês corrente
     let cumulativeBalanceHistorical = 0;
 
     if (selectedHistorical.length > 0) {
@@ -147,6 +264,7 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
 
     // Primeira passada: calcular apenas o saldo histórico até o mês corrente
     let lastHistoricalBalance = cumulativeBalanceHistorical;
+    let balanceBeforeCurrentMonth = cumulativeBalanceHistorical;
     const tempData = reorganizedData.map((item, index) => {
       const isCurrentMonth = index === selectedHistorical.length;
       const isProjected = index > selectedHistorical.length;
@@ -155,6 +273,9 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
         // Para meses históricos ou mês corrente, calcular saldo real
         const incomeActual = item.income_actual !== undefined ? item.income_actual : item.income;
         const expensesActual = item.expenses_actual !== undefined ? item.expenses_actual : item.expenses;
+        if (isCurrentMonth) {
+          balanceBeforeCurrentMonth = cumulativeBalanceHistorical;
+        }
         cumulativeBalanceHistorical += incomeActual - expensesActual;
         lastHistoricalBalance = cumulativeBalanceHistorical;
       }
@@ -167,8 +288,21 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
       };
     });
 
-    // Segunda passada: calcular o saldo projetado PARTINDO do último saldo histórico
-    let cumulativeBalanceProjected = lastHistoricalBalance;
+    // Segunda passada: calcular o saldo projetado a partir do saldo real do mês anterior
+    // somando o delta projetado do mês corrente
+    const currentMonthItem = tempData[selectedHistorical.length];
+    const currentIncomePlanned = currentMonthItem?.income_planned !== undefined
+      ? currentMonthItem.income_planned
+      : currentMonthItem?.income;
+    const currentExpensesPlanned = currentMonthItem?.expenses_planned !== undefined
+      ? currentMonthItem.expenses_planned
+      : currentMonthItem?.expenses;
+    const currentProjectedDelta = (currentIncomePlanned ?? 0) - (currentExpensesPlanned ?? 0);
+    const projectedStartBalance = currentMonthItem
+      ? balanceBeforeCurrentMonth + currentProjectedDelta
+      : lastHistoricalBalance;
+
+    let cumulativeBalanceProjected = projectedStartBalance;
     const finalData = tempData.map((item, index) => {
       const isCurrentMonth = item.isCurrentMonth;
       const isProjected = item.isProjectedMonth;
@@ -185,65 +319,74 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
       // e continua nos meses futuros
       const shouldIncludeInProjected = isCurrentMonth || isProjected;
 
-      // Separar valores reais de projetados para as barras
-      // Receitas: usar valores explícitos se disponíveis, senão inferir do contexto
-      const incomeActual = item.income_actual !== undefined ? item.income_actual : (!isProjected ? item.income : null);
-      const incomePlanned = item.income_planned !== undefined ? item.income_planned : (isProjected ? item.income : null);
+      // Para períodos agrupados (trimestre/ano) ou mês atual:
+      // Sempre mostrar valores consolidados de realizados E projetados
+      // Para meses passados: só mostrar realizados
+      // Para meses futuros: só mostrar projetados
       
-      // Despesas: usar valores explícitos se disponíveis, senão inferir do contexto
-      const expensesActual = item.expenses_actual !== undefined ? item.expenses_actual : (!isProjected ? item.expenses : null);
-      const expensesPlanned = item.expenses_planned !== undefined ? item.expenses_planned : (isProjected ? item.expenses : null);
+      // Valores realizados (actual)
+      const incomeActual = item.income_actual !== undefined ? item.income_actual : 0;
+      const expensesActual = item.expenses_actual !== undefined ? item.expenses_actual : 0;
+      
+      // Valores projetados (planned)
+      const incomePlanned = item.income_planned !== undefined ? item.income_planned : 0;
+      const expensesPlanned = item.expenses_planned !== undefined ? item.expenses_planned : 0;
+      
+      // Lógica para mostrar barras:
+      // - Meses passados (não projetados, não atual): só realizados
+      // - Mês/período atual: ambos (realizados e projetados)
+      // - Meses futuros (projetados): só projetados
+      // - Para groupBy !== 'month': sempre mostrar ambos se tiverem valor > 0
+      
+      let income_real: number | null = null;
+      let income_proj: number | null = null;
+      let expenses_real: number | null = null;
+      let expenses_proj: number | null = null;
+      
+      if (groupBy !== 'month') {
+        // Para trimestre/ano: sempre mostrar o consolidado de ambos
+        income_real = incomeActual > 0 ? incomeActual : null;
+        income_proj = incomePlanned > 0 ? incomePlanned : null;
+        expenses_real = expensesActual > 0 ? expensesActual : null;
+        expenses_proj = expensesPlanned > 0 ? expensesPlanned : null;
+      } else {
+        // Para mês: lógica original
+        if (isProjected) {
+          // Mês futuro: só projetados
+          income_proj = incomePlanned > 0 ? incomePlanned : (item.income > 0 ? item.income : null);
+          expenses_proj = expensesPlanned > 0 ? expensesPlanned : (item.expenses > 0 ? item.expenses : null);
+        } else if (isCurrentMonth) {
+          // Mês atual: ambos
+          income_real = incomeActual > 0 ? incomeActual : null;
+          income_proj = incomePlanned > 0 ? incomePlanned : null;
+          expenses_real = expensesActual > 0 ? expensesActual : null;
+          expenses_proj = expensesPlanned > 0 ? expensesPlanned : null;
+        } else {
+          // Mês passado: só realizados
+          income_real = incomeActual > 0 ? incomeActual : (item.income > 0 ? item.income : null);
+          expenses_real = expensesActual > 0 ? expensesActual : (item.expenses > 0 ? item.expenses : null);
+        }
+      }
 
-      // Separar em campos distintos para renderização
-      // Valores reais: para meses históricos OU mês corrente quando há valores reais
-      const income_real = (!isProjected && incomeActual !== null && incomeActual > 0) ? incomeActual : null;
-      const expenses_real = (!isProjected && expensesActual !== null && expensesActual > 0) ? expensesActual : null;
-      
-      // Valores projetados: para meses futuros OU mês corrente quando há valores projetados
-      // Quando há valores reais e projetados no mesmo mês, ambos serão mostrados e a projeção ficará sobreposta
-      const hasProjectedIncome = isProjected || (isCurrentMonth && (incomePlanned !== null || item.income > 0));
-      const income_proj = hasProjectedIncome && (incomePlanned !== null || (isProjected && item.income > 0)) ? (incomePlanned || item.income) : null;
-      
-      const hasProjectedExpenses = isProjected || (isCurrentMonth && (expensesPlanned !== null || item.expenses > 0));
-      const expenses_proj = hasProjectedExpenses && (expensesPlanned !== null || (isProjected && item.expenses > 0)) ? (expensesPlanned || item.expenses) : null;
-
-      // Flags para indicar quando há sobreposição (valores reais e projetados no mesmo mês)
+      // Flags para indicar quando há sobreposição (valores reais e projetados no mesmo período)
       const hasIncomeOverlap = income_real !== null && income_proj !== null;
       const hasExpensesOverlap = expenses_real !== null && expenses_proj !== null;
-
-      // Para sobreposição visual: quando há valores reais e projetados, ajustar os dados
-      // da projeção para que seja renderizada na mesma posição base da real
-      // Com stackId, isso requer que a projeção tenha um offset baseado no valor real
-      // Mas na verdade, com stackId, as barras são empilhadas automaticamente
-      // Para sobreposição visual, precisamos usar uma técnica diferente
       
-      // Ajustar valores projetados para sobreposição visual quando há sobreposição
-      // Quando há sobreposição, a projeção deve ser renderizada na mesma posição base
-      // Isso é feito ajustando o valor da projeção para incluir o offset da real
-      let income_proj_adjusted = income_proj;
-      let expenses_proj_adjusted = expenses_proj;
-      
-      if (hasIncomeOverlap && income_real !== null && income_proj !== null) {
-        // Para sobreposição visual, a projeção deve começar na mesma posição base da real
-        // Com stackId, isso significa que a projeção deve ter um valor que inclui o offset
-        // Mas na verdade, com stackId, não consigo fazer isso diretamente
-        // Vou manter o valor original e usar opacidade para diferenciar
-        income_proj_adjusted = income_proj;
-      }
-      
-      if (hasExpensesOverlap && expenses_real !== null && expenses_proj !== null) {
-        expenses_proj_adjusted = expenses_proj;
-      }
+      // Valores ajustados (mantidos iguais para simplicidade)
+      const income_proj_adjusted = income_proj;
+      const expenses_proj_adjusted = expenses_proj;
 
       return {
         ...item,
         isProjected: isProjected && !isCurrentMonth,
+        isCurrentMonth, // Garantir que isCurrentMonth está disponível
         cumulativeBalance: item.cumulativeBalanceHistorical || cumulativeBalanceProjected,
         cumulativeBalanceHistorical: shouldIncludeInHistorical ? item.cumulativeBalanceHistorical : null,
-        // No mês corrente, a linha projetada tem o mesmo valor da histórica (ponto de encontro)
+        // No mês corrente, a linha projetada começa no saldo do mês anterior
+        // somado ao delta projetado do mês
         // Nos meses futuros, continua com as projeções somadas
-        cumulativeBalanceProjected: shouldIncludeInProjected 
-          ? (isCurrentMonth ? lastHistoricalBalance : cumulativeBalanceProjected) 
+        cumulativeBalanceProjected: shouldIncludeInProjected
+          ? (isCurrentMonth ? projectedStartBalance : cumulativeBalanceProjected)
           : null,
         // Campos separados para barras reais e projetadas
         income_real,
@@ -260,7 +403,7 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
       chartData: finalData,
       currentMonthIndex: selectedHistorical.length,
     };
-  }, [data, periodMonths]);
+  }, [data, periodCount, viewOffset, groupBy]);
 
   // Formatação compacta para gráficos (sem centavos)
   const formatCurrency = (value: number) => {
@@ -272,58 +415,37 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
     }).format(value);
   };
 
-  // Formatação completa para valores exatos
-  const formatCurrencyFull = formatCurrencyValue;
-
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-      // Encontrar o item de dados correspondente ao label
-      const dataItem = chartData.find((item) => item.monthLabel === label);
+      const dataPoint = payload[0]?.payload;
+      const isCurrent = dataPoint?.isCurrentMonth;
+      const isProjected = dataPoint?.isProjected;
 
       return (
-        <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
-          <p className="font-semibold mb-2">{label}</p>
-
-          {/* Receitas */}
-          {dataItem && (
-            <>
-              {dataItem.income_real !== null && dataItem.income_real !== undefined && dataItem.income_real > 0 && (
-                <p className="text-sm" style={{ color: 'hsl(142, 71%, 35%)' }}>
-                  Receitas: {formatCurrency(dataItem.income_real)} <span className="text-muted-foreground">(realizado)</span>
-                </p>
-              )}
-              {dataItem.income_proj !== null && dataItem.income_proj !== undefined && dataItem.income_proj > 0 && (
-                <p className="text-sm" style={{ color: 'hsl(142, 71%, 60%)' }}>
-                  Receitas: {formatCurrency(dataItem.income_proj)} <span className="text-muted-foreground">(projetado)</span>
-                </p>
-              )}
-
-              {/* Despesas */}
-              {dataItem.expenses_real !== null && dataItem.expenses_real !== undefined && dataItem.expenses_real > 0 && (
-                <p className="text-sm" style={{ color: 'hsl(0, 84%, 50%)' }}>
-                  Despesas: {formatCurrency(dataItem.expenses_real)} <span className="text-muted-foreground">(realizado)</span>
-                </p>
-              )}
-              {dataItem.expenses_proj !== null && dataItem.expenses_proj !== undefined && dataItem.expenses_proj > 0 && (
-                <p className="text-sm" style={{ color: 'hsl(0, 84%, 75%)' }}>
-                  Despesas: {formatCurrency(dataItem.expenses_proj)} <span className="text-muted-foreground">(projetado)</span>
-                </p>
-              )}
-            </>
-          )}
-
-          {/* Saldo Acumulado */}
-          {payload.map((entry: any, index: number) => {
-            if (entry.name === 'Saldo Acumulado' || entry.name === 'Saldo Acumulado (Proj.)') {
-              const isProjected = entry.name === 'Saldo Acumulado (Proj.)';
-              return (
-                <p key={index} style={{ color: entry.color }} className={`text-sm ${isProjected ? 'opacity-70' : ''}`}>
-                  {entry.name}: {formatCurrency(entry.value)} {isProjected && <span className="text-muted-foreground">(projetado)</span>}
-                </p>
-              );
-            }
-            return null;
-          })}
+        <div className="rounded-lg border border-border bg-card p-3 shadow-xl">
+          <p className="mb-2 font-medium text-foreground">
+            {label}{' '}
+            {isCurrent && (
+              <span className="text-primary">
+                ({groupBy === 'month' ? 'Mês Atual' : groupBy === 'quarter' ? 'Trimestre Atual' : 'Ano Atual'})
+              </span>
+            )}
+            {isProjected && <span className="text-muted-foreground">(Projetado)</span>}
+          </p>
+          {payload
+            .filter((entry: any) => entry.value !== null)
+            .map((entry: any, index: number) => (
+              <div key={index} className="flex items-center gap-2 text-sm">
+                <div
+                  className="h-3 w-3 rounded-full"
+                  style={{ backgroundColor: entry.color }}
+                />
+                <span className="text-muted-foreground">{entry.name}:</span>
+                <span className="font-medium text-foreground">
+                  {formatCurrency(entry.value)}
+                </span>
+              </div>
+            ))}
         </div>
       );
     }
@@ -331,286 +453,233 @@ export function CashFlowChart({ data, periodMonths = 12 }: CashFlowChartProps) {
   };
 
   return (
-    <div className="w-full">
-      <ResponsiveContainer width="100%" height={isMobile ? 280 : 400}>
-        <ComposedChart
-          data={chartData}
-          margin={isMobile
-            ? { top: 10, right: 10, left: 0, bottom: 50 }
-            : { top: 20, right: 30, left: 20, bottom: 60 }
-          }
-          barGap={0}
-          barCategoryGap="20%"
+    <div className="w-full relative">
+      {/* Botões de navegação */}
+      <div className="absolute top-1/2 -translate-y-1/2 left-0 z-10">
+        <button
+          onClick={navigateLeft}
+          disabled={viewOffset <= minOffset}
+          className="p-1.5 rounded-full bg-card/80 backdrop-blur border border-border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+          title="Ver meses anteriores"
         >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+      </div>
+      <div className="absolute top-1/2 -translate-y-1/2 right-0 z-10">
+        <button
+          onClick={navigateRight}
+          disabled={viewOffset >= maxOffset}
+          className="p-1.5 rounded-full bg-card/80 backdrop-blur border border-border hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+          title="Ver meses futuros"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+      
+      {/* Container do gráfico com suporte a arraste */}
+      <div
+        ref={containerRef}
+        className="cursor-grab select-none"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        <ResponsiveContainer width="100%" height={isMobile ? 280 : 400}>
+          <ComposedChart
+            data={chartData}
+            margin={isMobile
+              ? { top: 10, right: 30, left: 10, bottom: 50 }
+              : { top: 20, right: 50, left: 40, bottom: 5 }
+            }
+            barGap={-40}
+            barCategoryGap="20%"
+          >
 
-          {/* Patterns removed for cleaner outlined style */}
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
+          {/* Grid sutil */}
+          <CartesianGrid 
+            strokeDasharray="3 3"
+            stroke="hsl(var(--border))"
+            opacity={0.3}
+          />
           <XAxis
             dataKey="monthLabel"
-            angle={-45}
-            textAnchor="end"
-            height={isMobile ? 70 : 100}
-            stroke="hsl(var(--muted-foreground))"
-            fontSize={isMobile ? 10 : 12}
-            interval={(() => {
-              if (isMobile) {
-                if (periodMonths <= 6) return 0;
-                if (periodMonths <= 12) return 1;
-                return 2;
-              }
-              // Desktop
-              if (periodMonths <= 12) return 0; // Show all
-              if (periodMonths <= 24) return 1; // Every 2nd
-              if (periodMonths <= 60) return 5; // Every 6th
-              return 11; // Every 12th
-            })()}
-            tick={(props: any) => {
-              const { x, y, payload } = props;
-              const isCurrentMonth = payload.value && chartData[currentMonthIndex]?.monthLabel === payload.value;
+            axisLine={false}
+            tickLine={false}
+            tick={({ x, y, payload }: any) => {
+              const dataPoint = chartData.find(d => d.monthLabel === payload.value);
+              const isCurrent = dataPoint?.isCurrentMonth;
               return (
-                <g transform={`translate(${x},${y})`}>
-                  <text
-                    x={0}
-                    y={0}
-                    dy={16}
-                    textAnchor="end"
-                    fill={isCurrentMonth ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))'}
-                    fontSize={isMobile ? 10 : 12}
-                    fontWeight={isCurrentMonth ? 'bold' : 'normal'}
-                    transform="rotate(-45)"
-                  >
-                    {payload.value}
-                  </text>
-                </g>
+                <text
+                  x={x}
+                  y={y + 12}
+                  textAnchor="middle"
+                  fill={isCurrent ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))'}
+                  fontSize={12}
+                  fontWeight={isCurrent ? 600 : 400}
+                >
+                  {payload.value}
+                </text>
               );
             }}
           />
           <YAxis
-            stroke="hsl(var(--muted-foreground))"
-            fontSize={isMobile ? 10 : 12}
-            tickFormatter={formatCurrency}
-            width={isMobile ? 60 : 80}
+            axisLine={false}
+            tickLine={false}
+            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+            tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
           />
           <Tooltip content={<CustomTooltip />} />
 
-          {/* Fundo destacado para mês corrente - cobre toda a área do mês */}
+          {/* Destaque do mês atual */}
           {currentMonthIndex >= 0 && currentMonthIndex < chartData.length && (() => {
             const currentMonthValue = chartData[currentMonthIndex]?.monthLabel;
             if (!currentMonthValue) return null;
-
-            // Para criar uma área visual maior, usar o mês anterior e próximo como limites
-            // Isso cria um fundo que cobre toda a área do mês corrente
-            const prevIndex = currentMonthIndex > 0 ? currentMonthIndex - 1 : currentMonthIndex;
-            const nextIndex = currentMonthIndex < chartData.length - 1 ? currentMonthIndex + 1 : currentMonthIndex;
-
-            // Se há mês anterior e próximo, criar área entre eles
-            // Caso contrário, usar apenas o mês corrente
-            if (prevIndex < currentMonthIndex && nextIndex > currentMonthIndex) {
-              const prevValue = chartData[prevIndex]?.monthLabel;
-              const nextValue = chartData[nextIndex]?.monthLabel;
-              // Criar área do meio do mês anterior ao meio do próximo
-              return (
-                <ReferenceArea
-                  x1={prevValue}
-                  x2={nextValue}
-                  y1="dataMin"
-                  y2="dataMax"
-                  fill="hsl(var(--primary))"
-                  fillOpacity={0.25}
-                  stroke="hsl(var(--primary))"
-                  strokeOpacity={0.7}
-                  strokeWidth={3}
-                  strokeDasharray="0"
-                  label={{
-                    value: '◆ MÊS ATUAL ◆',
-                    position: 'top',
-                    fill: 'hsl(var(--primary))',
-                    fontSize: isMobile ? 12 : 14,
-                    fontWeight: 'bold',
-                    offset: isMobile ? 10 : 15
-                  }}
-                  ifOverflow="extendDomain"
-                />
-              );
-            } else {
-              // Fallback: usar apenas o mês corrente
-              return (
-                <ReferenceArea
-                  x1={currentMonthValue}
-                  x2={currentMonthValue}
-                  y1="dataMin"
-                  y2="dataMax"
-                  fill="hsl(var(--primary))"
-                  fillOpacity={0.25}
-                  stroke="hsl(var(--primary))"
-                  strokeOpacity={0.7}
-                  strokeWidth={3}
-                  strokeDasharray="0"
-                  label={{
-                    value: '◆ MÊS ATUAL ◆',
-                    position: 'top',
-                    fill: 'hsl(var(--primary))',
-                    fontSize: isMobile ? 12 : 14,
-                    fontWeight: 'bold',
-                    offset: isMobile ? 10 : 15
-                  }}
-                  ifOverflow="extendDomain"
-                />
-              );
-            }
+            return (
+              <ReferenceArea
+                x1={currentMonthValue}
+                x2={currentMonthValue}
+                fill="hsl(var(--primary))"
+                fillOpacity={0.08}
+                stroke="hsl(var(--primary))"
+                strokeOpacity={0.3}
+                strokeDasharray="4 2"
+              />
+            );
           })()}
 
-          {/* Ordem de renderização para empilhar receitas sobre despesas */}
-          {/* 1. Despesas Reais - escuro, opacidade 100% (base da pilha) */}
-          <Bar
-            dataKey="expenses_real"
-            name="Despesas (Real)"
-            fill="hsl(0, 84%, 50%)"
-            radius={[0, 0, 0, 0]}
-            stackId="cashflow"
-          />
-
-          {/* 2. Despesas Projeção - claro, translúcido (opacidade 55%) */}
-          <Bar
-            dataKey="expenses_proj"
-            name="Despesas (Proj.)"
-            fill="hsl(0, 84%, 75%)"
-            radius={[0, 0, 0, 0]}
-            stackId="cashflow"
-          >
-            {chartData.map((entry, index) => (
-              <Cell 
-                key={`expenses-proj-${index}`} 
-                fill="hsl(0, 84%, 75%)" 
-                opacity={0.55}
-              />
-            ))}
-          </Bar>
-
-          {/* 3. Receitas Reais - escuro, opacidade 100% (sobre as despesas) */}
-          <Bar
-            dataKey="income_real"
-            name="Receitas (Real)"
-            fill="hsl(142, 71%, 35%)"
-            radius={[4, 4, 0, 0]}
-            stackId="cashflow"
-          />
-
-          {/* 4. Receitas Projeção - claro, translúcido (opacidade 55%) */}
-          {/* Com stackId, será empilhada sobre a real; a opacidade cria efeito de sobreposição visual */}
+          {/* Barras de Receitas Projetadas (background - translúcidas) */}
           <Bar
             dataKey="income_proj"
-            name="Receitas (Proj.)"
-            fill="hsl(142, 71%, 60%)"
+            name="Receitas Proj."
+            fill={chartIncomeColor}
             radius={[4, 4, 0, 0]}
-            stackId="cashflow"
-          >
-            {chartData.map((entry, index) => (
-              <Cell 
-                key={`income-proj-${index}`} 
-                fill="hsl(142, 71%, 60%)" 
-                opacity={0.55}
-              />
-            ))}
-          </Bar>
+            maxBarSize={28}
+            fillOpacity={0.35}
+          />
+          
+          {/* Barras de Receitas Realizadas (foreground - sólidas, sobrepostas) */}
+          <Bar
+            dataKey="income_real"
+            name="Receitas"
+            fill={chartIncomeColor}
+            radius={[4, 4, 0, 0]}
+            maxBarSize={28}
+          />
 
-          {/* Balance line - sólida para histórico */}
+          {/* Barras de Despesas Projetadas (background - translúcidas) */}
+          <Bar
+            dataKey="expenses_proj"
+            name="Despesas Proj."
+            fill={chartExpenseColor}
+            radius={[4, 4, 0, 0]}
+            maxBarSize={28}
+            fillOpacity={0.35}
+          />
+          
+          {/* Barras de Despesas Realizadas (foreground - sólidas) */}
+          <Bar
+            dataKey="expenses_real"
+            name="Despesas"
+            fill={chartExpenseColor}
+            radius={[4, 4, 0, 0]}
+            maxBarSize={28}
+          />
+
+          {/* Linha de Saldo Realizado (sólida) */}
           <Line
             type="monotone"
             dataKey="cumulativeBalanceHistorical"
-            name="Saldo Acumulado"
-            stroke="hsl(var(--primary))"
-            strokeWidth={2}
-            dot={(props: any) => {
-              const { payload } = props;
-              if (!payload || payload.cumulativeBalanceHistorical === null || payload.cumulativeBalanceHistorical === undefined) {
-                // Return an empty SVG element instead of null
-                return <g key={`dot-historical-empty-${props.index}`} />;
-              }
-              return (
-                <circle
-                  key={`dot-historical-${props.index}`}
-                  cx={props.cx}
-                  cy={props.cy}
-                  r={4}
-                  fill="hsl(var(--primary))"
-                />
-              );
+            name="Saldo"
+            stroke={chartBalanceColor}
+            strokeWidth={3}
+            dot={{
+              fill: chartBalanceColor,
+              strokeWidth: 2,
+              r: 5,
             }}
-            activeDot={{ r: 6 }}
-            connectNulls={true}
+            activeDot={{
+              fill: chartBalanceColor,
+              strokeWidth: 2,
+              r: 7,
+            }}
+            connectNulls={false}
           />
-          {/* Balance line - tracejada para projeção */}
+
+          {/* Linha de Saldo Projetado (tracejada) */}
           <Line
             type="monotone"
             dataKey="cumulativeBalanceProjected"
-            name="Saldo Acumulado (Proj.)"
-            stroke="hsl(var(--primary))"
-            strokeWidth={2}
-            strokeDasharray="5 5"
-            dot={(props: any) => {
-              const { payload } = props;
-              if (!payload || payload.cumulativeBalanceProjected === null || payload.cumulativeBalanceProjected === undefined) {
-                // Return an empty SVG element instead of null
-                return <g key={`dot-projected-empty-${props.index}`} />;
-              }
-              return (
-                <circle
-                  key={`dot-projected-${props.index}`}
-                  cx={props.cx}
-                  cy={props.cy}
-                  r={4}
-                  fill="hsl(var(--primary))"
-                  fillOpacity={0.5}
-                />
-              );
+            name="Saldo Projetado"
+            stroke={chartBalanceColor}
+            strokeWidth={3}
+            strokeDasharray="8 4"
+            dot={{
+              fill: 'hsl(var(--background))',
+              stroke: chartBalanceColor,
+              strokeWidth: 2,
+              r: 5,
             }}
-            activeDot={{ r: 6 }}
-            connectNulls={true}
-            opacity={0.5}
+            activeDot={{
+              fill: chartBalanceColor,
+              strokeWidth: 2,
+              r: 7,
+            }}
+            connectNulls={false}
           />
 
-          {/* Legenda customizada com cores sólidas */}
+          {/* Legenda customizada */}
           <Legend
             wrapperStyle={{ paddingTop: isMobile ? '10px' : '20px' }}
             content={() => (
-              <div className={`flex items-center justify-center flex-wrap ${isMobile ? 'gap-x-3 gap-y-1.5 text-xs px-2' : 'gap-6 text-sm'}`}>
-                <div className="flex items-center gap-1.5">
-                  <div className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} rounded`} style={{ backgroundColor: 'hsl(142, 71%, 35%)' }}></div>
-                  <span>Receitas</span>
+              <div className={`flex items-center justify-center flex-wrap ${isMobile ? 'gap-x-4 gap-y-2 text-xs px-2' : 'gap-x-6 gap-y-2 text-sm'}`}>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: chartIncomeColor }}></div>
+                  <span className="text-muted-foreground">Receitas Realizadas</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <div className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} rounded`} style={{
-                    backgroundColor: 'hsl(142, 71%, 60%)'
-                  }}></div>
-                  <span>{isMobile ? 'Rec. (Proj.)' : 'Receitas (Proj.)'}</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-sm opacity-40" style={{ backgroundColor: chartIncomeColor }}></div>
+                  <span className="text-muted-foreground">Receitas Projetadas</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <div className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} rounded`} style={{ backgroundColor: 'hsl(0, 84%, 50%)' }}></div>
-                  <span>Despesas</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: chartExpenseColor }}></div>
+                  <span className="text-muted-foreground">Despesas Realizadas</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <div className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} rounded`} style={{
-                    backgroundColor: 'hsl(0, 84%, 75%)'
-                  }}></div>
-                  <span>{isMobile ? 'Desp. (Proj.)' : 'Despesas (Proj.)'}</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-sm opacity-40" style={{ backgroundColor: chartExpenseColor }}></div>
+                  <span className="text-muted-foreground">Despesas Projetadas</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <div className={`${isMobile ? 'w-3' : 'w-4'} h-1 rounded`} style={{ backgroundColor: 'hsl(var(--primary))' }}></div>
-                  <span>{isMobile ? 'Saldo' : 'Saldo Acumulado'}</span>
+                <div className="flex items-center gap-2">
+                  <div className="h-0.5 w-6" style={{ backgroundColor: chartBalanceColor }}></div>
+                  <span className="text-muted-foreground">Saldo Realizado</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <div className={`${isMobile ? 'w-3' : 'w-4'} h-1 rounded`} style={{
-                    background: 'repeating-linear-gradient(to right, hsl(var(--primary)) 0px, hsl(var(--primary)) 3px, transparent 3px, transparent 6px)',
-                    backgroundColor: 'transparent'
-                  }}></div>
-                  <span>{isMobile ? 'Saldo (Proj.)' : 'Saldo Acumulado (Proj.)'}</span>
+                <div className="flex items-center gap-2">
+                  <div className="h-0.5 w-6 border-t-2 border-dashed" style={{ borderColor: chartBalanceColor }}></div>
+                  <span className="text-muted-foreground">Saldo Projetado</span>
                 </div>
               </div>
             )}
           />
-        </ComposedChart>
-      </ResponsiveContainer>
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+      
+      {/* Indicador de navegação */}
+      {(viewOffset !== 0) && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10">
+          <button
+            onClick={() => setViewOffset(0)}
+            className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+          >
+            {groupBy === 'month' ? 'Voltar ao mês atual' : 
+             groupBy === 'quarter' ? 'Voltar ao trimestre atual' : 
+             'Voltar ao ano atual'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

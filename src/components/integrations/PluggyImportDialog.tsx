@@ -24,6 +24,8 @@ interface PluggyTransaction {
   currency: string;
   type: string;
   category: string | null;
+  account_name?: string;
+  institution_name?: string;
 }
 
 interface Category {
@@ -325,6 +327,7 @@ export default function PluggyImportDialog({ open, onOpenChange, linkId, onImpor
                   <tr className="text-left text-xs text-muted-foreground border-b">
                     <th className="p-2 w-10"></th>
                     <th className="p-2">Data</th>
+                    <th className="p-2">Conta</th>
                     <th className="p-2">Descrição</th>
                     <th className="p-2 text-right">Valor</th>
                     <th className="p-2">Categoria</th>
@@ -343,6 +346,18 @@ export default function PluggyImportDialog({ open, onOpenChange, linkId, onImpor
                       </td>
                       <td className="p-2 text-sm">
                         {formatDate(tx.date)}
+                      </td>
+                      <td className="p-2 text-sm">
+                        <div className="flex flex-col">
+                          <span className="truncate max-w-[120px]" title={tx.account_name}>
+                            {tx.account_name || 'Conta'}
+                          </span>
+                          {tx.institution_name && (
+                            <span className="text-xs text-muted-foreground truncate max-w-[120px]" title={tx.institution_name}>
+                              {tx.institution_name}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="p-2 text-sm">
                         <div className="flex items-center gap-2">

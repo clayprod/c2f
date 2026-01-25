@@ -149,6 +149,10 @@ type ExportParams = {
   endDate: string;
   accountIds?: string[];
   categoryIds?: string[];
+  search?: string;
+  type?: 'income' | 'expense';
+  isInstallment?: boolean;
+  assignedTo?: string;
 };
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
@@ -270,6 +274,26 @@ async function exportTransactions(
   }
   if (params.categoryIds?.length) {
     query = query.in('category_id', params.categoryIds);
+  }
+  if (params.search) {
+    query = query.ilike('description', `%${params.search}%`);
+  }
+  if (params.type) {
+    if (params.type === 'income') {
+      query = query.gt('amount', 0);
+    } else if (params.type === 'expense') {
+      query = query.lt('amount', 0);
+    }
+  }
+  if (params.isInstallment !== undefined) {
+    if (params.isInstallment) {
+      query = query.or('installment_parent_id.not.is.null,installment_total.gt.1');
+    } else {
+      query = query.is('installment_parent_id', null).or('installment_total.is.null,installment_total.eq.1');
+    }
+  }
+  if (params.assignedTo) {
+    query = query.eq('assigned_to', params.assignedTo);
   }
 
   const { data, error } = await query;

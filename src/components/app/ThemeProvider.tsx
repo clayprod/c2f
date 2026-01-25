@@ -19,19 +19,21 @@ const applyThemeToDocument = (theme: AppTheme) => {
   document.documentElement.dataset.theme = theme;
 };
 
+// Lê o tema inicial do DOM (já aplicado pelo script inline no layout)
+const getInitialTheme = (): AppTheme => {
+  if (typeof document === 'undefined') return 'dark';
+  const current = document.documentElement.dataset.theme;
+  return current === 'light' ? 'light' : 'dark';
+};
+
 export function AppThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<AppTheme>('dark');
+  // Inicializa com o tema já aplicado pelo script inline (evita FOUC)
+  const [theme, setThemeState] = useState<AppTheme>(() => getInitialTheme());
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    const initialTheme: AppTheme = stored === 'light' ? 'light' : 'dark';
-    setThemeState(initialTheme);
-    applyThemeToDocument(initialTheme);
-
-    return () => {
-      applyThemeToDocument('dark');
-    };
+    // Sincroniza o estado React com o tema atual do DOM
+    const currentTheme = getInitialTheme();
+    setThemeState(currentTheme);
   }, []);
 
   const setTheme = useCallback((nextTheme: AppTheme) => {

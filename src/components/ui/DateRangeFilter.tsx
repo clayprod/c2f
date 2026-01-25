@@ -155,7 +155,9 @@ export default function DateRangeFilter({
         onClick={handleClearClick}
         className={cn(
           'text-xs h-8 px-3',
-          activePreset === 'all' && 'shadow-sm'
+          activePreset === 'all'
+            ? 'bg-muted text-foreground hover:bg-muted/80 hover:text-foreground'
+            : 'bg-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground border-border'
         )}
       >
         Sem filtro
@@ -168,7 +170,9 @@ export default function DateRangeFilter({
           onClick={() => handlePresetClick(months)}
           className={cn(
             'text-xs h-8 px-3',
-            activePreset === months && 'shadow-sm'
+            activePreset === months
+              ? 'bg-muted text-foreground hover:bg-muted/80 hover:text-foreground'
+              : 'bg-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground border-border'
           )}
         >
           {label}
@@ -182,7 +186,9 @@ export default function DateRangeFilter({
         onClick={handleCustomClick}
         className={cn(
           'text-xs h-8 px-3',
-          activePreset === 'custom' && 'shadow-sm'
+          activePreset === 'custom'
+            ? 'bg-muted text-foreground hover:bg-muted/80 hover:text-foreground'
+            : 'bg-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground border-border'
         )}
       >
         Personalizado

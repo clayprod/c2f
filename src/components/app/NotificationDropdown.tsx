@@ -36,8 +36,8 @@ export function NotificationDropdown() {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <button className="relative p-2 text-muted-foreground hover:text-foreground transition-colors focus:outline-none">
-                    <i className='bx bx-bell text-xl'></i>
+                <button className="flex items-center justify-center relative p-1.5 md:p-2 text-muted-foreground hover:text-foreground transition-colors focus:outline-none">
+                    <i className='bx bx-bell text-lg md:text-xl'></i>
                     {unreadCount > 0 && (
                         <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-black">
                             {unreadCount > 9 ? '9+' : unreadCount}

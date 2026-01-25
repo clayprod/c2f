@@ -30,6 +30,7 @@ export async function syncItem(
 ): Promise<SyncResult> {
   const supabase = options?.supabase ?? await createClient();
   const startedAt = new Date().toISOString();
+  let syncLogId: string | undefined;
 
   try {
     // Get item details from Pluggy API
@@ -56,7 +57,7 @@ export async function syncItem(
     console.log(`[Pluggy Sync] Item ${itemId}: connector_id=${connectorId}, logo_url=${institutionLogoUrl}`);
 
     // Create sync log
-    const { data: syncLog } = await supabase
+    const { data: syncLog, error: syncLogError } = await supabase
       .from('pluggy_sync_logs')
       .insert({
         user_id: userId,
@@ -66,6 +67,12 @@ export async function syncItem(
       })
       .select()
       .single();
+
+    if (syncLogError || !syncLog) {
+      console.warn('[Pluggy Sync] Failed to create sync log:', syncLogError);
+    }
+
+    syncLogId = syncLog?.id;
 
     // Sync accounts
     const pluggyAccounts = await getAccountsByItem(itemId);
@@ -164,15 +171,24 @@ export async function syncItem(
     }
 
     // Update sync log
+    if (syncLogId) {
+      await supabase
+        .from('pluggy_sync_logs')
+        .update({
+          finished_at: new Date().toISOString(),
+          status: 'success',
+          accounts_synced: accountsSynced,
+          transactions_synced: transactionsSynced,
+        })
+        .eq('id', syncLogId);
+    }
+
+    // Update item's updated_at to reflect last successful sync
     await supabase
-      .from('pluggy_sync_logs')
-      .update({
-        finished_at: new Date().toISOString(),
-        status: 'success',
-        accounts_synced: accountsSynced,
-        transactions_synced: transactionsSynced,
-      })
-      .eq('id', syncLog.id);
+      .from('pluggy_items')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .eq('item_id', itemId);
 
     return {
       success: true,
@@ -181,16 +197,28 @@ export async function syncItem(
     };
   } catch (error: any) {
     // Update sync log with error
-    await supabase
-      .from('pluggy_sync_logs')
-      .update({
-        finished_at: new Date().toISOString(),
-        status: 'error',
-        error_message: error.message,
-      })
-      .eq('user_id', userId)
-      .eq('item_id', itemId)
-      .eq('started_at', startedAt);
+    if (syncLogId) {
+      await supabase
+        .from('pluggy_sync_logs')
+        .update({
+          finished_at: new Date().toISOString(),
+          status: 'error',
+          error_message: error.message,
+        })
+        .eq('id', syncLogId);
+    } else {
+      // Fallback: try to match by started_at if we don't have the sync log id
+      await supabase
+        .from('pluggy_sync_logs')
+        .update({
+          finished_at: new Date().toISOString(),
+          status: 'error',
+          error_message: error.message,
+        })
+        .eq('user_id', userId)
+        .eq('item_id', itemId)
+        .eq('started_at', startedAt);
+    }
 
     return {
       success: false,

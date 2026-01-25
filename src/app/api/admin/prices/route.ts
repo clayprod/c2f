@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth';
 import { createErrorResponse } from '@/lib/errors';
+import { clearPricingCache } from '@/services/pricing/cache';
 import { getStripeClient } from '@/services/stripe/client';
 import { updateGlobalSettings } from '@/services/admin/globalSettings';
 
@@ -66,6 +67,8 @@ export async function POST(request: NextRequest) {
       currency: currency.toLowerCase(),
     });
 
+    clearPricingCache();
+
     return NextResponse.json({
       price: {
         id: newPrice.id,
@@ -103,6 +106,8 @@ export async function PATCH(request: NextRequest) {
     const updatedProduct = await stripe.products.update(product_id, {
       description: description || '',
     });
+
+    clearPricingCache();
 
     return NextResponse.json({
       product: {
@@ -150,6 +155,8 @@ export async function PUT(request: NextRequest) {
       await updateGlobalSettings({ stripe_price_id_business: newPrice.id });
     }
 
+    clearPricingCache();
+
     return NextResponse.json({
       new_price: {
         id: newPrice.id,
@@ -167,4 +174,3 @@ export async function PUT(request: NextRequest) {
     );
   }
 }
-

@@ -36,13 +36,30 @@ export const metadata: Metadata = {
   },
 };
 
+// Script inline para aplicar tema ANTES do render (evita FOUC)
+const themeInitScript = `
+(function() {
+  try {
+    var theme = localStorage.getItem('c2f-theme');
+    document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+  } catch (e) {
+    document.documentElement.dataset.theme = 'dark';
+  }
+})();
+`;
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR" className={`${inter.variable} ${sora.variable} overflow-x-hidden`}>
+    <html lang="pt-BR" className={`${inter.variable} ${sora.variable} overflow-x-hidden`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <link rel="stylesheet" href="/boxicons.min.css" />
+        <link rel="stylesheet" href="/boxicons-brands.min.css" />
+      </head>
       <body className="overflow-x-hidden">
         <Providers>
           {children}

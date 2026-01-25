@@ -60,13 +60,28 @@ const MODULE_LABELS = PLAN_MODULES.reduce<Record<string, string>>((acc, planModu
  * Currently always returns with asterisk since Open Finance is admin-only
  * When Open Finance is available for non-admin, this will need to be updated
  */
+// Descriptive labels for features in pricing display
+const DESCRIPTIVE_LABELS: Record<string, string> = {
+  dashboard: 'Visão geral das finanças',
+  accounts: 'Contas bancárias ilimitadas',
+  credit_cards: 'Controle de cartões de crédito',
+  categories: 'Categorização personalizada',
+  budgets: 'Orçamentos mensais por categoria',
+  debts: 'Controle e negociação de dívidas',
+  receivables: 'Gestão de recebíveis',
+  investments: 'Acompanhamento de investimentos',
+  assets: 'Gestão de patrimônio e bens',
+  goals: 'Metas financeiras com projeções',
+  reports: 'Relatórios detalhados e exportação',
+};
+
 export function formatFeatureTextSync(featureId: string, feature: PlanFeature | undefined): string {
   if (featureId === 'transactions') {
-    if (feature?.unlimited) return 'Transações ilimitadas';
+    if (feature?.unlimited) return 'Lançamentos ilimitados';
     if (typeof feature?.limit === 'number') {
-      return `Até ${feature.limit} transações/mês`;
+      return `Até ${feature.limit} lançamentos/mês`;
     }
-    return 'Transações';
+    return 'Lançamentos';
   }
 
   if (featureId === 'ai_advisor') {
@@ -80,10 +95,10 @@ export function formatFeatureTextSync(featureId: string, feature: PlanFeature | 
   if (featureId === 'integrations') {
     // For now, always return with asterisk since Open Finance is admin-only
     // When Open Finance is available for non-admin, update this logic
-    return 'Integrações (Whatsapp + OpenFinance*)';
+    return 'WhatsApp + Open Finance*';
   }
 
-  return MODULE_LABELS[featureId] || featureId;
+  return DESCRIPTIVE_LABELS[featureId] || MODULE_LABELS[featureId] || featureId;
 }
 
 /**
@@ -92,11 +107,11 @@ export function formatFeatureTextSync(featureId: string, feature: PlanFeature | 
  */
 export async function formatFeatureText(featureId: string, feature: PlanFeature | undefined): Promise<string> {
   if (featureId === 'transactions') {
-    if (feature?.unlimited) return 'Transações ilimitadas';
+    if (feature?.unlimited) return 'Lançamentos ilimitados';
     if (typeof feature?.limit === 'number') {
-      return `Até ${feature.limit} transações/mês`;
+      return `Até ${feature.limit} lançamentos/mês`;
     }
-    return 'Transações';
+    return 'Lançamentos';
   }
 
   if (featureId === 'ai_advisor') {
@@ -110,12 +125,12 @@ export async function formatFeatureText(featureId: string, feature: PlanFeature 
   if (featureId === 'integrations') {
     const openFinanceAvailable = await isOpenFinanceAvailableForNonAdmin();
     if (openFinanceAvailable) {
-      return 'Integrações (Whatsapp + OpenFinance)';
+      return 'WhatsApp + Open Finance';
     }
-    return 'Integrações (Whatsapp + OpenFinance*)';
+    return 'WhatsApp + Open Finance*';
   }
 
-  return MODULE_LABELS[featureId] || featureId;
+  return DESCRIPTIVE_LABELS[featureId] || MODULE_LABELS[featureId] || featureId;
 }
 
 function resolveFeatureLimit(feature: PlanFeature | undefined): { enabled: boolean; unlimited: boolean; limit: number } {
@@ -146,22 +161,34 @@ function isLimitUpgrade(current: PlanFeature | undefined, previous: PlanFeature 
 }
 
 export function planIncludesAllFeatures(current: PlanFeatures, previous: PlanFeatures): boolean {
+  // If previous plan is empty, current includes all by default
+  if (!previous || Object.keys(previous).length === 0) return true;
+  
   return PLAN_MODULES.every((planModule) => {
     const currentFeature = current?.[planModule.id];
     const previousFeature = previous?.[planModule.id];
 
+    // If previous plan doesn't have this feature enabled, no need to check
     if (!previousFeature?.enabled) return true;
+    
+    // For transactions and ai_advisor, check limits
     if (planModule.id === 'transactions' || planModule.id === 'ai_advisor') {
       const currentResolved = resolveFeatureLimit(currentFeature);
       const previousResolved = resolveFeatureLimit(previousFeature);
 
+      // If current doesn't have this feature defined, assume it's inherited (not less than previous)
+      if (currentFeature === undefined) return true;
+      
       if (!currentResolved.enabled) return false;
       if (previousResolved.unlimited) return currentResolved.unlimited;
       if (currentResolved.unlimited) return true;
       return currentResolved.limit >= previousResolved.limit;
     }
 
-    return currentFeature?.enabled === true;
+    // For other features: if not explicitly set in current, assume inherited
+    // Only return false if explicitly disabled (enabled === false)
+    if (currentFeature === undefined) return true;
+    return currentFeature?.enabled !== false;
   });
 }
 
@@ -252,7 +279,7 @@ export function buildPlanFeatureListWithInheritanceSync(
   return [
     {
       id: `all_${previousLabel.toLowerCase()}`,
-      text: `Tudo do ${previousLabel}`,
+      text: `Tudo do plano ${previousLabel}`,
       enabled: true,
     },
     ...additionalItems,
@@ -309,7 +336,7 @@ export async function buildPlanFeatureListWithInheritance(
   return [
     {
       id: `all_${previousLabel.toLowerCase()}`,
-      text: `Tudo do ${previousLabel}`,
+      text: `Tudo do plano ${previousLabel}`,
       enabled: true,
     },
     ...additionalItems,

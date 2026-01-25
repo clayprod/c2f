@@ -26,7 +26,8 @@ export async function GET(request: NextRequest) {
       .from('pluggy_items')
       .select('*, pluggy_sync_logs(status, finished_at, accounts_synced, transactions_synced)')
       .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .order('finished_at', { referencedTable: 'pluggy_sync_logs', ascending: false });
 
     if (error) throw error;
 
@@ -114,4 +115,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

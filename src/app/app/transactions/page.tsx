@@ -54,6 +54,7 @@ export default function TransactionsPage() {
   });
   const [formOpen, setFormOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<TransactionFormType | undefined>();
   const { toast } = useToast();
   const { confirm, ConfirmDialog } = useConfirmDialog();
@@ -281,6 +282,60 @@ export default function TransactionsPage() {
     setImportOpen(true);
   };
 
+  const handleExportCSV = async () => {
+    try {
+      setExporting(true);
+      const res = await fetch('/api/reports/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reportType: 'transactions',
+          startDate: filters.fromDate || undefined,
+          endDate: filters.toDate || undefined,
+          accountIds: filters.accountId ? [filters.accountId] : undefined,
+          categoryIds: filters.categoryId ? [filters.categoryId] : undefined,
+          search: filters.search || undefined,
+          type: filters.type || undefined,
+          isInstallment: filters.isInstallment === 'all'
+            ? undefined
+            : filters.isInstallment === 'installment',
+          assignedTo: filters.assignedTo || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Erro ao exportar');
+      }
+
+      const blob = await res.blob();
+      const contentDisposition = res.headers.get('Content-Disposition');
+      const filename = contentDisposition?.match(/filename="(.+)"/)?.[1] || 'transacoes.csv';
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+
+      toast({
+        title: 'Sucesso',
+        description: 'Transações exportadas com sucesso',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Falha ao exportar transações',
+        description: error.message || 'Não foi possível exportar as transações. Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const totalPages = Math.ceil(pagination.count / pagination.limit);
   const currentPage = Math.floor(pagination.offset / pagination.limit) + 1;
 
@@ -295,6 +350,10 @@ export default function TransactionsPage() {
           <Button onClick={handleImportCSV} variant="outline">
             <i className='bx bx-file-plus mr-2'></i>
             Importar
+          </Button>
+          <Button onClick={handleExportCSV} variant="outline" disabled={exporting}>
+            <i className='bx bx-save mr-2'></i>
+            Exportar CSV
           </Button>
           <Button onClick={handleNewTransaction} className="btn-primary">
             <i className='bx bx-plus'></i>

@@ -461,7 +461,7 @@ export default function IntegrationsPage() {
                           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2 mt-1">
                             {getStatusBadge(item.execution_status || item.status)}
                             <span className="text-xs text-muted-foreground">
-                              Última atualização: {formatDate(item.updated_at)}
+                              Última atualização: {formatDate(lastSync?.finished_at || item.updated_at)}
                             </span>
                           </div>
                         </div>
@@ -499,11 +499,7 @@ export default function IntegrationsPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <i className='bx bx-arrow-right-left'></i>
-                          <span>{lastSync.transactions_synced || 0} transações</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <i className='bx bx-time'></i>
-                          <span>{formatDate(lastSync.finished_at)}</span>
+                          <span>{lastSync.transactions_synced || 0} novas transações</span>
                         </div>
                       </div>
                     )}

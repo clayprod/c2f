@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -69,7 +69,7 @@ export function useConfirmDialog() {
     }
   }, [resolvePromise]);
 
-  const ConfirmDialog = (
+  const ConfirmDialog = useMemo(() => (
     <AlertDialog open={open} onOpenChange={(isOpen) => {
       if (!isOpen) {
         handleCancel();
@@ -99,7 +99,7 @@ export function useConfirmDialog() {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  );
+  ), [open, options, handleCancel, handleConfirm]);
 
   return {
     confirm,

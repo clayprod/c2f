@@ -11,6 +11,8 @@ interface Plan {
   name: string;
   price: number | null;
   priceFormatted: string;
+  originalPrice?: number | null;
+  originalPriceFormatted?: string | null;
   period: string;
   description: string;
   cta: string;
@@ -50,11 +52,11 @@ async function getPricingData(): Promise<Plan[]> {
         cta: 'Começar agora',
         popular: false,
         features: [
-          { id: 'dashboard', text: 'Dashboard', enabled: true },
-          { id: 'transactions', text: 'Até 100 transações/mês', enabled: true },
-          { id: 'accounts', text: 'Contas', enabled: true },
-          { id: 'credit_cards', text: 'Cartões', enabled: true },
-          { id: 'categories', text: 'Categorias', enabled: true },
+          { id: 'dashboard', text: 'Visão geral das finanças', enabled: true },
+          { id: 'transactions', text: 'Até 100 lançamentos/mês', enabled: true },
+          { id: 'accounts', text: 'Contas bancárias ilimitadas', enabled: true },
+          { id: 'credit_cards', text: 'Controle de cartões de crédito', enabled: true },
+          { id: 'categories', text: 'Categorização personalizada', enabled: true },
         ],
       },
       {
@@ -67,12 +69,12 @@ async function getPricingData(): Promise<Plan[]> {
         cta: 'Assinar Pro',
         popular: true,
         features: [
-          { id: 'all_free', text: 'Tudo do Free', enabled: true },
-          { id: 'transactions', text: 'Transações ilimitadas', enabled: true },
-          { id: 'budgets', text: 'Orçamentos', enabled: true },
-          { id: 'debts', text: 'Dívidas', enabled: true },
-          { id: 'investments', text: 'Investimentos', enabled: true },
-          { id: 'goals', text: 'Objetivos', enabled: true },
+          { id: 'all_free', text: 'Tudo do plano Free', enabled: true },
+          { id: 'transactions', text: 'Lançamentos ilimitados', enabled: true },
+          { id: 'budgets', text: 'Orçamentos mensais por categoria', enabled: true },
+          { id: 'debts', text: 'Controle e negociação de dívidas', enabled: true },
+          { id: 'investments', text: 'Acompanhamento de investimentos', enabled: true },
+          { id: 'goals', text: 'Metas financeiras com projeções', enabled: true },
           { id: 'ai_advisor', text: 'AI Advisor (10 consultas/mês)', enabled: true },
         ],
       },
@@ -86,11 +88,11 @@ async function getPricingData(): Promise<Plan[]> {
         cta: 'Assinar Premium',
         popular: false,
         features: [
-          { id: 'all_pro', text: 'Tudo do Pro', enabled: true },
-          { id: 'reports', text: 'Relatórios', enabled: true },
-          { id: 'integrations', text: 'Integrações (Whatsapp + OpenFinance*)', enabled: true },
-          { id: 'assets', text: 'Patrimônio', enabled: true },
-          { id: 'ai_advisor', text: 'AI Advisor (100 consultas/mês)', enabled: true },
+          { id: 'all_pro', text: 'Tudo do plano Pro', enabled: true },
+          { id: 'reports', text: 'Relatórios detalhados e exportação', enabled: true },
+          { id: 'integrations', text: 'WhatsApp + Open Finance*', enabled: true },
+          { id: 'assets', text: 'Gestão de patrimônio e bens', enabled: true },
+          { id: 'ai_advisor', text: 'AI Advisor ilimitado', enabled: true },
         ],
       },
     ];
@@ -132,7 +134,15 @@ const Pricing = async () => {
 
               <div className="mb-6">
                 <h3 className="font-display font-semibold text-xl mb-2">{plan.name}</h3>
+                {plan.originalPriceFormatted && (
+                  <div className="text-muted-foreground text-sm mb-1">
+                    <span className="line-through">de {plan.originalPriceFormatted}</span>
+                  </div>
+                )}
                 <div className="flex items-baseline gap-1 mb-2">
+                  {plan.originalPriceFormatted && (
+                    <span className="text-muted-foreground text-sm mr-1">por</span>
+                  )}
                   <span className="font-display text-4xl font-bold">{plan.priceFormatted}</span>
                   <span className="text-muted-foreground text-sm">{plan.period}</span>
                 </div>

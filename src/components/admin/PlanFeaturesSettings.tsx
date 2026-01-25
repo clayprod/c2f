@@ -87,6 +87,13 @@ export default function PlanFeaturesSettings() {
   const [activeTab, setActiveTab] = useState<'free' | 'pro' | 'premium' | 'display'>('free');
   const [features, setFeatures] = useState<PlanFeaturesData>({});
   const [displayConfig, setDisplayConfig] = useState<PlanDisplayConfig>({});
+  const [originalPriceInputs, setOriginalPriceInputs] = useState<
+    Record<'free' | 'pro' | 'premium', string>
+  >({
+    free: '',
+    pro: '',
+    premium: '',
+  });
 
   const parseLegacyLimit = (text?: string): number | undefined => {
     if (!text) return undefined;
@@ -171,7 +178,18 @@ export default function PlanFeaturesSettings() {
         plan_features_pro: normalizedPro,
         plan_features_premium: normalizedPremium,
       });
-      setDisplayConfig(data.plan_display_config || {});
+    setDisplayConfig(data.plan_display_config || {});
+    setOriginalPriceInputs({
+      free: data.plan_display_config?.free?.originalPrice
+        ? (data.plan_display_config.free.originalPrice / 100).toFixed(2)
+        : '',
+      pro: data.plan_display_config?.pro?.originalPrice
+        ? (data.plan_display_config.pro.originalPrice / 100).toFixed(2)
+        : '',
+      premium: data.plan_display_config?.premium?.originalPrice
+        ? (data.plan_display_config.premium.originalPrice / 100).toFixed(2)
+        : '',
+    });
     } catch (error) {
       console.error('Error fetching plan features:', error);
       toast({
@@ -187,9 +205,22 @@ export default function PlanFeaturesSettings() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      const parsedDisplayConfig = { ...displayConfig };
+      (['free', 'pro', 'premium'] as const).forEach((plan) => {
+        const value = originalPriceInputs[plan] ?? '';
+        const normalized = value.replace(',', '.').trim();
+        const parsed = parseFloat(normalized);
+        const cents = !Number.isNaN(parsed) && parsed > 0 ? Math.round(parsed * 100) : null;
+        parsedDisplayConfig[plan] = {
+          ...parsedDisplayConfig[plan],
+          originalPrice: cents,
+        };
+      });
+
+      setDisplayConfig(parsedDisplayConfig);
       const payload = {
         ...features,
-        plan_display_config: displayConfig,
+        plan_display_config: parsedDisplayConfig,
       };
       
       console.log('[PlanFeaturesSettings] Saving payload:', JSON.stringify(payload, null, 2));
@@ -448,7 +479,13 @@ export default function PlanFeaturesSettings() {
                       <div className="text-lg font-bold mb-2">
                         {displayConfig.free?.name || 'Free'}
                       </div>
+                      {displayConfig.free?.originalPrice && (
+                        <div className="text-sm text-muted-foreground">
+                          <span className="line-through">de R$ {(displayConfig.free.originalPrice / 100).toFixed(2).replace('.', ',')}</span>
+                        </div>
+                      )}
                       <div className="text-2xl font-bold mb-1">
+                        {displayConfig.free?.originalPrice && <span className="text-sm font-normal text-muted-foreground mr-1">por</span>}
                         {displayConfig.free?.priceFormatted || 'Grátis'}
                       </div>
                       <div className="text-sm text-muted-foreground mb-4">
@@ -509,7 +546,13 @@ export default function PlanFeaturesSettings() {
                       <div className="text-lg font-bold mb-2">
                         {displayConfig.pro?.name || 'Pro'}
                       </div>
+                      {displayConfig.pro?.originalPrice && (
+                        <div className="text-sm text-muted-foreground">
+                          <span className="line-through">de R$ {(displayConfig.pro.originalPrice / 100).toFixed(2).replace('.', ',')}</span>
+                        </div>
+                      )}
                       <div className="text-2xl font-bold mb-1">
+                        {displayConfig.pro?.originalPrice && <span className="text-sm font-normal text-muted-foreground mr-1">por</span>}
                         R$ <span className="text-muted-foreground text-sm">(do Stripe)</span>
                       </div>
                       <div className="text-sm text-muted-foreground mb-4">
@@ -570,7 +613,13 @@ export default function PlanFeaturesSettings() {
                       <div className="text-lg font-bold mb-2">
                         {displayConfig.premium?.name || 'Premium'}
                       </div>
+                      {displayConfig.premium?.originalPrice && (
+                        <div className="text-sm text-muted-foreground">
+                          <span className="line-through">de R$ {(displayConfig.premium.originalPrice / 100).toFixed(2).replace('.', ',')}</span>
+                        </div>
+                      )}
                       <div className="text-2xl font-bold mb-1">
+                        {displayConfig.premium?.originalPrice && <span className="text-sm font-normal text-muted-foreground mr-1">por</span>}
                         R$ <span className="text-muted-foreground text-sm">(do Stripe)</span>
                       </div>
                       <div className="text-sm text-muted-foreground mb-4">
@@ -680,6 +729,41 @@ export default function PlanFeaturesSettings() {
                             <p className="text-sm">Obtido automaticamente do Stripe</p>
                           </div>
                         )}
+                        <div>
+                          <Label htmlFor={`${plan}-originalPrice`}>
+                            Preço Original (riscado)
+                            <span className="text-xs text-muted-foreground ml-2">opcional</span>
+                          </Label>
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">R$</span>
+                            <Input
+                              id={`${plan}-originalPrice`}
+                              type="text"
+                              inputMode="decimal"
+                              value={originalPriceInputs[plan]}
+                              onChange={(e) =>
+                                setOriginalPriceInputs({
+                                  ...originalPriceInputs,
+                                  [plan]: e.target.value,
+                                })
+                              }
+                              onBlur={() => {
+                                const value = (originalPriceInputs[plan] || '').replace(',', '.').trim();
+                                const parsed = parseFloat(value);
+                                const cents = !Number.isNaN(parsed) && parsed > 0 ? Math.round(parsed * 100) : null;
+                                setDisplayConfig({
+                                  ...displayConfig,
+                                  [plan]: { ...displayConfig[plan], originalPrice: cents },
+                                });
+                              }}
+                              placeholder="Ex: 89.90"
+                              className="flex-1"
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Se preenchido, exibe &quot;de R$XX&quot; riscado acima do preço real
+                          </p>
+                        </div>
                         <div>
                           <Label htmlFor={`${plan}-period`}>Período</Label>
                           <Input

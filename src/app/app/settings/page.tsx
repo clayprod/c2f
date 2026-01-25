@@ -982,19 +982,6 @@ function SettingsPageContent() {
                   <Button
                     variant="outline"
                     className="border-red-500/50 text-red-500 hover:bg-red-500/10 w-full text-xs md:text-sm"
-                    onClick={() => {
-                      toast({
-                        title: 'Funcionalidade em desenvolvimento',
-                        description: 'A exportação de dados estará disponível em breve',
-                      });
-                    }}
-                  >
-                    <i className='bx bx-download'></i>
-                    Exportar Dados
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="border-red-500/50 text-red-500 hover:bg-red-500/10 w-full text-xs md:text-sm"
                     onClick={() => setShowDeleteDialog(true)}
                   >
                     <i className='bx bx-trash'></i>

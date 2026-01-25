@@ -231,9 +231,9 @@ function LoginForm() {
             <Checkbox id="remember" />
             <span className="text-muted-foreground">Lembrar de mim</span>
           </label>
-          <a href="#" className="text-primary hover:underline">
+          <Link href="/forgot-password" className="text-primary hover:underline">
             Esqueceu a senha?
-          </a>
+          </Link>
         </div>
 
         {lockoutStatus && lockoutStatus.attemptsRemaining < 3 && (

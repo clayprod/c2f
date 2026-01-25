@@ -7,6 +7,23 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { decrypt } from '@/lib/encryption';
 
+/**
+ * Safe decrypt that returns fallback on error
+ * This handles cases where encryption algorithm mismatch or key mismatch occurs
+ */
+function safeDecrypt(encryptedValue: string | null | undefined, fallbackValue: string | null | undefined): string | null {
+  if (!encryptedValue) {
+    return fallbackValue ?? null;
+  }
+  try {
+    const decrypted = decrypt(encryptedValue);
+    return decrypted ?? fallbackValue ?? null;
+  } catch (error) {
+    console.warn('[GlobalSettings] Decryption failed, using fallback value:', error);
+    return fallbackValue ?? null;
+  }
+}
+
 export interface PlanFeature {
   enabled: boolean;
   text?: string;
@@ -24,6 +41,7 @@ export interface PlanDisplayConfig {
     period?: string;
     cta?: string;
     popular?: boolean;
+    originalPrice?: number | null; // Preço "de" em centavos (ex: 8990 = R$89,90)
   };
   pro?: {
     name?: string;
@@ -31,6 +49,7 @@ export interface PlanDisplayConfig {
     period?: string;
     cta?: string;
     popular?: boolean;
+    originalPrice?: number | null; // Preço "de" em centavos (ex: 8990 = R$89,90)
   };
   premium?: {
     name?: string;
@@ -38,6 +57,7 @@ export interface PlanDisplayConfig {
     period?: string;
     cta?: string;
     popular?: boolean;
+    originalPrice?: number | null; // Preço "de" em centavos (ex: 8990 = R$89,90)
   };
 }
 
@@ -108,22 +128,26 @@ export async function getGlobalSettings(forceRefresh = false): Promise<GlobalSet
     // Use admin client to bypass RLS (this is a server-side service)
     const supabase = createAdminClient();
 
-    // Define columns - some may not exist in older databases
-    // Note: smtp_secure is removed from allColumns because it doesn't exist in the database
-    const allColumns = 'support_email, support_whatsapp, smtp_host, smtp_port, smtp_user, smtp_password, smtp_password_encrypted, smtp_from_email, groq_api_key, groq_api_key_encrypted, openai_api_key, openai_api_key_encrypted, ai_model, ai_model_name, advisor_prompt, tips_prompt, categorization_prompt, tips_enabled, chat_max_tokens, session_ttl_minutes, stripe_price_id_pro, stripe_price_id_business, advisor_limit_pro, advisor_limit_premium, evolution_api_url, evolution_api_key, evolution_api_key_encrypted, evolution_instance_name, evolution_webhook_secret, evolution_webhook_secret_encrypted, n8n_api_key, n8n_api_key_encrypted, whatsapp_enabled, pluggy_client_id, pluggy_client_secret, pluggy_client_secret_encrypted, pluggy_enabled, plan_features_free, plan_features_pro, plan_features_premium, plan_display_config';
-    // Columns that exist in current database (including Pluggy settings and Plan Features)
-    const minimalColumns = 'support_email, support_whatsapp, smtp_host, smtp_port, smtp_user, smtp_password, smtp_password_encrypted, smtp_from_email, groq_api_key, groq_api_key_encrypted, openai_api_key, openai_api_key_encrypted, ai_model, ai_model_name, advisor_prompt, tips_prompt, categorization_prompt, tips_enabled, chat_max_tokens, session_ttl_minutes, stripe_price_id_pro, stripe_price_id_business, evolution_api_url, evolution_api_key, evolution_api_key_encrypted, evolution_instance_name, evolution_webhook_secret, evolution_webhook_secret_encrypted, n8n_api_key, n8n_api_key_encrypted, whatsapp_enabled, pluggy_client_id, pluggy_client_secret, pluggy_client_secret_encrypted, pluggy_enabled, plan_features_free, plan_features_pro, plan_features_premium, plan_display_config';
+    // Define columns - all columns that exist in the current database schema
+    const allColumns = 'support_email, support_whatsapp, smtp_host, smtp_port, smtp_user, smtp_password, smtp_password_encrypted, smtp_from_email, smtp_secure, groq_api_key, groq_api_key_encrypted, openai_api_key, openai_api_key_encrypted, ai_model, ai_model_name, advisor_prompt, tips_prompt, categorization_prompt, tips_enabled, chat_max_tokens, session_ttl_minutes, stripe_price_id_pro, stripe_price_id_business, advisor_limit_pro, advisor_limit_premium, evolution_api_url, evolution_api_key, evolution_api_key_encrypted, evolution_instance_name, evolution_webhook_secret, evolution_webhook_secret_encrypted, n8n_api_key, n8n_api_key_encrypted, whatsapp_enabled, pluggy_client_id, pluggy_client_secret, pluggy_client_secret_encrypted, pluggy_enabled, plan_features_free, plan_features_pro, plan_features_premium, plan_display_config';
+    // Minimal columns for fallback (in case some columns don't exist)
+    const minimalColumns = 'support_email, support_whatsapp, smtp_host, smtp_port, smtp_user, smtp_password, smtp_password_encrypted, smtp_from_email, groq_api_key, groq_api_key_encrypted, openai_api_key, openai_api_key_encrypted, ai_model, ai_model_name, advisor_prompt, tips_prompt, tips_enabled, chat_max_tokens, session_ttl_minutes, stripe_price_id_pro, stripe_price_id_business';
 
     let { data, error } = await supabase
       .from('global_settings')
       .select(allColumns)
-      .limit(1)
-      .single();
+      .order('updated_at', { ascending: false })
+      .limit(1);
 
     console.log('[GlobalSettings] Query result - error:', error);
-    console.log('[GlobalSettings] Query result - data exists:', !!data);
-    console.log('[GlobalSettings] Query result - plan_features_free:', data?.plan_features_free);
-    console.log('[GlobalSettings] Query result - plan_features_free type:', typeof data?.plan_features_free);
+    const logRow = Array.isArray(data) ? data[0] : data;
+    console.log('[GlobalSettings] Query result - data exists:', !!logRow);
+    if (logRow) {
+      console.log('[GlobalSettings] Query result - support_email:', logRow.support_email);
+      console.log('[GlobalSettings] Query result - smtp_host:', logRow.smtp_host);
+      console.log('[GlobalSettings] Query result - ai_model:', logRow.ai_model);
+      console.log('[GlobalSettings] Query result - advisor_limit_pro:', logRow.advisor_limit_pro);
+    }
 
     // If column doesn't exist (42703), retry with minimal columns
     if (error && error.code === '42703') {
@@ -131,8 +155,8 @@ export async function getGlobalSettings(forceRefresh = false): Promise<GlobalSet
       const retryResult = await supabase
         .from('global_settings')
         .select(minimalColumns)
-        .limit(1)
-        .single();
+        .order('updated_at', { ascending: false })
+        .limit(1);
       data = retryResult.data as typeof data;
       error = retryResult.error;
     }
@@ -143,75 +167,63 @@ export async function getGlobalSettings(forceRefresh = false): Promise<GlobalSet
 
     const settings: GlobalSettings = {};
 
-    if (data) {
+    const row = Array.isArray(data) ? data[0] : data;
+
+    if (row) {
       // Use database values if available
-      settings.smtp_host = data.smtp_host;
-      settings.smtp_port = data.smtp_port;
-      settings.smtp_user = data.smtp_user;
+      settings.smtp_host = row.smtp_host;
+      settings.smtp_port = row.smtp_port;
+      settings.smtp_user = row.smtp_user;
       // Decrypt sensitive fields if encrypted columns exist, otherwise use plain columns
-      settings.smtp_password = data.smtp_password_encrypted 
-        ? decrypt(data.smtp_password_encrypted) 
-        : data.smtp_password;
-      settings.smtp_from_email = data.smtp_from_email;
-      settings.smtp_secure = (data as any)?.smtp_secure;
-      settings.groq_api_key = data.groq_api_key_encrypted 
-        ? decrypt(data.groq_api_key_encrypted) 
-        : data.groq_api_key;
-      settings.openai_api_key = data.openai_api_key_encrypted 
-        ? decrypt(data.openai_api_key_encrypted) 
-        : data.openai_api_key;
-      settings.ai_model = data.ai_model as 'groq' | 'openai' | null;
-      settings.ai_model_name = data.ai_model_name;
-      settings.advisor_prompt = data.advisor_prompt;
-      settings.tips_prompt = data.tips_prompt;
-      settings.tips_enabled = data.tips_enabled;
-      settings.chat_max_tokens = data.chat_max_tokens;
-      settings.session_ttl_minutes = data.session_ttl_minutes;
-      settings.stripe_price_id_pro = data.stripe_price_id_pro;
-      settings.stripe_price_id_business = data.stripe_price_id_business;
-      settings.advisor_limit_pro = data.advisor_limit_pro;
-      settings.advisor_limit_premium = data.advisor_limit_premium;
-      settings.support_email = data.support_email;
-      settings.support_whatsapp = data.support_whatsapp;
+      settings.smtp_password = safeDecrypt(row.smtp_password_encrypted, row.smtp_password);
+      settings.smtp_from_email = row.smtp_from_email;
+      settings.smtp_secure = row.smtp_secure;
+      settings.groq_api_key = safeDecrypt(row.groq_api_key_encrypted, row.groq_api_key);
+      settings.openai_api_key = safeDecrypt(row.openai_api_key_encrypted, row.openai_api_key);
+      settings.ai_model = row.ai_model as 'groq' | 'openai' | null;
+      settings.ai_model_name = row.ai_model_name;
+      settings.advisor_prompt = row.advisor_prompt;
+      settings.tips_prompt = row.tips_prompt;
+      settings.tips_enabled = row.tips_enabled;
+      settings.chat_max_tokens = row.chat_max_tokens;
+      settings.session_ttl_minutes = row.session_ttl_minutes;
+      settings.stripe_price_id_pro = row.stripe_price_id_pro;
+      settings.stripe_price_id_business = row.stripe_price_id_business;
+      settings.advisor_limit_pro = row.advisor_limit_pro;
+      settings.advisor_limit_premium = row.advisor_limit_premium;
+      settings.support_email = row.support_email;
+      settings.support_whatsapp = row.support_whatsapp;
       // Evolution API / WhatsApp Integration
-      settings.evolution_api_url = data.evolution_api_url;
-      settings.evolution_api_key = data.evolution_api_key_encrypted 
-        ? decrypt(data.evolution_api_key_encrypted) 
-        : data.evolution_api_key;
-      settings.evolution_instance_name = data.evolution_instance_name;
-      settings.evolution_webhook_secret = data.evolution_webhook_secret_encrypted 
-        ? decrypt(data.evolution_webhook_secret_encrypted) 
-        : data.evolution_webhook_secret;
-      settings.n8n_api_key = data.n8n_api_key_encrypted 
-        ? decrypt(data.n8n_api_key_encrypted) 
-        : data.n8n_api_key;
-      settings.whatsapp_enabled = data.whatsapp_enabled;
+      settings.evolution_api_url = row.evolution_api_url;
+      settings.evolution_api_key = safeDecrypt(row.evolution_api_key_encrypted, row.evolution_api_key);
+      settings.evolution_instance_name = row.evolution_instance_name;
+      settings.evolution_webhook_secret = safeDecrypt(row.evolution_webhook_secret_encrypted, row.evolution_webhook_secret);
+      settings.n8n_api_key = safeDecrypt(row.n8n_api_key_encrypted, row.n8n_api_key);
+      settings.whatsapp_enabled = row.whatsapp_enabled;
       // Pluggy / Open Finance Integration
-      settings.pluggy_client_id = data.pluggy_client_id;
-      settings.pluggy_client_secret = data.pluggy_client_secret_encrypted 
-        ? decrypt(data.pluggy_client_secret_encrypted) 
-        : data.pluggy_client_secret;
-      settings.pluggy_enabled = data.pluggy_enabled;
-      settings.categorization_prompt = data.categorization_prompt;
+      settings.pluggy_client_id = row.pluggy_client_id;
+      settings.pluggy_client_secret = safeDecrypt(row.pluggy_client_secret_encrypted, row.pluggy_client_secret);
+      settings.pluggy_enabled = row.pluggy_enabled;
+      settings.categorization_prompt = row.categorization_prompt;
       // Plan Features
-      settings.plan_features_free = data.plan_features_free as PlanFeatures | null;
-      settings.plan_features_pro = data.plan_features_pro as PlanFeatures | null;
-      settings.plan_features_premium = data.plan_features_premium as PlanFeatures | null;
-      settings.plan_display_config = data.plan_display_config as PlanDisplayConfig | null;
+      settings.plan_features_free = row.plan_features_free as PlanFeatures | null;
+      settings.plan_features_pro = row.plan_features_pro as PlanFeatures | null;
+      settings.plan_features_premium = row.plan_features_premium as PlanFeatures | null;
+      settings.plan_display_config = row.plan_display_config as PlanDisplayConfig | null;
 
       console.log('[GlobalSettings] Fetched settings:', {
-        hasSupportEmail: !!data.support_email,
-        hasSupportWhatsapp: !!data.support_whatsapp,
-        supportEmail: data.support_email,
-        supportWhatsapp: data.support_whatsapp,
+        hasSupportEmail: !!row.support_email,
+        hasSupportWhatsapp: !!row.support_whatsapp,
+        supportEmail: row.support_email,
+        supportWhatsapp: row.support_whatsapp,
         // Pluggy debug
-        hasPluggyClientId: !!data.pluggy_client_id,
-        hasPluggyClientSecret: !!data.pluggy_client_secret,
-        pluggyEnabled: data.pluggy_enabled,
+        hasPluggyClientId: !!row.pluggy_client_id,
+        hasPluggyClientSecret: !!row.pluggy_client_secret,
+        pluggyEnabled: row.pluggy_enabled,
         // Plan Features debug
-        hasPlanFeaturesFree: !!data.plan_features_free,
-        planFeaturesFreeKeys: data.plan_features_free ? Object.keys(data.plan_features_free) : [],
-        planFeaturesFreeBudgets: data.plan_features_free?.budgets,
+        hasPlanFeaturesFree: !!row.plan_features_free,
+        planFeaturesFreeKeys: row.plan_features_free ? Object.keys(row.plan_features_free) : [],
+        planFeaturesFreeBudgets: row.plan_features_free?.budgets,
       });
     }
 
@@ -263,12 +275,21 @@ export async function updateGlobalSettings(updates: Partial<GlobalSettings>): Pr
   // Use admin client to bypass RLS (authorization is done at the API route level)
   const supabase = createAdminClient();
 
-  // Get existing settings or create new
-  const { data: existing } = await supabase
+  // Get existing settings rows (global_settings is a singleton table)
+  const { data: existingRows, error: existingError } = await supabase
     .from('global_settings')
-    .select('id')
-    .limit(1)
-    .single();
+    .select('id');
+
+  if (existingError) {
+    console.error('[GlobalSettings] Error loading existing rows:', existingError);
+    console.error('[GlobalSettings] Error code:', existingError.code);
+    console.error('[GlobalSettings] Error details:', existingError.details);
+    console.error('[GlobalSettings] Error hint:', existingError.hint);
+    // If we can't read existing rows, we can't proceed
+    throw new Error(`Erro ao acessar configurações globais: ${existingError.message}`);
+  }
+
+  const existingIds = (existingRows || []).map((row) => row.id);
 
   const updateData: any = {};
 
@@ -337,20 +358,34 @@ export async function updateGlobalSettings(updates: Partial<GlobalSettings>): Pr
     updateData.plan_display_config = cleanedDisplay;
   }
 
+  updateData.updated_at = new Date().toISOString();
+
   try {
     console.log('updateGlobalSettings - updateData keys:', Object.keys(updateData));
     console.log('updateGlobalSettings - smtp_secure value:', updateData.smtp_secure);
     
-    if (existing) {
+    if (existingIds.length > 0) {
       const { error } = await supabase
         .from('global_settings')
         .update(updateData)
-        .eq('id', existing.id);
+        .in('id', existingIds);
 
       if (error) {
         console.error('Error updating global_settings:', error);
         console.error('Error code:', error.code);
         console.error('Error message:', error.message);
+        console.error('Error details:', error.details);
+        console.error('Error hint:', error.hint);
+        
+        // Check for trigger-related errors (often caused by audit trigger trying to access user_id)
+        if (error.message?.includes('user_id') && error.message?.includes('does not exist')) {
+          const triggerError = new Error(
+            'Erro no trigger de auditoria. A tabela global_settings não possui coluna user_id. ' +
+            'Execute a migration 068_fix_global_settings_audit_trigger.sql no Supabase para corrigir.'
+          );
+          (triggerError as any).code = 'AUDIT_TRIGGER_ERROR';
+          throw triggerError;
+        }
         
         // If columns don't exist, try without the new fields
         if (error.code === '42703' || error.message?.includes('column')) {
@@ -374,6 +409,7 @@ export async function updateGlobalSettings(updates: Partial<GlobalSettings>): Pr
           delete basicData.session_ttl_minutes;
           delete basicData.smtp_secure;
           delete basicData.categorization_prompt;
+          delete basicData.updated_at;
           // Pluggy fields (added in migration 050)
           delete basicData.pluggy_client_id;
           delete basicData.pluggy_client_secret;
@@ -382,7 +418,7 @@ export async function updateGlobalSettings(updates: Partial<GlobalSettings>): Pr
           const { error: retryError } = await supabase
             .from('global_settings')
             .update(basicData)
-            .eq('id', existing.id);
+            .in('id', existingIds);
 
           if (retryError) {
             console.error('Retry error:', retryError);
@@ -402,6 +438,20 @@ export async function updateGlobalSettings(updates: Partial<GlobalSettings>): Pr
         .insert(updateData);
 
       if (error) {
+        console.error('Error inserting global_settings:', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        
+        // Check for trigger-related errors (often caused by audit trigger trying to access user_id)
+        if (error.message?.includes('user_id') && error.message?.includes('does not exist')) {
+          const triggerError = new Error(
+            'Erro no trigger de auditoria. A tabela global_settings não possui coluna user_id. ' +
+            'Execute a migration 068_fix_global_settings_audit_trigger.sql no Supabase para corrigir.'
+          );
+          (triggerError as any).code = 'AUDIT_TRIGGER_ERROR';
+          throw triggerError;
+        }
+        
         // If columns don't exist, try without the new fields
         if (error.code === '42703' || error.message?.includes('column')) {
           // Check if Pluggy fields are being inserted - if so, throw a specific error
@@ -423,6 +473,7 @@ export async function updateGlobalSettings(updates: Partial<GlobalSettings>): Pr
           delete basicData.session_ttl_minutes;
           delete basicData.smtp_secure;
           delete basicData.categorization_prompt;
+          delete basicData.updated_at;
           // Pluggy fields (added in migration 050)
           delete basicData.pluggy_client_id;
           delete basicData.pluggy_client_secret;
@@ -525,5 +576,3 @@ export async function updatePlanFeatures(
 export async function updatePlanDisplayConfig(config: PlanDisplayConfig): Promise<void> {
   await updateGlobalSettings({ plan_display_config: config });
 }
-
-

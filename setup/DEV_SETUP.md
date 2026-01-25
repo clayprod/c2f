@@ -115,6 +115,64 @@ PORT=3000
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
+## 🔐 Configuração do Google OAuth (Supabase)
+
+Para o login com Google funcionar corretamente, você precisa configurar as URLs de redirect no Supabase Dashboard.
+
+### 1. Configurar URLs de Redirect no Supabase
+
+1. Acesse o [Supabase Dashboard](https://app.supabase.com)
+2. Vá para **Authentication** > **URL Configuration**
+3. Em **Redirect URLs**, adicione as seguintes URLs:
+
+**Para Desenvolvimento:**
+```
+http://localhost:3000/auth/callback
+http://127.0.0.1:3000/auth/callback
+```
+
+**Para Produção:**
+```
+https://seu-dominio.com/auth/callback
+```
+
+> ⚠️ **Importante**: Se você estiver rodando o servidor com `0.0.0.0`, a URL `http://0.0.0.0:3000/auth/callback` também deve ser adicionada. Porém, é recomendado usar `localhost` para desenvolvimento.
+
+### 2. Configurar Provider Google no Supabase
+
+1. No Supabase Dashboard, vá para **Authentication** > **Providers**
+2. Habilite **Google**
+3. Configure o **Client ID** e **Client Secret** do Google OAuth
+   - Obtenha essas credenciais no [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+   - Ao criar credenciais OAuth no Google, adicione como URIs de redirecionamento autorizados:
+     - `https://[SEU-PROJETO].supabase.co/auth/v1/callback`
+
+### 3. Testar Login com Google
+
+```bash
+# Acesse a aplicação
+http://localhost:3000/login
+
+# Clique em "Continuar com Google"
+# Você deve ser redirecionado para o Google e depois de volta para a aplicação
+```
+
+### Erro Comum: "Database error saving new user"
+
+Se você receber este erro ao tentar fazer login pela primeira vez com Google:
+
+1. **Execute a migration de correção**:
+   ```sql
+   -- Execute no Supabase SQL Editor:
+   -- Conteúdo de supabase/migrations/070_fix_audit_trigger_profiles.sql
+   ```
+
+2. **Verifique se a chave de encriptação está configurada** (opcional):
+   ```sql
+   -- No Supabase SQL Editor:
+   ALTER DATABASE postgres SET app.encryption_key = 'sua-chave-hex-64-chars';
+   ```
+
 ## 🔧 Troubleshooting
 
 ### Problema: Porta 3000 já em uso

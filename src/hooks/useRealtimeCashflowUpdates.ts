@@ -8,6 +8,10 @@ type UseRealtimeCashflowUpdatesOptions = {
   debounceMs?: number;
   minIntervalMs?: number;
   pollingIntervalMs?: number;
+  tables?: string[];
+  events?: Array<'INSERT' | 'UPDATE' | 'DELETE' | '*'>;
+  refreshOnFocus?: boolean;
+  refreshOnVisibility?: boolean;
 };
 
 const CASHFLOW_TABLES = [
@@ -27,6 +31,10 @@ export function useRealtimeCashflowUpdates({
   debounceMs = 400,
   minIntervalMs = 1000,
   pollingIntervalMs = 60000,
+  tables = CASHFLOW_TABLES,
+  events = ['*'],
+  refreshOnFocus = true,
+  refreshOnVisibility = true,
 }: UseRealtimeCashflowUpdatesOptions) {
   const [supabase] = useState(() => createClient());
   const refreshRef = useRef(onRefresh);
@@ -58,19 +66,21 @@ export function useRealtimeCashflowUpdates({
 
     const channel = supabase.channel(`cashflow-updates:${ownerId}`);
 
-    CASHFLOW_TABLES.forEach((table) => {
-      channel.on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table,
-          filter: `user_id=eq.${ownerId}`,
-        },
-        () => {
-          scheduleRefresh();
-        }
-      );
+    tables.forEach((table) => {
+      events.forEach((event) => {
+        (channel as any).on(
+          'postgres_changes',
+          {
+            event,
+            schema: 'public',
+            table,
+            filter: `user_id=eq.${ownerId}`,
+          },
+          () => {
+            scheduleRefresh();
+          }
+        );
+      });
     });
 
     channel.subscribe();
@@ -81,25 +91,33 @@ export function useRealtimeCashflowUpdates({
       }
       supabase.removeChannel(channel);
     };
-  }, [enabled, ownerId, scheduleRefresh, supabase]);
+  }, [enabled, events, ownerId, scheduleRefresh, supabase, tables]);
 
   useEffect(() => {
-    if (!enabled || !ownerId) return;
+    if (!enabled || !ownerId || (!refreshOnFocus && !refreshOnVisibility)) return;
 
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
+      if (refreshOnVisibility && document.visibilityState === 'visible') {
         scheduleRefresh();
       }
     };
 
-    window.addEventListener('focus', scheduleRefresh);
-    document.addEventListener('visibilitychange', handleVisibility);
+    if (refreshOnFocus) {
+      window.addEventListener('focus', scheduleRefresh);
+    }
+    if (refreshOnVisibility) {
+      document.addEventListener('visibilitychange', handleVisibility);
+    }
 
     return () => {
-      window.removeEventListener('focus', scheduleRefresh);
-      document.removeEventListener('visibilitychange', handleVisibility);
+      if (refreshOnFocus) {
+        window.removeEventListener('focus', scheduleRefresh);
+      }
+      if (refreshOnVisibility) {
+        document.removeEventListener('visibilitychange', handleVisibility);
+      }
     };
-  }, [enabled, ownerId, scheduleRefresh]);
+  }, [enabled, ownerId, refreshOnFocus, refreshOnVisibility, scheduleRefresh]);
 
   useEffect(() => {
     if (!enabled || !ownerId || !pollingIntervalMs) return;

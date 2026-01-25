@@ -4,15 +4,15 @@ import { getLogo } from '@/lib/logo';
 
 const footerLinks = {
   produto: [
-    { label: 'Recursos', href: '#features' },
+    { label: 'Recursos', href: '/#features' },
     { label: 'Preços', href: '/pricing' },
-    { label: 'Demo', href: '#demo' },
-    { label: 'Integrações', href: '#integrations' },
+    { label: 'Demo', href: '/#demo' },
+    { label: 'Integrações', href: '/#integrations' },
   ],
   empresa: [
-    { label: 'Sobre', href: '#' },
-    { label: 'Blog', href: '#' },
-    { label: 'Carreiras', href: '#' },
+    { label: 'Sobre', href: '/#' },
+    { label: 'Blog', href: '/blog' },
+    { label: 'Carreiras', href: '/#' },
     { label: 'Contato', href: 'mailto:contato@c2finance.com' },
   ],
   legal: [

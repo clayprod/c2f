@@ -2,14 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getGlobalSettings, getAllPlanFeatures, getPlanDisplayConfig } from '@/services/admin/globalSettings';
 import { buildPlanFeatureList, buildPlanFeatureListWithInheritance } from '@/lib/planFeatures';
 import { getStripeClient } from '@/services/stripe/client';
+import { clearPricingCache, getPricingCache, setPricingCache } from '@/services/pricing/cache';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 300; // Revalidate every 5 minutes
-
-// Cache in-memory (will be cleared on server restart or manual invalidation)
-let cachedPricing: any = null;
-let cacheTimestamp: number = 0;
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 interface PlanFeature {
   id: string;
@@ -22,6 +18,8 @@ interface PlanData {
   name: string;
   price: number | null;
   priceFormatted: string;
+  originalPrice?: number | null;
+  originalPriceFormatted?: string | null;
   period: string;
   description: string;
   cta: string;
@@ -53,27 +51,27 @@ async function fetchPricingData(): Promise<PlanData[]> {
   const plans: PlanData[] = [];
   const fallbackFeatureSets = {
     free: [
-      { id: 'dashboard', text: 'Dashboard', enabled: true },
-      { id: 'transactions', text: 'Até 100 transações/mês', enabled: true },
-      { id: 'accounts', text: 'Contas', enabled: true },
-      { id: 'credit_cards', text: 'Cartões', enabled: true },
-      { id: 'categories', text: 'Categorias', enabled: true },
+      { id: 'dashboard', text: 'Visão geral das finanças', enabled: true },
+      { id: 'transactions', text: 'Até 100 lançamentos/mês', enabled: true },
+      { id: 'accounts', text: 'Contas bancárias ilimitadas', enabled: true },
+      { id: 'credit_cards', text: 'Controle de cartões de crédito', enabled: true },
+      { id: 'categories', text: 'Categorização personalizada', enabled: true },
     ],
     pro: [
-      { id: 'all_free', text: 'Tudo do Free', enabled: true },
-      { id: 'transactions', text: 'Transações ilimitadas', enabled: true },
-      { id: 'budgets', text: 'Orçamentos', enabled: true },
-      { id: 'debts', text: 'Dívidas', enabled: true },
-      { id: 'investments', text: 'Investimentos', enabled: true },
-      { id: 'goals', text: 'Objetivos', enabled: true },
+      { id: 'all_free', text: 'Tudo do plano Free', enabled: true },
+      { id: 'transactions', text: 'Lançamentos ilimitados', enabled: true },
+      { id: 'budgets', text: 'Orçamentos mensais por categoria', enabled: true },
+      { id: 'debts', text: 'Controle e negociação de dívidas', enabled: true },
+      { id: 'investments', text: 'Acompanhamento de investimentos', enabled: true },
+      { id: 'goals', text: 'Metas financeiras com projeções', enabled: true },
       { id: 'ai_advisor', text: 'AI Advisor (10 consultas/mês)', enabled: true },
     ],
     premium: [
-      { id: 'all_pro', text: 'Tudo do Pro', enabled: true },
-            { id: 'reports', text: 'Relatórios', enabled: true },
-            { id: 'integrations', text: 'Integrações (Whatsapp + OpenFinance*)', enabled: true },
-            { id: 'assets', text: 'Patrimônio', enabled: true },
-      { id: 'ai_advisor', text: 'AI Advisor (100 consultas/mês)', enabled: true },
+      { id: 'all_pro', text: 'Tudo do plano Pro', enabled: true },
+      { id: 'reports', text: 'Relatórios detalhados e exportação', enabled: true },
+      { id: 'integrations', text: 'WhatsApp + Open Finance*', enabled: true },
+      { id: 'assets', text: 'Gestão de patrimônio e bens', enabled: true },
+      { id: 'ai_advisor', text: 'AI Advisor ilimitado', enabled: true },
     ],
   };
 
@@ -91,6 +89,8 @@ async function fetchPricingData(): Promise<PlanData[]> {
     name: freeConfig.name || 'Free',
     price: null,
     priceFormatted: freeConfig.priceFormatted || 'Grátis',
+    originalPrice: freeConfig.originalPrice || null,
+    originalPriceFormatted: freeConfig.originalPrice ? formatPrice(freeConfig.originalPrice) : null,
     period: freeConfig.period || 'para sempre',
     description: freeConfig.description || 'Comece a organizar suas finanças',
     cta: freeConfig.cta || 'Começar agora',
@@ -139,6 +139,8 @@ async function fetchPricingData(): Promise<PlanData[]> {
     name: proConfig.name || 'Pro',
     price: proPrice,
     priceFormatted: formatPrice(proPrice),
+    originalPrice: proConfig.originalPrice || null,
+    originalPriceFormatted: proConfig.originalPrice ? formatPrice(proConfig.originalPrice) : null,
     period: proConfig.period || '/mês',
     description: proConfig.description || 'O poder da IA para suas finanças',
     cta: proConfig.cta || 'Assinar Pro',
@@ -188,6 +190,8 @@ async function fetchPricingData(): Promise<PlanData[]> {
     name: premiumConfig.name || 'Premium',
     price: premiumPrice,
     priceFormatted: formatPrice(premiumPrice),
+    originalPrice: premiumConfig.originalPrice || null,
+    originalPriceFormatted: premiumConfig.originalPrice ? formatPrice(premiumConfig.originalPrice) : null,
     period: premiumConfig.period || '/mês',
     description: premiumConfig.description || 'Análise avançada e IA ilimitada',
     cta: premiumConfig.cta || 'Assinar Premium',
@@ -204,8 +208,9 @@ export async function GET(request: NextRequest) {
     // Check cache
     const now = Date.now();
     const forceRefresh = request.nextUrl.searchParams.get('refresh') === 'true';
-    
-    if (!forceRefresh && cachedPricing && (now - cacheTimestamp) < CACHE_TTL) {
+
+    const cachedPricing = getPricingCache(now);
+    if (!forceRefresh && cachedPricing) {
       return NextResponse.json({
         plans: cachedPricing,
         cached: true,
@@ -215,8 +220,7 @@ export async function GET(request: NextRequest) {
     const plans = await fetchPricingData();
 
     // Update cache
-    cachedPricing = plans;
-    cacheTimestamp = now;
+    setPricingCache(plans, now);
 
     return NextResponse.json({
       plans,
@@ -238,11 +242,11 @@ export async function GET(request: NextRequest) {
           cta: 'Começar agora',
           popular: false,
           features: [
-            { id: 'dashboard', text: 'Dashboard', enabled: true },
-            { id: 'transactions', text: 'Até 100 transações/mês', enabled: true },
-            { id: 'accounts', text: 'Contas', enabled: true },
-            { id: 'credit_cards', text: 'Cartões', enabled: true },
-            { id: 'categories', text: 'Categorias', enabled: true },
+            { id: 'dashboard', text: 'Visão geral das finanças', enabled: true },
+            { id: 'transactions', text: 'Até 100 lançamentos/mês', enabled: true },
+            { id: 'accounts', text: 'Contas bancárias ilimitadas', enabled: true },
+            { id: 'credit_cards', text: 'Controle de cartões de crédito', enabled: true },
+            { id: 'categories', text: 'Categorização personalizada', enabled: true },
           ],
         },
         {
@@ -255,12 +259,12 @@ export async function GET(request: NextRequest) {
           cta: 'Assinar Pro',
           popular: true,
           features: [
-            { id: 'all_free', text: 'Tudo do Free', enabled: true },
-            { id: 'transactions', text: 'Transações ilimitadas', enabled: true },
-            { id: 'budgets', text: 'Orçamentos', enabled: true },
-            { id: 'debts', text: 'Dívidas', enabled: true },
-            { id: 'investments', text: 'Investimentos', enabled: true },
-            { id: 'goals', text: 'Objetivos', enabled: true },
+            { id: 'all_free', text: 'Tudo do plano Free', enabled: true },
+            { id: 'transactions', text: 'Lançamentos ilimitados', enabled: true },
+            { id: 'budgets', text: 'Orçamentos mensais por categoria', enabled: true },
+            { id: 'debts', text: 'Controle e negociação de dívidas', enabled: true },
+            { id: 'investments', text: 'Acompanhamento de investimentos', enabled: true },
+            { id: 'goals', text: 'Metas financeiras com projeções', enabled: true },
             { id: 'ai_advisor', text: 'AI Advisor (10 consultas/mês)', enabled: true },
           ],
         },
@@ -274,11 +278,11 @@ export async function GET(request: NextRequest) {
           cta: 'Assinar Premium',
           popular: false,
           features: [
-            { id: 'all_pro', text: 'Tudo do Pro', enabled: true },
-            { id: 'reports', text: 'Relatórios', enabled: true },
-            { id: 'integrations', text: 'Integrações (Whatsapp + OpenFinance*)', enabled: true },
-            { id: 'assets', text: 'Patrimônio', enabled: true },
-            { id: 'ai_advisor', text: 'AI Advisor (100 consultas/mês)', enabled: true },
+            { id: 'all_pro', text: 'Tudo do plano Pro', enabled: true },
+            { id: 'reports', text: 'Relatórios detalhados e exportação', enabled: true },
+            { id: 'integrations', text: 'WhatsApp + Open Finance*', enabled: true },
+            { id: 'assets', text: 'Gestão de patrimônio e bens', enabled: true },
+            { id: 'ai_advisor', text: 'AI Advisor ilimitado', enabled: true },
           ],
         },
       ],
@@ -305,8 +309,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    cachedPricing = null;
-    cacheTimestamp = 0;
+    clearPricingCache();
 
     return NextResponse.json({ success: true, message: 'Cache cleared' });
   } catch (error: any) {
