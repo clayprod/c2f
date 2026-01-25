@@ -52,8 +52,10 @@ gemini.md
 # Windows reserved names
 nul
 
-# n8n workflows with API keys
-n8n/c2f-whatsapp-agent.json
+# n8n workflows with API keys (contain secrets)
+n8n/
+n8n-workflow-*.json
+scripts/deploy-n8n-workflow.js
 
 #desktop.ini
 desktop.ini

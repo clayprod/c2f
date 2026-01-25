@@ -107,6 +107,9 @@ async function fetchFromSingleLink(
     }, { status: 400 });
   }
 
+  // Extract Pluggy account from link
+  const pluggyAccount = link.pluggy_accounts as any;
+
   // Also check if Pluggy account is a credit card
   if (pluggyAccount.type === 'CREDIT' || pluggyAccount.subtype === 'credit_card') {
     return NextResponse.json({
