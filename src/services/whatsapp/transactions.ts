@@ -209,7 +209,7 @@ export async function createTransactionFromWhatsApp(
     categoryId = await findOrCreateCategory(input.userId, input.categoryName, type);
   }
 
-  // Create transaction
+  // Create transaction (type is inferred from amount sign: negative = expense, positive = income)
   const { data: transaction, error } = await supabase
     .from('transactions')
     .insert({
@@ -218,7 +218,6 @@ export async function createTransactionFromWhatsApp(
       category_id: categoryId,
       description: input.description,
       amount: type === 'expense' ? -absoluteAmount : absoluteAmount,
-      type,
       posted_at: input.postedAt,
       notes: input.notes ? `${input.notes}\n\n[Via WhatsApp]` : '[Via WhatsApp]',
       source: 'manual',
@@ -577,7 +576,6 @@ export async function createInstallmentTransactionsFromWhatsApp(
         category_id: categoryId,
         description: `${input.description} (${i}/${input.installmentTotal})`,
         amount: -installmentAmountCents,
-        type: 'expense',
         posted_at: installmentDate.toISOString().split('T')[0],
         notes: input.notes
           ? `${input.notes}\n\n[Via WhatsApp - Parcelado ${i}/${input.installmentTotal}]`
