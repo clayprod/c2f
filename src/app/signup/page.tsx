@@ -34,8 +34,7 @@ function SignupPageContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showPasswords, setShowPasswords] = useState(false);
   const [cep, setCep] = useState('');
   const [state, setState] = useState('');
   const [city, setCity] = useState('');
@@ -53,6 +52,8 @@ function SignupPageContent() {
   const [hasAutoFilledFromCep, setHasAutoFilledFromCep] = useState(false);
   const inviteToken = searchParams?.get('invite');
   const logo = useLogo();
+  const isPasswordMismatch =
+    password.length > 0 && confirmPassword.length > 0 && password !== confirmPassword;
 
   // If user already has a session, don't force them through signup.
   // Redirect to accept page (existing user flow).
@@ -102,7 +103,7 @@ function SignupPageContent() {
 
       // Se o estado foi preenchido pelo CEP, não recarregar as cidades
       // pois o lookupCep já fez isso e pode ter adicionado cidade como fallback
-      if (hasAutoFilledFromCep) {
+      if (hasAutoFilledFromCep && cidades.length > 0) {
         return;
       }
 
@@ -122,7 +123,7 @@ function SignupPageContent() {
       }
     }
     loadCidades();
-  }, [state, hasAutoFilledFromCep]);
+  }, [state, hasAutoFilledFromCep, cidades.length]);
 
   // Função para normalizar nome de cidade (remove acentos, converte para minúsculas)
   const normalizeCityName = (name: string): string => {
@@ -283,12 +284,7 @@ function SignupPageContent() {
       return;
     }
 
-    if (password !== confirmPassword) {
-      toast({
-        variant: "destructive",
-        title: "Senhas não coincidem",
-        description: "A senha e a confirmação de senha devem ser iguais",
-      });
+    if (isPasswordMismatch) {
       return;
     }
 
@@ -325,6 +321,16 @@ function SignupPageContent() {
       });
 
       if (error) throw error;
+
+      if (!signUpData.session) {
+        toast({
+          title: 'Verifique seu email',
+          description: 'Enviamos um link de confirmação para ativar sua conta.',
+        });
+        router.push('/auth/check-email');
+        router.refresh();
+        return;
+      }
 
       // If this signup came from an invite link, accept the invite after signup.
       if (inviteToken) {
@@ -444,52 +450,49 @@ function SignupPageContent() {
               <label htmlFor="password" className="block text-sm font-medium mb-2">
                 Senha
               </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  id="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 pr-12 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
-                  placeholder="Mínimo 8 caracteres"
-                  required
-                  disabled={loading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  tabIndex={-1}
-                >
-                  <i className={`bx ${showPassword ? 'bx-hide' : 'bx-show'} text-xl`} />
-                </button>
-              </div>
+              <input
+                type={showPasswords ? 'text' : 'password'}
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                placeholder="Mínimo 8 caracteres"
+                required
+                disabled={loading}
+              />
             </div>
 
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium mb-2">
                 Confirmar Senha
               </label>
-              <div className="relative">
-                <input
-                  type={showConfirmPassword ? "text" : "password"}
-                  id="confirmPassword"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full px-4 py-3 pr-12 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
-                  placeholder="Digite a senha novamente"
-                  required
-                  disabled={loading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  tabIndex={-1}
-                >
-                  <i className={`bx ${showConfirmPassword ? 'bx-hide' : 'bx-show'} text-xl`} />
-                </button>
-              </div>
+              <input
+                type={showPasswords ? 'text' : 'password'}
+                id="confirmPassword"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                placeholder="Digite a senha novamente"
+                required
+                disabled={loading}
+              />
+              {isPasswordMismatch && (
+                <p className="text-xs text-destructive mt-2">
+                  As senhas nao coincidem.
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Checkbox
+                id="showPasswords"
+                checked={showPasswords}
+                onCheckedChange={(checked) => setShowPasswords(checked === true)}
+                disabled={loading}
+              />
+              <label htmlFor="showPasswords" className="cursor-pointer">
+                Mostrar senhas
+              </label>
             </div>
 
             <div>
@@ -504,6 +507,7 @@ function SignupPageContent() {
                   const value = e.target.value.replace(/\D/g, '');
                   if (value.length <= 8) {
                     setCep(value);
+                    setHasAutoFilledFromCep(false);
                   }
                 }}
                 onBlur={handleCepBlur}
@@ -521,7 +525,15 @@ function SignupPageContent() {
               <label htmlFor="state" className="block text-sm font-medium mb-2">
                 Estado <span className="text-destructive">*</span>
               </label>
-              <Select value={state} onValueChange={setState} disabled={loading || loadingCep} required>
+              <Select
+                value={state}
+                onValueChange={(value) => {
+                  setHasAutoFilledFromCep(false);
+                  setState(value);
+                }}
+                disabled={loading || loadingCep}
+                required
+              >
                 <SelectTrigger className="w-full px-4 py-3 h-auto rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors">
                   <SelectValue placeholder="Selecione o estado" />
                 </SelectTrigger>
@@ -657,7 +669,11 @@ function SignupPageContent() {
               </label>
             </div>
 
-            <button type="submit" className="btn-primary w-full" disabled={loading || !acceptedTerms}>
+            <button
+              type="submit"
+              className="btn-primary w-full"
+              disabled={loading || !acceptedTerms || isPasswordMismatch}
+            >
               <i className='bx bx-rocket'></i>
               {loading ? 'Criando conta...' : 'Criar conta grátis'}
             </button>

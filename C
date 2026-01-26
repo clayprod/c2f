@@ -1,119 +1,56 @@
-import { createServerClient } from '@supabase/ssr';
-import { NextResponse, type NextRequest } from 'next/server';
+'use client';
 
-export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
+import Link from 'next/link';
+import { useLogo } from '@/hooks/useLogo';
+import Image from 'next/image';
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
-        },
-        set(name: string, value: string, options: any) {
-          const cookieOptions = {
-            ...options,
-            maxAge: options?.maxAge || 60 * 60 * 24 * 30,
-            sameSite: 'lax' as const,
-            path: '/',
-            httpOnly: false,
-          };
-          request.cookies.set({
-            name,
-            value,
-            ...cookieOptions,
-          });
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          });
-          response.cookies.set({
-            name,
-            value,
-            ...cookieOptions,
-          });
-        },
-        remove(name: string, options: any) {
-          const cookieOptions = {
-            ...options,
-            maxAge: 0,
-            path: '/',
-          };
-          request.cookies.set({
-            name,
-            value: '',
-            ...cookieOptions,
-          });
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          });
-          response.cookies.set({
-            name,
-            value: '',
-            ...cookieOptions,
-          });
-        },
-      },
-    }
+export default function CheckEmailPage() {
+  const logo = useLogo();
+
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[120px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-[120px]" />
+      </div>
+
+      <div className="w-full max-w-md relative z-10">
+        <Link href="/" className="flex items-center justify-center mb-8">
+          <Image
+            src={logo}
+            alt="c2Finance"
+            width={120}
+            height={40}
+            className="h-8 md:h-10 w-auto"
+            style={{ objectFit: 'contain' }}
+            priority
+          />
+        </Link>
+
+        <div className="glass-card p-8">
+          <div className="text-center space-y-4">
+            <div className="w-20 h-20 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+              <i className="bx bx-mail-send text-5xl text-primary" />
+            </div>
+
+            <div>
+              <h1 className="font-display text-2xl font-bold mb-2">Confirme seu email</h1>
+              <p className="text-muted-foreground text-sm">
+                Enviamos um link de confirmacao para seu email. Clique nele para ativar sua conta.
+              </p>
+            </div>
+
+            <div className="pt-4 space-y-3">
+              <Link href="/login" className="btn-primary w-full inline-block text-center">
+                Ir para o login
+              </Link>
+              <p className="text-xs text-muted-foreground">
+                Depois de confirmar, voce ja pode entrar normalmente.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (request.nextUrl.pathname === '/' && user) {
-    return NextResponse.redirect(new URL('/app', request.url));
-  }
-
-  const protectedRoutes = ['/app'];
-  const publicAppRoutes = ['/app/terms-of-service', '/app/privacy-policy'];
-
-  const isPublicAppRoute = publicAppRoutes.some((route) =>
-    request.nextUrl.pathname.startsWith(route)
-  );
-
-  const isProtectedRoute = protectedRoutes.some((route) =>
-    request.nextUrl.pathname.startsWith(route)
-  ) && !isPublicAppRoute;
-
-  if (isProtectedRoute && !user) {
-    const redirectUrl = new URL('/login', request.url);
-    redirectUrl.searchParams.set('next', request.nextUrl.pathname);
-    return NextResponse.redirect(redirectUrl);
-  }
-
-  const isAdminRoute = request.nextUrl.pathname.startsWith('/app/admin');
-
-  if (isAdminRoute && user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile || profile.role !== 'admin') {
-      return NextResponse.redirect(new URL('/app', request.url));
-    }
-  }
-
-  if (isProtectedRoute && user) {
-    return response;
-  }
-
-  return response;
 }
-
-export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
-};
