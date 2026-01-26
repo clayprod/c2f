@@ -304,10 +304,16 @@ function SignupPageContent() {
       // Convert monthly income to cents
       const monthlyIncomeCents = parseCurrencyToCents(monthlyIncome);
       
+      let origin = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+      if (origin.includes('0.0.0.0')) {
+        origin = origin.replace('0.0.0.0', 'localhost');
+      }
+
       const { data: signUpData, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
+          emailRedirectTo: `${origin}/auth/confirm`,
           data: {
             full_name: name,
             city: resolvedCity,
