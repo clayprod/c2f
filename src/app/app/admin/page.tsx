@@ -85,7 +85,7 @@ export default function AdminPage() {
       </div>
 
       <Tabs defaultValue="dashboard" className="w-full">
-        <TabsList className="grid w-full grid-cols-10">
+        <TabsList className="flex w-full overflow-x-auto scrollbar-hide lg:grid lg:grid-cols-10 pb-1">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="map">Mapa</TabsTrigger>
           <TabsTrigger value="reports">Relatórios</TabsTrigger>

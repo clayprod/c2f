@@ -73,8 +73,18 @@ const Hero = () => {
               className="h-[28rem] md:h-[38rem] w-full border-4 border-primary/30 p-2 md:p-6 bg-card rounded-[30px] shadow-2xl"
             >
               <div className="h-full w-full overflow-hidden rounded-2xl bg-background md:rounded-2xl md:p-4">
-                {/* Empty frame - add video later */}
-                <div className="relative w-full h-full bg-gradient-to-br from-card via-background to-card rounded-xl" />
+                {/* YouTube Video - autoplay, loop, no UI */}
+                <div className="relative w-full h-full rounded-xl overflow-hidden">
+                  <iframe
+                    className="absolute inset-0 w-full h-full"
+                    src="https://www.youtube.com/embed/zxjHLiZcqtY?autoplay=1&mute=1&loop=1&playlist=zxjHLiZcqtY&controls=0&showinfo=0&rel=0&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0&playsinline=1"
+                    title="c2Finance Demo"
+                    allow="autoplay; encrypted-media"
+                    allowFullScreen={false}
+                    frameBorder="0"
+                    style={{ pointerEvents: 'none' }}
+                  />
+                </div>
               </div>
             </motion.div>
           </div>

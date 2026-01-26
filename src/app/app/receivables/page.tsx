@@ -242,9 +242,9 @@ export default function ReceivablesPage() {
 
               return (
                 <div key={receivable.id} className="glass-card p-6">
-                  <div className="flex items-start justify-between mb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
                         <h3 className="font-display font-semibold text-lg">{receivable.name}</h3>
                         <span className={`badge-pill text-xs ${getStatusColor(receivable.status)}`}>
                           {getStatusLabel(receivable.status)}
@@ -288,7 +288,7 @@ export default function ReceivablesPage() {
                     </div>
                     <Link
                       href={`/app/receivables/${receivable.id}`}
-                      className="text-primary hover:underline text-sm"
+                      className="text-primary hover:underline text-sm mt-2 sm:mt-0"
                     >
                       Ver detalhes
                     </Link>

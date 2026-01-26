@@ -285,9 +285,9 @@ export default function DebtsPage() {
 
               return (
                 <div key={debt.id} className="glass-card p-6">
-                  <div className="flex items-start justify-between mb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
                         <h3 className="font-display font-semibold text-lg">{debt.name}</h3>
                         <span className={`badge-pill text-xs ${getStatusColor(debt.status)}`}>
                           {getStatusLabel(debt.status)}
@@ -329,7 +329,7 @@ export default function DebtsPage() {
                         </p>
                       )}
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 mt-2 sm:mt-0">
                       <Link
                         href={`/app/debts/${debt.id}`}
                         className="text-primary hover:underline text-sm"

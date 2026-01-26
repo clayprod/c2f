@@ -99,7 +99,7 @@ export async function getAPIConfig(userId?: string): Promise<{
   try {
     settings = await getGlobalSettings();
   } catch (error) {
-    console.error('Error fetching global settings, using defaults:', error);
+    console.error('[Advisor] Error fetching global settings, using defaults:', error);
   }
 
   // Check if user has paid plan to use global keys
@@ -109,7 +109,7 @@ export async function getAPIConfig(userId?: string): Promise<{
       const plan = await getUserPlan(userId);
       useGlobalKeys = plan.plan === 'pro' || plan.plan === 'premium';
     } catch (error) {
-      console.error('Error checking user plan:', error);
+      console.error('[Advisor] Error checking user plan:', error);
     }
   }
 
@@ -135,6 +135,18 @@ export async function getAPIConfig(userId?: string): Promise<{
       apiKey = settings.openai_api_key;
     }
   }
+
+  console.log('[Advisor] API Config:', {
+    provider,
+    model,
+    hasApiKey: !!apiKey,
+    apiKeyLength: apiKey?.length || 0,
+    useGlobalKeys,
+    hasSettingsGroqKey: !!settings.groq_api_key,
+    hasSettingsOpenaiKey: !!settings.openai_api_key,
+    hasEnvGroqKey: !!process.env.GROQ_API_KEY,
+    hasEnvOpenaiKey: !!process.env.OPENAI_API_KEY,
+  });
 
   return { provider, model, apiKey, useGlobalKeys };
 }
@@ -250,9 +262,11 @@ export async function getAdvisorResponse(
 
     // Return fallback response
     return createFallbackResponse('Não foi possível processar a resposta. Tente novamente.');
-  } catch (error) {
+  } catch (error: any) {
     console.error('Advisor response error:', error);
-    return createFallbackResponse('Ocorreu um erro ao processar sua solicitação.');
+    // Propagate specific error messages to the user
+    const errorMessage = error?.message || 'Ocorreu um erro ao processar sua solicitação.';
+    return createFallbackResponse(errorMessage);
   }
 }
 
