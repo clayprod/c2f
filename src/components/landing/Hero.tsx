@@ -74,7 +74,7 @@ const Hero = () => {
             >
               {/* YouTube Video - autoplay, loop, no UI */}
               <iframe
-                className="w-full h-full"
+                className="w-[101%] h-[102%] -ml-[0.5%] -mt-[1%] md:w-full md:h-full md:ml-0 md:mt-0"
                 src="https://www.youtube-nocookie.com/embed/zxjHLiZcqtY?autoplay=1&mute=1&loop=1&playlist=zxjHLiZcqtY&controls=0&showinfo=0&rel=0&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0&playsinline=1&start=1&hd=1&vq=hd1080"
                 title="c2Finance Demo"
                 allow="autoplay; encrypted-media"
