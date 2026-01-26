@@ -1,9 +1,25 @@
-import Link from 'next/link';
-import Image from 'next/image';
+"use client";
+import React, { useRef } from "react";
+import { useScroll, useTransform, motion } from "framer-motion";
 
 const Hero = () => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start start", "end start"],
+  });
+
+  // Animation transforms - responds immediately to scroll
+  const rotate = useTransform(scrollYProgress, [0, 0.5], [20, 0]);
+  const scale = useTransform(scrollYProgress, [0, 0.5], [0.9, 1]);
+  const translateY = useTransform(scrollYProgress, [0, 0.5], [100, 0]);
+  const opacity = useTransform(scrollYProgress, [0, 0.3], [0.6, 1]);
+
   return (
-    <section className="section-padding pt-16 md:pt-24 relative overflow-hidden">
+    <section 
+      ref={containerRef}
+      className="min-h-[150vh] pt-16 md:pt-24 relative overflow-hidden"
+    >
       {/* Background Effects */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-[120px]" />
@@ -27,7 +43,7 @@ const Hero = () => {
           </h1>
 
           {/* Subtitle */}
-          <p className="fade-in-up stagger-3 text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8 text-balance">
+          <p className="fade-in-up stagger-3 text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-12 text-balance">
             Transações, orçamentos, projeções e insights acionáveis — tudo em um painel simples.
             Utilize o <span className="inline-flex items-center gap-1 font-semibold text-emerald-400 ml-1.5">
               <svg
@@ -42,25 +58,28 @@ const Hero = () => {
             </span> para inserir novas compras e fazer consultas.
           </p>
 
-          {/* CTAs */}
-          <div className="fade-in-up stagger-4 flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
-            <Link href="/signup" className="btn-primary w-full sm:w-auto">
-              <i className='bx bx-rocket'></i>
-              Começar grátis
-            </Link>
-            <a href="#demo" className="btn-secondary w-full sm:w-auto">
-              <i className='bx bx-play-circle'></i>
-              Ver demo
-            </a>
+          {/* Animated Frame */}
+          <div 
+            className="w-full max-w-5xl mx-auto"
+            style={{ perspective: "1000px" }}
+          >
+            <motion.div
+              style={{
+                rotateX: rotate,
+                scale,
+                y: translateY,
+                opacity,
+              }}
+              className="h-[28rem] md:h-[38rem] w-full border-4 border-primary/30 p-2 md:p-6 bg-card rounded-[30px] shadow-2xl"
+            >
+              <div className="h-full w-full overflow-hidden rounded-2xl bg-background md:rounded-2xl md:p-4">
+                {/* Empty frame - add video later */}
+                <div className="relative w-full h-full bg-gradient-to-br from-card via-background to-card rounded-xl" />
+              </div>
+            </motion.div>
           </div>
 
-          {/* Trust text */}
-          <p className="fade-in-up stagger-5 text-sm text-muted-foreground">
-            <i className='bx bx-check-shield text-primary mr-1'></i>
-            Sem cartão de crédito no plano grátis
-          </p>
         </div>
-
       </div>
     </section>
   );

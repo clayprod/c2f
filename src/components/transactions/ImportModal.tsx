@@ -621,9 +621,9 @@ export default function ImportModal({
   const getConfidenceBadge = (confidence?: 'low' | 'medium' | 'high') => {
     if (!confidence) return null;
     const colors = {
-      low: 'bg-red-500/10 text-red-500',
+      low: 'bg-negative/10 text-negative',
       medium: 'bg-yellow-500/10 text-yellow-500',
-      high: 'bg-green-500/10 text-green-500',
+      high: 'bg-positive/10 text-positive',
     };
     return (
       <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${colors[confidence]}`}>
@@ -737,7 +737,7 @@ export default function ImportModal({
                     />
                     {file && (
                       <p className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
-                        <i className='bx bx-check-circle text-green-500'></i>
+                        <i className='bx bx-check-circle text-positive'></i>
                         Arquivo selecionado: {file.name}
                       </p>
                     )}
@@ -838,7 +838,7 @@ export default function ImportModal({
                     </div>
                   )}
                   {progress.status === 'error' && (
-                    <div className="flex items-center gap-2 text-red-500">
+                    <div className="flex items-center gap-2 text-negative">
                       <i className='bx bx-error-circle text-xl'></i>
                       <span>{progress.message}</span>
                     </div>
@@ -980,11 +980,11 @@ export default function ImportModal({
               )}
               {progress.status === 'completed' && progress.result && (
                 <div className="text-center space-y-4">
-                  <i className="bx bx-check-circle text-4xl text-green-500"></i>
+                  <i className="bx bx-check-circle text-4xl text-positive"></i>
                   <div>
                     <p className="font-medium text-lg">{progress.message}</p>
                     <div className="mt-4 space-y-2 text-sm">
-                      <p className="text-green-500">
+                      <p className="text-positive">
                         <i className='bx bx-check mr-1'></i>
                         {progress.result.imported} transações importadas
                       </p>
@@ -995,13 +995,13 @@ export default function ImportModal({
                         </p>
                       )}
                       {progress.result.errors.length > 0 && (
-                        <p className="text-red-500">
+                        <p className="text-negative">
                           <i className='bx bx-error mr-1'></i>
                           {progress.result.errors.length} erros
                         </p>
                       )}
                       {progress.result.errors.length > 0 && (
-                        <div className="text-red-500 text-xs space-y-1">
+                        <div className="text-negative text-xs space-y-1">
                           {progress.result.errors.slice(0, 3).map((error, index) => (
                             <p key={`${error}-${index}`}>{error}</p>
                           ))}
@@ -1013,8 +1013,8 @@ export default function ImportModal({
               )}
               {progress.status === 'error' && (
                 <div className="text-center">
-                  <i className="bx bx-error-circle text-4xl text-red-500"></i>
-                  <p className="mt-2 text-red-500">{progress.message}</p>
+                  <i className="bx bx-error-circle text-4xl text-negative"></i>
+                  <p className="mt-2 text-negative">{progress.message}</p>
                 </div>
               )}
             </div>

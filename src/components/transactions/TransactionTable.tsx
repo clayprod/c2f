@@ -33,10 +33,10 @@ interface TransactionTableProps {
   onDelete: (id: string) => void;
   loading?: boolean;
   sorting?: {
-    sortBy: 'posted_at' | 'amount';
+    sortBy: 'posted_at' | 'amount' | 'created_at';
     sortOrder: 'asc' | 'desc';
   };
-  onSortChange?: (sorting: { sortBy: 'posted_at' | 'amount'; sortOrder: 'asc' | 'desc' }) => void;
+  onSortChange?: (sorting: { sortBy: 'posted_at' | 'amount' | 'created_at'; sortOrder: 'asc' | 'desc' }) => void;
 }
 
 // Mobile Card Component for transactions
@@ -63,11 +63,11 @@ function MobileTransactionCard({
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <div
             className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-              isIncome ? 'bg-green-500/10' : 'bg-red-500/10'
+              isIncome ? 'bg-positive/10' : 'bg-negative/10'
             }`}
           >
             <i
-              className={`bx text-xl ${isIncome ? 'bx-trending-up text-green-500' : 'bx-trending-down text-red-500'}`}
+              className={`bx text-xl ${isIncome ? 'bx-trending-up text-positive' : 'bx-trending-down text-negative'}`}
             ></i>
           </div>
           <div className="flex-1 min-w-0">
@@ -76,7 +76,7 @@ function MobileTransactionCard({
           </div>
         </div>
         <div className="text-right flex-shrink-0">
-          <p className={`font-semibold ${isIncome ? 'text-green-500' : 'text-red-500'}`}>
+          <p className={`font-semibold ${isIncome ? 'text-positive' : 'text-negative'}`}>
             {isIncome ? '+' : ''}{formatCurrency(amount)}
           </p>
         </div>
@@ -130,7 +130,7 @@ export default function TransactionTable({
   onEdit, 
   onDelete,
   loading = false,
-  sorting = { sortBy: 'posted_at', sortOrder: 'desc' },
+  sorting = { sortBy: 'created_at', sortOrder: 'desc' },
   onSortChange
 }: TransactionTableProps) {
   // Helper para lidar com valores string ou number
@@ -143,7 +143,7 @@ export default function TransactionTable({
     return new Date(date).toLocaleDateString('pt-BR');
   };
 
-  const handleSort = (column: 'posted_at' | 'amount') => {
+  const handleSort = (column: 'posted_at' | 'amount' | 'created_at') => {
     if (!onSortChange) return;
     
     if (sorting.sortBy === column) {
@@ -161,7 +161,7 @@ export default function TransactionTable({
     }
   };
 
-  const SortIcon = ({ column }: { column: 'posted_at' | 'amount' }) => {
+  const SortIcon = ({ column }: { column: 'posted_at' | 'amount' | 'created_at' }) => {
     if (sorting.sortBy !== column) {
       return <i className='bx bx-sort text-muted-foreground/50'></i>;
     }
@@ -268,11 +268,11 @@ export default function TransactionTable({
                       <div className="flex items-center gap-3">
                         <div
                           className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                            isIncome ? 'bg-green-500/10' : 'bg-red-500/10'
+                            isIncome ? 'bg-positive/10' : 'bg-negative/10'
                           }`}
                         >
                           <i
-                            className={`bx ${isIncome ? 'bx-trending-up text-green-500' : 'bx-trending-down text-red-500'}`}
+                            className={`bx ${isIncome ? 'bx-trending-up text-positive' : 'bx-trending-down text-negative'}`}
                           ></i>
                         </div>
                         <div>
@@ -316,7 +316,7 @@ export default function TransactionTable({
                     </td>
                     <td
                       className={`py-4 px-6 text-right font-medium ${
-                        isIncome ? 'text-green-500' : 'text-red-500'
+                        isIncome ? 'text-positive' : 'text-negative'
                       }`}
                     >
                       {isIncome ? '+' : ''}{formatCurrency(amount)}

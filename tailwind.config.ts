@@ -43,6 +43,21 @@ export default {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
         },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        info: {
+          DEFAULT: "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))",
+        },
+        positive: "hsl(var(--positive))",
+        negative: "hsl(var(--negative))",
+        neutral: "hsl(var(--neutral))",
         muted: {
           DEFAULT: "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",
@@ -89,8 +104,8 @@ export default {
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
         "pulse-glow": {
-          "0%, 100%": { boxShadow: "0 0 20px hsl(175 80% 50% / 0.3)" },
-          "50%": { boxShadow: "0 0 40px hsl(175 80% 50% / 0.5)" },
+          "0%, 100%": { boxShadow: "0 0 20px hsl(185 75% 47% / 0.3)" }, /* Strong Cyan */
+          "50%": { boxShadow: "0 0 40px hsl(185 75% 47% / 0.5)" },
         },
         "float": {
           "0%, 100%": { transform: "translateY(0)" },

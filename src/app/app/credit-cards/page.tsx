@@ -610,9 +610,9 @@ export default function CreditCardsPage() {
     const styles = {
       open: 'bg-blue-500/20 text-blue-500',
       closed: 'bg-yellow-500/20 text-yellow-500',
-      paid: 'bg-green-500/20 text-green-500',
+      paid: 'bg-green-500/20 text-positive',
       partial: 'bg-orange-500/20 text-orange-500',
-      overdue: 'bg-red-500/20 text-red-500',
+      overdue: 'bg-red-500/20 text-negative',
     };
     const labels = {
       open: 'Aberta',
@@ -732,11 +732,11 @@ export default function CreditCardsPage() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Total Pago</p>
-                    <p className="text-2xl font-bold text-green-500">{formatCurrency(currentMonthSummary.totalPaid)}</p>
+                    <p className="text-2xl font-bold text-positive">{formatCurrency(currentMonthSummary.totalPaid)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Restante</p>
-                    <p className={`text-2xl font-bold ${currentMonthSummary.remaining > 0 ? 'text-orange-500' : 'text-green-500'}`}>
+                    <p className={`text-2xl font-bold ${currentMonthSummary.remaining > 0 ? 'text-orange-500' : 'text-positive'}`}>
                       {formatCurrency(currentMonthSummary.remaining)}
                     </p>
                   </div>
@@ -1009,22 +1009,22 @@ export default function CreditCardsPage() {
           <div className="glass-card p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
-                <i className='bx bx-minus-circle text-xl text-red-500'></i>
+                <i className='bx bx-minus-circle text-xl text-negative'></i>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Limite Usado</p>
-                <p className="text-xl font-bold text-red-500">{formatCurrency(totalUsed)}</p>
+                <p className="text-xl font-bold text-negative">{formatCurrency(totalUsed)}</p>
               </div>
             </div>
           </div>
           <div className="glass-card p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
-                <i className='bx bx-check-circle text-xl text-green-500'></i>
+                <i className='bx bx-check-circle text-xl text-positive'></i>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Limite Disponivel</p>
-                <p className="text-xl font-bold text-green-500">{formatCurrency(totalAvailable)}</p>
+                <p className="text-xl font-bold text-positive">{formatCurrency(totalAvailable)}</p>
               </div>
             </div>
           </div>
@@ -1239,11 +1239,11 @@ export default function CreditCardsPage() {
                       <div className="grid grid-cols-2 gap-2 mb-2">
                         <div>
                           <p className="text-[10px] text-muted-foreground">Total Pago</p>
-                          <p className="font-semibold text-xs text-green-500">{formatCurrency(cardTotalPaid)}</p>
+                          <p className="font-semibold text-xs text-positive">{formatCurrency(cardTotalPaid)}</p>
                         </div>
                         <div>
                           <p className="text-[10px] text-muted-foreground">Restante</p>
-                          <p className={`font-semibold text-xs ${cardRemaining > 0 ? 'text-orange-500' : 'text-green-500'}`}>
+                          <p className={`font-semibold text-xs ${cardRemaining > 0 ? 'text-orange-500' : 'text-positive'}`}>
                             {formatCurrency(cardRemaining)}
                           </p>
                         </div>
@@ -1346,7 +1346,7 @@ export default function CreditCardsPage() {
                                   {tx.category && <span>• {tx.category.name}</span>}
                                 </div>
                               </div>
-                              <p className={`font-semibold text-xs flex-shrink-0 ${tx.amount_cents >= 0 ? 'text-red-500' : 'text-green-500'}`}>
+                              <p className={`font-semibold text-xs flex-shrink-0 ${tx.amount_cents >= 0 ? 'text-negative' : 'text-positive'}`}>
                                 {formatCurrency(Math.abs(tx.amount_cents))}
                               </p>
                             </div>
@@ -1376,9 +1376,9 @@ export default function CreditCardsPage() {
                 {/* Expired Warning */}
                 {isExpired && (
                   <div className="border-t border-border pt-3">
-                    <div className="flex items-center gap-2 p-2 bg-red-500/10 border border-red-500/20 rounded-lg">
-                      <i className='bx bx-error-circle text-red-500 text-sm'></i>
-                      <p className="text-xs text-red-500 font-medium">
+                    <div className="flex items-center gap-2 p-2 bg-negative/10 border border-red-500/20 rounded-lg">
+                      <i className='bx bx-error-circle text-negative text-sm'></i>
+                      <p className="text-xs text-negative font-medium">
                         Este cartão expirou e não pode ser mais utilizado
                       </p>
                     </div>

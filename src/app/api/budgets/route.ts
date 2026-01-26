@@ -588,7 +588,8 @@ export async function POST(request: NextRequest) {
 
     const { supabase } = createClientFromRequest(request);
     // Parse month to year and month integers
-    const monthDate = new Date(validated.month);
+    // Use T12:00:00 to avoid timezone issues (UTC midnight can become previous day in local timezone)
+    const monthDate = new Date(validated.month + 'T12:00:00');
     if (isNaN(monthDate.getTime())) {
       return NextResponse.json(
         { error: 'Data inválida' },

@@ -159,8 +159,8 @@ function ResetPasswordForm() {
     return (
       <div className="glass-card p-8">
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 mx-auto rounded-full bg-green-500/10 flex items-center justify-center">
-            <i className="bx bx-check text-3xl text-green-500" />
+          <div className="w-16 h-16 mx-auto rounded-full bg-success/10 flex items-center justify-center">
+            <i className="bx bx-check text-3xl text-success" />
           </div>
           <div>
             <h2 className="font-semibold text-lg mb-2">Senha atualizada!</h2>

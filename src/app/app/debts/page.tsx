@@ -7,6 +7,8 @@ import { PlanGuard } from '@/components/app/PlanGuard';
 import { formatCurrency } from '@/lib/utils';
 import { useAccountContext } from '@/hooks/useAccountContext';
 import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
+import { useToast } from '@/hooks/use-toast';
 
 interface Debt {
   id: string;
@@ -37,6 +39,8 @@ export default function DebtsPage() {
   const router = useRouter();
   const { context: accountContext, activeAccountId } = useAccountContext();
   const ownerId = activeAccountId || accountContext?.currentUserId || null;
+  const { confirm, ConfirmDialog } = useConfirmDialog();
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchDebts();
@@ -103,13 +107,51 @@ export default function DebtsPage() {
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'urgent':
-        return 'text-red-500';
+        return 'text-negative';
       case 'high':
         return 'text-orange-500';
       case 'medium':
         return 'text-yellow-500';
       default:
         return 'text-muted-foreground';
+    }
+  };
+
+  const handleDeleteDebt = async (debt: Debt) => {
+    const confirmed = await confirm({
+      title: 'Excluir dívida',
+      description: `Tem certeza que deseja excluir "${debt.name}"? Esta ação também removerá todos os pagamentos e orçamentos associados.`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/debts/${debt.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erro ao excluir dívida');
+      }
+
+      toast({
+        title: 'Dívida excluída',
+        description: 'A dívida foi removida com sucesso.',
+      });
+
+      fetchDebts();
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Falha ao excluir dívida',
+        description: error.message || 'Não foi possível excluir a dívida. Tente novamente.',
+      });
     }
   };
 
@@ -123,6 +165,7 @@ export default function DebtsPage() {
 
   return (
     <PlanGuard minPlan="pro">
+      {ConfirmDialog}
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -286,12 +329,21 @@ export default function DebtsPage() {
                         </p>
                       )}
                     </div>
-                    <Link
-                      href={`/app/debts/${debt.id}`}
-                      className="text-primary hover:underline text-sm"
-                    >
-                      Ver detalhes
-                    </Link>
+                    <div className="flex items-center gap-3">
+                      <Link
+                        href={`/app/debts/${debt.id}`}
+                        className="text-primary hover:underline text-sm"
+                      >
+                        Ver detalhes
+                      </Link>
+                      <button
+                        onClick={() => handleDeleteDebt(debt)}
+                        className="text-destructive hover:text-destructive/80 text-sm"
+                        title="Excluir dívida"
+                      >
+                        <i className='bx bx-trash'></i>
+                      </button>
+                    </div>
                   </div>
 
                   <div className="mb-4">
@@ -316,13 +368,13 @@ export default function DebtsPage() {
                     </div>
                     <div>
                       <p className="text-muted-foreground">Pago</p>
-                      <p className="font-semibold text-green-500">
+                      <p className="font-semibold text-positive">
                         {formatCurrency(debt.paid_amount_cents)}
                       </p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Restante</p>
-                      <p className="font-semibold text-red-500">
+                      <p className="font-semibold text-negative">
                         {formatCurrency(debt.remaining_amount_cents)}
                       </p>
                     </div>

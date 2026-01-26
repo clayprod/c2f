@@ -32,7 +32,7 @@ interface TipResponse {
 const severityColors = {
   low: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
   medium: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
-  high: 'bg-red-500/10 text-red-600 border-red-500/20',
+  high: 'bg-destructive/10 text-destructive border-destructive/20',
 };
 
 const severityIcons = {
@@ -44,7 +44,7 @@ const severityIcons = {
 const confidenceColors = {
   low: 'bg-slate-500/10 text-slate-600',
   medium: 'bg-emerald-500/10 text-emerald-600',
-  high: 'bg-green-500/10 text-green-600',
+  high: 'bg-success/10 text-success',
 };
 
 export function AdvisorTips() {
@@ -115,13 +115,13 @@ export function AdvisorTips() {
   }
 
   return (
-    <div className="glass-card p-6">
+    <div className="glass-card p-6 animate-slide-in-right delay-300">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <i className="bx bx-sparkles text-2xl text-purple-600"></i>
+          <i className="bx bx-sparkles text-2xl text-purple-600 animate-pulse-soft"></i>
           <h2 className="font-display font-semibold">Dica do Dia</h2>
           {tip.isNew && (
-            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-500/10 text-green-600 border border-green-500/20">
+            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-success/10 text-success border border-success/20">
               Nova
             </span>
           )}
@@ -153,12 +153,12 @@ export function AdvisorTips() {
       {/* Insights */}
       {tip.insights && tip.insights.length > 0 && (
         <div className="mb-4">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 animate-children-stagger">
             {tip.insights.slice(0, expanded ? undefined : 3).map((insight, index) => (
               <div
                 key={index}
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border',
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-300 hover:scale-105',
                   severityColors[insight.severity]
                 )}
               >
@@ -184,14 +184,14 @@ export function AdvisorTips() {
       {tip.actions && tip.actions.length > 0 && (
         <div className={cn(!expanded && 'hidden')}>
           <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
-            <i className="bx bx-target-lock"></i>
+            <i className="bx bx-target-lock animate-pulse-soft"></i>
             Ações Sugeridas
           </p>
-          <div className="space-y-2">
+          <div className="space-y-2 animate-children-stagger">
             {tip.actions.map((action, index) => (
               <div
                 key={index}
-                className="flex items-start gap-2 p-3 rounded-lg bg-card/50 border border-border"
+                className="flex items-start gap-2 p-3 rounded-lg bg-card/50 border border-border hover-lift transition-all duration-300"
               >
                 <i className="bx bx-right-arrow-alt text-primary mt-0.5"></i>
                 <div className="flex-1">

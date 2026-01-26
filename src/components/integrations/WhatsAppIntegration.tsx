@@ -278,7 +278,7 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <i className="bxl bx-whatsapp text-green-500 text-2xl"></i>
+            <i className="bxl bx-whatsapp text-success text-2xl"></i>
             WhatsApp
           </CardTitle>
         </CardHeader>
@@ -299,7 +299,7 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
       <Card className={`${isUpgradeRequired ? 'border-blue-500/20 bg-blue-500/5' : 'border-yellow-500/20 bg-yellow-500/5'}`}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <i className="bxl bx-whatsapp text-green-500 text-2xl"></i>
+            <i className="bxl bx-whatsapp text-success text-2xl"></i>
             WhatsApp
           </CardTitle>
           <CardDescription>
@@ -333,7 +333,7 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
       <Card className="border-green-500/20 bg-green-500/5">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <i className="bxl bx-whatsapp text-green-500 text-2xl"></i>
+            <i className="bxl bx-whatsapp text-success text-2xl"></i>
             WhatsApp
             <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full">
               Conectado
@@ -402,7 +402,7 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <i className="bxl bx-whatsapp text-green-500 text-2xl"></i>
+            <i className="bxl bx-whatsapp text-success text-2xl"></i>
             WhatsApp
             <span className="text-xs bg-yellow-600 text-white px-2 py-0.5 rounded-full">
               Verificação Pendente
@@ -473,7 +473,7 @@ export default function WhatsAppIntegration({ onStatusChange }: WhatsAppIntegrat
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <i className="bxl bx-whatsapp text-green-500 text-2xl"></i>
+          <i className="bxl bx-whatsapp text-success text-2xl"></i>
           WhatsApp
         </CardTitle>
         <CardDescription>

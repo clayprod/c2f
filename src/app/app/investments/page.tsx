@@ -234,8 +234,8 @@ export default function InvestmentsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="glass-card p-5">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
-                <i className='bx bx-wallet text-xl text-blue-500'></i>
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <i className='bx bx-wallet text-xl text-primary'></i>
               </div>
               <span className="text-sm text-muted-foreground">Total Investido</span>
             </div>
@@ -244,26 +244,26 @@ export default function InvestmentsPage() {
 
           <div className="glass-card p-5">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
-                <i className='bx bx-trending-up text-xl text-green-500'></i>
+              <div className="w-10 h-10 rounded-xl bg-positive/10 flex items-center justify-center">
+                <i className='bx bx-trending-up text-xl text-positive'></i>
               </div>
               <span className="text-sm text-muted-foreground">Valor Atual</span>
             </div>
-            <p className="font-display text-2xl font-bold text-green-500">
+            <p className="font-display text-2xl font-bold text-positive">
               {formatCurrency(totalCurrent)}
             </p>
           </div>
 
           <div className="glass-card p-5">
             <div className="flex items-center gap-3 mb-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${totalReturn >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${totalReturn >= 0 ? 'bg-positive/10' : 'bg-negative/10'
                 }`}>
-                <i className={`bx ${totalReturn >= 0 ? 'bx-trending-up' : 'bx-trending-down'} text-xl ${totalReturn >= 0 ? 'text-green-500' : 'text-red-500'
+                <i className={`bx ${totalReturn >= 0 ? 'bx-trending-up' : 'bx-trending-down'} text-xl ${totalReturn >= 0 ? 'text-positive' : 'text-negative'
                   }`}></i>
               </div>
               <span className="text-sm text-muted-foreground">Retorno</span>
             </div>
-            <p className={`font-display text-2xl font-bold ${totalReturn >= 0 ? 'text-green-500' : 'text-red-500'
+            <p className={`font-display text-2xl font-bold ${totalReturn >= 0 ? 'text-positive' : 'text-negative'
               }`}>
               {totalReturn >= 0 ? '+' : ''}{totalReturn.toFixed(2)}%
             </p>
@@ -340,7 +340,7 @@ export default function InvestmentsPage() {
                       <button
                         type="button"
                         onClick={() => handleDeleteInvestment(investment)}
-                        className="text-red-500 hover:text-red-400 text-sm"
+                        className="text-destructive hover:text-destructive/80 text-sm"
                         title="Excluir investimento"
                       >
                         <i className='bx bx-trash'></i>
@@ -363,7 +363,7 @@ export default function InvestmentsPage() {
                     </div>
                     <div>
                       <p className="text-muted-foreground">Retorno</p>
-                      <p className={`font-semibold ${returnPercent >= 0 ? 'text-green-500' : 'text-red-500'
+                      <p className={`font-semibold ${returnPercent >= 0 ? 'text-positive' : 'text-negative'
                         }`}>
                         {returnPercent >= 0 ? '+' : ''}{returnPercent.toFixed(2)}%
                       </p>

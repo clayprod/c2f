@@ -216,7 +216,7 @@ export default function AssetForm({
           placeholder="Ex: Apartamento Centro, Carro Corolla 2020"
         />
         {errors.name && (
-          <p className="text-sm text-red-500 mt-1">{errors.name.message}</p>
+          <p className="text-sm text-negative mt-1">{errors.name.message}</p>
         )}
       </div>
 
@@ -239,7 +239,7 @@ export default function AssetForm({
           </SelectContent>
         </Select>
         {errors.type && (
-          <p className="text-sm text-red-500 mt-1">{errors.type.message}</p>
+          <p className="text-sm text-negative mt-1">{errors.type.message}</p>
         )}
       </div>
 
@@ -269,7 +269,7 @@ export default function AssetForm({
           placeholder="Selecione a data de compra"
         />
         {errors.purchase_date && (
-          <p className="text-sm text-red-500 mt-1">{errors.purchase_date.message}</p>
+          <p className="text-sm text-negative mt-1">{errors.purchase_date.message}</p>
         )}
       </div>
 
@@ -293,7 +293,7 @@ export default function AssetForm({
           )}
         />
         {errors.purchase_price_cents && (
-          <p className="text-sm text-red-500 mt-1">{errors.purchase_price_cents.message}</p>
+          <p className="text-sm text-negative mt-1">{errors.purchase_price_cents.message}</p>
         )}
       </div>
 
@@ -476,7 +476,7 @@ export default function AssetForm({
               placeholder="Selecione a data de venda"
             />
             {errors.sale_date && (
-              <p className="text-sm text-red-500 mt-1">{errors.sale_date.message}</p>
+              <p className="text-sm text-negative mt-1">{errors.sale_date.message}</p>
             )}
           </div>
           <div>
@@ -498,7 +498,7 @@ export default function AssetForm({
               )}
             />
             {errors.sale_price_cents && (
-              <p className="text-sm text-red-500 mt-1">{errors.sale_price_cents.message}</p>
+              <p className="text-sm text-negative mt-1">{errors.sale_price_cents.message}</p>
             )}
           </div>
         </>

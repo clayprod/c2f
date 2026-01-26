@@ -137,13 +137,13 @@ export function BudgetsByCategory() {
                     <li>Mostra os orçamentos para o mês selecionado.</li>
                     <li>A barra de progresso indica o consumo em relação ao limite.</li>
                     <li className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-red-500" /> Acima do limite (&gt;100%)
+                      <div className="w-1.5 h-1.5 rounded-full bg-destructive" /> Acima do limite (&gt;100%)
                     </li>
                     <li className="flex items-center gap-1.5">
                       <div className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Próximo ao limite (80-100%)
                     </li>
                     <li className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Dentro do limite (&lt;80%)
+                      <div className="w-1.5 h-1.5 rounded-full bg-success" /> Dentro do limite (&lt;80%)
                     </li>
                   </ul>
                 </div>
@@ -170,9 +170,9 @@ export function BudgetsByCategory() {
               <DropdownMenuSeparator />
               <DropdownMenuRadioGroup value={statusFilter} onValueChange={(v) => setStatusFilter(v as FilterStatus)}>
                 <DropdownMenuRadioItem value="all">Todos os Orçamentos</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="over" className="text-red-500">Acima do Limite</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="warning" className="text-amber-500">Próximo ao Limite</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="ok" className="text-emerald-500">Dentro do Limite</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="over" className="text-destructive">Acima do Limite</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="warning" className="text-warning">Próximo ao Limite</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="ok" className="text-success">Dentro do Limite</DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -207,8 +207,8 @@ export function BudgetsByCategory() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-2 md:gap-3 lg:gap-4 max-w-full overflow-visible">
-          {filteredBudgets.map((budget) => {
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-2 md:gap-3 lg:gap-4 max-w-full overflow-visible animate-children-stagger">
+          {filteredBudgets.map((budget, index) => {
             const spent = Math.abs(budget.amount_actual || 0);
             const limit = Math.abs((budget.limit_cents || budget.amount_planned_cents || 0) / 100);
             const percentage = limit > 0 ? (spent / limit) * 100 : 0;
@@ -235,7 +235,7 @@ export function BudgetsByCategory() {
                 className={cn(
                   "group relative p-2.5 md:p-3 lg:p-4 rounded-xl border border-border bg-card/30",
                   "hover:bg-card/50 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-pointer",
-                  isOver && "border-red-500/30 bg-red-500/[0.02] hover:bg-red-500/[0.04] hover:border-red-500/40",
+                  isOver && "border-destructive/30 bg-destructive/[0.02] hover:bg-destructive/[0.04] hover:border-destructive/40",
                   isWarning && "border-amber-500/30 bg-amber-500/[0.02] hover:bg-amber-500/[0.04] hover:border-amber-500/40",
                   showEstimates && !isMobile && !isAutomatic && "hover:ring-2 hover:ring-primary/20"
                 )}
@@ -244,7 +244,7 @@ export function BudgetsByCategory() {
                   <div className="flex items-center gap-1.5 md:gap-2 min-w-0 flex-1">
                     <div className={cn(
                       "w-7 h-7 md:w-7 md:h-7 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center text-sm md:text-sm lg:text-lg shadow-sm transition-transform group-hover:scale-110 flex-shrink-0",
-                      isOver ? "bg-red-500/10" : isWarning ? "bg-amber-500/10" : "bg-muted"
+                      isOver ? "bg-destructive/10" : isWarning ? "bg-warning/10" : "bg-muted"
                     )}
                       style={!isOver && !isWarning ? { backgroundColor: `${categoryColor}15` } : undefined}
                     >
@@ -254,7 +254,7 @@ export function BudgetsByCategory() {
                       <h3 className="font-semibold text-xs md:text-xs lg:text-sm leading-tight line-clamp-2" title={categoryName}>{categoryName}</h3>
                       <div className="flex items-center gap-1 mt-0.5">
                         {isOver ? (
-                          <div className="flex items-center gap-0.5 text-red-500">
+                          <div className="flex items-center gap-0.5 text-destructive">
                             <AlertCircle className="w-2.5 h-2.5 md:w-3 md:h-3 flex-shrink-0" />
                             <span className="text-[8px] md:text-[9px] lg:text-[10px] font-medium">Crítico</span>
                           </div>
@@ -264,7 +264,7 @@ export function BudgetsByCategory() {
                             <span className="text-[8px] md:text-[9px] lg:text-[10px] font-medium">Atenção</span>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-0.5 text-emerald-500">
+                          <div className="flex items-center gap-0.5 text-success">
                             <CheckCircle2 className="w-2.5 h-2.5 md:w-3 md:h-3 flex-shrink-0" />
                             <span className="text-[8px] md:text-[9px] lg:text-[10px] font-medium">OK</span>
                           </div>
@@ -275,7 +275,7 @@ export function BudgetsByCategory() {
                   <div className="text-right flex-shrink-0">
                     <span className={cn(
                       "text-xs md:text-[11px] lg:text-xs font-bold",
-                      isOver ? "text-red-500" : isWarning ? "text-amber-500" : "text-emerald-500"
+                      isOver ? "text-destructive" : isWarning ? "text-warning" : "text-success"
                     )}>
                       {percentage.toFixed(0)}%
                     </span>
@@ -293,7 +293,7 @@ export function BudgetsByCategory() {
                       className="h-1.5 md:h-1 lg:h-1.5 transition-all"
                       indicatorClassName={cn(
                         "transition-all duration-500",
-                        isOver ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]" :
+                        isOver ? "bg-destructive shadow-[0_0_8px_hsl(0_99%_64%_/_0.4)]" :
                           isWarning ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]" :
                             ""
                       )}
@@ -314,7 +314,7 @@ export function BudgetsByCategory() {
                       </span>
                       <span className={cn(
                         "text-[10px] md:text-[10px] lg:text-xs font-bold",
-                        isOver ? "text-red-500" : "text-emerald-500"
+                        isOver ? "text-destructive" : "text-success"
                       )}>
                         {formatCurrency(isOver ? spent - limit : remaining)}
                       </span>
@@ -359,8 +359,8 @@ export function BudgetsByCategory() {
                       "max-w-[320px] bg-gradient-to-br from-popover to-popover/95",
                       "border-2 shadow-2xl backdrop-blur-sm",
                       "px-4 py-3",
-                      isOver && "border-red-500/30 shadow-red-500/20",
-                      isWarning && "border-amber-500/30 shadow-amber-500/20",
+                      isOver && "border-destructive/30 shadow-destructive/20",
+                      isWarning && "border-warning/30 shadow-warning/20",
                       !isOver && !isWarning && "border-primary/30 shadow-primary/20"
                     )}
                     style={{ zIndex: 999999 }}
@@ -369,7 +369,7 @@ export function BudgetsByCategory() {
                       <div className="flex items-center gap-2 font-bold text-sm text-foreground">
                         <div className={cn(
                           "p-1.5 rounded-md",
-                          isOver ? "bg-red-500/20 text-red-500" :
+                          isOver ? "bg-destructive/20 text-destructive" :
                           isWarning ? "bg-amber-500/20 text-amber-500" :
                           "bg-primary/20 text-primary"
                         )}>
@@ -397,7 +397,7 @@ export function BudgetsByCategory() {
                               estimates!.estimatedDailyRemaining > estimates!.averageDailySpent * 1.2 
                                 ? "text-amber-500" 
                                 : estimates!.estimatedDailyRemaining < estimates!.averageDailySpent * 0.8
-                                ? "text-emerald-500"
+                                ? "text-success"
                                 : "text-foreground"
                             )}>
                               {estimates!.daysRemaining > 0 

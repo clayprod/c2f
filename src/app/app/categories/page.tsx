@@ -700,7 +700,7 @@ export default function CategoriesPage() {
                   type="button"
                   onClick={() => setFormData({ ...formData, type: 'expense' })}
                   className={`flex-1 py-3 px-4 rounded-xl border transition-all ${formData.type === 'expense'
-                    ? 'border-red-500 bg-red-500/10 text-red-500'
+                    ? 'border-red-500 bg-red-500/10 text-negative'
                     : 'border-border bg-muted/30 text-muted-foreground hover:bg-muted/50'
                     }`}
                 >
@@ -711,7 +711,7 @@ export default function CategoriesPage() {
                   type="button"
                   onClick={() => setFormData({ ...formData, type: 'income' })}
                   className={`flex-1 py-3 px-4 rounded-xl border transition-all ${formData.type === 'income'
-                    ? 'border-green-500 bg-green-500/10 text-green-500'
+                    ? 'border-green-500 bg-green-500/10 text-positive'
                     : 'border-border bg-muted/30 text-muted-foreground hover:bg-muted/50'
                     }`}
                 >
@@ -881,7 +881,7 @@ function CategoryCard({
             )}
           </div>
           <span className={`text-[10px] sm:text-xs block mt-0.5 font-medium ${category.type === 'income'
-            ? 'text-green-500'
+            ? 'text-positive'
             : category.source_type === 'goal'
               ? 'text-blue-500'
               : category.source_type === 'debt'
@@ -890,7 +890,7 @@ function CategoryCard({
                   ? 'text-pink-500'
                   : category.source_type === 'investment'
                     ? 'text-cyan-500'
-                    : 'text-red-500'
+                    : 'text-negative'
             }`}>
             {isInactive ? (
               <span className="text-muted-foreground">Inativa</span>
@@ -943,7 +943,7 @@ function CategoryCard({
                   onToggleActive();
                 }}
                 className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors ${category.is_active === false
-                  ? 'hover:bg-green-500/10 text-muted-foreground hover:text-green-500'
+                  ? 'hover:bg-green-500/10 text-muted-foreground hover:text-positive'
                   : 'hover:bg-amber-500/10 text-foreground hover:text-amber-500'
                   }`}
                 title={category.is_active === false ? "Ativar" : "Inativar"}
@@ -959,7 +959,7 @@ function CategoryCard({
                 }}
                 disabled={!canDelete}
                 className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors ${canDelete
-                  ? 'hover:bg-red-500/10 text-red-500'
+                  ? 'hover:bg-red-500/10 text-negative'
                   : 'opacity-50 cursor-not-allowed text-muted-foreground'
                   }`}
                 title={canDelete ? 'Excluir' : 'Não é possível excluir categoria com transações'}

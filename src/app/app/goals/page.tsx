@@ -104,7 +104,7 @@ export default function GoalsPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'bg-green-500/10 text-green-500 border-green-500/20';
+        return 'bg-green-500/10 text-positive border-green-500/20';
       case 'paused':
         return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
       case 'cancelled':
@@ -167,7 +167,7 @@ export default function GoalsPage() {
             <div className="glass-card p-5">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
-                  <i className='bx bx-coin text-xl text-green-500'></i>
+                  <i className='bx bx-coin text-xl text-positive'></i>
                 </div>
                 <span className="text-sm text-muted-foreground">Total Poupado</span>
               </div>

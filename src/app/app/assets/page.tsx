@@ -115,7 +115,7 @@ export default function AssetsPage() {
             <div className="glass-card p-5">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
-                  <i className='bx bx-coin-stack text-xl text-green-500'></i>
+                  <i className='bx bx-coin text-xl text-positive'></i>
                 </div>
                 <span className="text-sm text-muted-foreground">Patrimônio Total</span>
               </div>
@@ -126,12 +126,12 @@ export default function AssetsPage() {
               <div className="flex items-center gap-3 mb-3">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${totalAppreciation >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'
                   }`}>
-                  <i className={`bx ${totalAppreciation >= 0 ? 'bx-trending-up' : 'bx-trending-down'} text-xl ${totalAppreciation >= 0 ? 'text-green-500' : 'text-red-500'
+                  <i className={`bx ${totalAppreciation >= 0 ? 'bx-trending-up' : 'bx-trending-down'} text-xl ${totalAppreciation >= 0 ? 'text-positive' : 'text-negative'
                     }`}></i>
                 </div>
                 <span className="text-sm text-muted-foreground">Valorização</span>
               </div>
-              <p className={`font-display text-2xl font-bold ${totalAppreciation >= 0 ? 'text-green-500' : 'text-red-500'
+              <p className={`font-display text-2xl font-bold ${totalAppreciation >= 0 ? 'text-positive' : 'text-negative'
                 }`}>
                 {totalAppreciation >= 0 ? '+' : ''}{formatCurrency(totalAppreciation)}
               </p>

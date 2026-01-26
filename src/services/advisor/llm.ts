@@ -215,7 +215,7 @@ export async function getAdvisorResponse(
   const messages: ChatMessage[] = [
     {
       role: 'system',
-      content: `${systemPrompt}\n\n---\n\nDADOS FINANCEIROS DO USUÁRIO:\n${financialContext}`,
+      content: `${systemPrompt}\n\n---\n\nSEUS DADOS FINANCEIROS:\n${financialContext}`,
     },
     ...conversationHistory.filter(m => m.role !== 'system'),
     {

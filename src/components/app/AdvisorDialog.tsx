@@ -47,7 +47,7 @@ export default function AdvisorDialog({ open, onOpenChange }: AdvisorDialogProps
             )}
           >
             {/* Content wrapper - pt garante espaço para o botão de fechar */}
-            <div className="flex-1 overflow-hidden flex flex-col min-h-0 px-4 pb-4 pt-16 sm:px-5 sm:pb-5 sm:pt-16 md:px-6 md:pb-6 md:pt-14">
+            <div className="flex-1 flex flex-col min-h-0 px-4 pb-4 pt-16 sm:px-5 sm:pb-5 sm:pt-16 md:px-6 md:pb-6 md:pt-14 overflow-hidden scrollbar-hide">
               <AdvisorContent inDialog={true} />
             </div>
             

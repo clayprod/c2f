@@ -48,8 +48,8 @@ export default function EmailConfirmedPage() {
 
         <div className="glass-card p-8">
           <div className="text-center space-y-4">
-            <div className="w-20 h-20 mx-auto rounded-full bg-green-500/10 flex items-center justify-center">
-              <i className="bx bx-check-circle text-5xl text-green-500" />
+            <div className="w-20 h-20 mx-auto rounded-full bg-success/10 flex items-center justify-center">
+              <i className="bx bx-check-circle text-5xl text-success" />
             </div>
             
             <div>

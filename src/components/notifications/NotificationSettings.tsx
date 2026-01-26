@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 interface NotificationRule {
   id?: string;
   user_id?: string | null;
-  rule_type: 'debt_due' | 'receivable_due' | 'budget_limit' | 'budget_empty';
+  rule_type: 'debt_due' | 'receivable_due' | 'budget_limit' | 'budget_empty' | 'balance_divergence' | 'daily_spending_exceeded' | 'expenses_above_budget';
   enabled: boolean;
   threshold_days?: number | null;
   threshold_percentage?: number | null;
@@ -41,6 +41,21 @@ const defaultRules: NotificationRule[] = [
     rule_type: 'budget_empty',
     enabled: true,
     frequency_hours: 48,
+  },
+  {
+    rule_type: 'balance_divergence',
+    enabled: true,
+    frequency_hours: 24,
+  },
+  {
+    rule_type: 'daily_spending_exceeded',
+    enabled: true,
+    frequency_hours: 24,
+  },
+  {
+    rule_type: 'expenses_above_budget',
+    enabled: true,
+    frequency_hours: 24,
   },
 ];
 
@@ -130,6 +145,9 @@ export function NotificationSettings() {
       receivable_due: 'Vencimentos de Recebíveis',
       budget_limit: 'Limites de Orçamento',
       budget_empty: 'Orçamentos Não Preenchidos',
+      balance_divergence: 'Divergência de Saldo (Open Finance)',
+      daily_spending_exceeded: 'Gasto Diário Acima do Permitido',
+      expenses_above_budget: 'Despesas Acima do Orçamento',
     };
     return labels[ruleType] || ruleType;
   };
@@ -140,6 +158,9 @@ export function NotificationSettings() {
       receivable_due: 'Receba alertas quando seus recebíveis estiverem próximos do vencimento',
       budget_limit: 'Receba alertas quando seus orçamentos estiverem próximos do limite',
       budget_empty: 'Receba alertas quando você não tiver definido orçamentos para categorias',
+      balance_divergence: 'Receba alertas quando houver divergência entre o saldo das contas vinculadas no Open Finance e o saldo interno',
+      daily_spending_exceeded: 'Receba alertas quando sua média de gasto diário estiver acima do permitido para o restante do mês',
+      expenses_above_budget: 'Receba alertas quando suas despesas ultrapassarem o valor orçado para alguma categoria',
     };
     return descriptions[ruleType] || '';
   };

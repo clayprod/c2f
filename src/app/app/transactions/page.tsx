@@ -51,7 +51,7 @@ export default function TransactionsPage() {
     count: 0,
   });
   const [sorting, setSorting] = useState({
-    sortBy: 'posted_at' as 'posted_at' | 'amount',
+    sortBy: 'created_at' as 'posted_at' | 'amount' | 'created_at',
     sortOrder: 'desc' as 'asc' | 'desc',
   });
   const [formOpen, setFormOpen] = useState(false);
@@ -86,7 +86,7 @@ export default function TransactionsPage() {
   });
 
   // Reset offset when sorting changes
-  const handleSortChange = (newSorting: { sortBy: 'posted_at' | 'amount'; sortOrder: 'asc' | 'desc' }) => {
+  const handleSortChange = (newSorting: { sortBy: 'posted_at' | 'amount' | 'created_at'; sortOrder: 'asc' | 'desc' }) => {
     setSorting(newSorting);
     setPagination(prev => ({ ...prev, offset: 0 }));
   };

@@ -460,7 +460,7 @@ export default function AccountsPage() {
                         setAccountToDelete(account);
                         setDeleteDialogOpen(true);
                       }}
-                      className="p-2 hover:bg-red-500/10 text-red-500 rounded-lg transition-colors"
+                      className="p-2 hover:bg-red-500/10 text-negative rounded-lg transition-colors"
                     >
                       <i className='bx bx-trash text-lg'></i>
                     </button>
@@ -476,7 +476,7 @@ export default function AccountsPage() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Saldo</span>
-                  <span className={`font-semibold ${account.current_balance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  <span className={`font-semibold ${account.current_balance >= 0 ? 'text-positive' : 'text-negative'}`}>
                     {formatCurrency(account.current_balance)}
                   </span>
                 </div>

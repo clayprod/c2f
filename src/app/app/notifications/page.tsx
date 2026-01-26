@@ -21,9 +21,9 @@ export default function NotificationsPage() {
 
     const getIcon = (type: string) => {
         switch (type) {
-            case 'success': return 'bx-check-circle text-green-500';
+            case 'success': return 'bx-check-circle text-positive';
             case 'warning': return 'bx-error text-amber-500';
-            case 'error': return 'bx-x-circle text-red-500';
+            case 'error': return 'bx-x-circle text-negative';
             default: return 'bx-info-circle text-blue-500';
         }
     };

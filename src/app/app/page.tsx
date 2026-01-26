@@ -441,16 +441,16 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-4 md:space-y-6 max-w-full overflow-x-hidden">
-      <div className="max-w-full">
+      <div className="max-w-full animate-slide-in-left">
         <h1 className="font-display text-xl md:text-2xl lg:text-3xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground text-sm md:text-base">Visão geral das suas finanças</p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 max-w-full">
-        <div className="glass-card p-3 md:p-5">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 max-w-full animate-children-stagger">
+        <div className="glass-card p-3 md:p-5 hover-lift animate-float-slow" style={{ animationDelay: '0s' }}>
           <div className="flex items-center justify-between mb-2 md:mb-3">
             <div className="flex items-center gap-2 md:gap-3">
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-primary/10 flex items-center justify-center">
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-primary/10 flex items-center justify-center animate-pulse-soft">
                 <i className='bx bx-wallet text-lg md:text-xl text-primary'></i>
               </div>
               <span className="text-xs md:text-sm text-muted-foreground">Saldo Total</span>
@@ -473,11 +473,11 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <div className="glass-card p-3 md:p-5">
+        <div className="glass-card p-3 md:p-5 hover-lift animate-float-slow" style={{ animationDelay: '0.5s' }}>
           <div className="flex items-center justify-between mb-2 md:mb-3">
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2 md:gap-3">
-                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-blue-500/10 flex items-center justify-center">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-blue-500/10 flex items-center justify-center animate-pulse-soft">
                   <i className='bx bx-bar-chart text-lg md:text-xl text-blue-500'></i>
                 </div>
                 <span className="text-xs md:text-sm text-muted-foreground">Saldo Projetado</span>
@@ -505,12 +505,12 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <div className="glass-card p-3 md:p-5">
+        <div className="glass-card p-3 md:p-5 hover-lift animate-float-slow" style={{ animationDelay: '1s' }}>
           <div className="flex items-center justify-between mb-2 md:mb-3">
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2 md:gap-3">
-                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-green-500/10 flex items-center justify-center">
-                  <i className='bx bx-trending-up text-lg md:text-xl text-green-500'></i>
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-positive/10 flex items-center justify-center animate-pulse-soft">
+                  <i className='bx bx-trending-up text-lg md:text-xl text-positive'></i>
                 </div>
                 <span className="text-xs md:text-sm font-semibold text-foreground">
                   Receitas
@@ -534,17 +534,17 @@ export default function DashboardPage() {
               }
             />
           </div>
-          <p className="font-display text-lg md:text-2xl font-bold text-green-500">
+          <p className="font-display text-lg md:text-2xl font-bold text-positive">
             {data ? formatCurrency(data.totalIncome) : 'R$ 0,00'}
           </p>
         </div>
 
-        <div className="glass-card p-3 md:p-5">
+        <div className="glass-card p-3 md:p-5 hover-lift animate-float-slow" style={{ animationDelay: '1.5s' }}>
           <div className="flex items-center justify-between mb-2 md:mb-3">
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2 md:gap-3">
-                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-red-500/10 flex items-center justify-center">
-                  <i className='bx bx-trending-down text-lg md:text-xl text-red-500'></i>
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-negative/10 flex items-center justify-center animate-pulse-soft">
+                  <i className='bx bx-trending-down text-lg md:text-xl text-negative'></i>
                 </div>
                 <span className="text-xs md:text-sm font-semibold text-foreground">
                   Despesas
@@ -568,16 +568,16 @@ export default function DashboardPage() {
               }
             />
           </div>
-          <p className="font-display text-lg md:text-2xl font-bold text-red-500">
+          <p className="font-display text-lg md:text-2xl font-bold text-negative">
             {data ? formatCurrency(data.totalExpenses) : 'R$ 0,00'}
           </p>
         </div>
 
-        <div className="glass-card p-3 md:p-5">
+        <div className="glass-card p-3 md:p-5 hover-lift animate-float-slow" style={{ animationDelay: '2s' }}>
           <div className="flex items-center justify-between mb-2 md:mb-3">
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2 md:gap-3">
-                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-secondary/10 flex items-center justify-center">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-secondary/10 flex items-center justify-center animate-pulse-soft">
                   <i className='bx bx-pie-chart text-lg md:text-xl text-secondary'></i>
                 </div>
                 <span className="text-xs md:text-sm font-semibold text-foreground">
@@ -602,7 +602,7 @@ export default function DashboardPage() {
               }
             />
           </div>
-          <p className={`font-display text-lg md:text-2xl font-bold ${data && data.savings >= 0 ? 'text-green-500' : 'text-red-500'
+          <p className={`font-display text-lg md:text-2xl font-bold ${data && data.savings >= 0 ? 'text-positive' : 'text-negative'
             }`}>
             {data ? formatCurrency(data.savings) : 'R$ 0,00'}
           </p>
@@ -610,7 +610,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4 md:gap-6">
-        <div className="lg:col-span-2 glass-card p-4 md:p-6">
+        <div className="lg:col-span-2 glass-card p-4 md:p-6 animate-slide-in-up delay-300">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
             <div className="flex items-center gap-2">
               <h2 className="font-display font-semibold text-sm md:text-base">Fluxo de Caixa</h2>
@@ -693,15 +693,17 @@ export default function DashboardPage() {
         </PlanGuard>
       </div>
 
-      <ExpensesByCategoryChart />
+      <div className="animate-slide-in-up delay-400">
+        <ExpensesByCategoryChart />
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 lg:items-stretch items-start w-full">
         <PlanGuard minPlan="pro" showFallback={false}>
-          <div ref={budgetsContainerRef} className="w-full min-w-0">
+          <div ref={budgetsContainerRef} className="w-full min-w-0 animate-slide-in-left delay-500">
             <BudgetsByCategory />
           </div>
         </PlanGuard>
-        <div className="glass-card p-3 md:p-6 flex flex-col w-full min-w-0">
+        <div className="glass-card p-3 md:p-6 flex flex-col w-full min-w-0 animate-slide-in-right delay-500 hover-lift">
           <div className="flex items-center justify-between mb-4 flex-shrink-0">
             <div className="flex items-center gap-2 min-w-0">
               <h2 className="font-display font-semibold text-sm md:text-base whitespace-nowrap">Transações Recentes</h2>
@@ -745,7 +747,7 @@ export default function DashboardPage() {
                           {tx.categories?.name || 'Sem categoria'} • {new Date(tx.posted_at).toLocaleDateString('pt-BR')}
                         </p>
                       </div>
-                      <p className={`text-xs font-semibold whitespace-nowrap flex-shrink-0 ${isIncome ? 'text-green-500' : 'text-red-500'}`}>
+                      <p className={`text-xs font-semibold whitespace-nowrap flex-shrink-0 ${isIncome ? 'text-positive' : 'text-negative'}`}>
                         {isIncome ? '+' : ''}{formatCurrency(amount)}
                       </p>
                     </div>
@@ -779,7 +781,7 @@ export default function DashboardPage() {
                         <td
                           className={`py-2 px-2 text-xs text-right font-medium ${(() => {
                             const amount = typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount;
-                            return amount > 0 ? 'text-green-500' : 'text-red-500';
+                            return amount > 0 ? 'text-positive' : 'text-negative';
                           })()
                             }`}
                         >
@@ -824,7 +826,7 @@ export default function DashboardPage() {
                         <td
                           className={`py-3 px-2 text-sm text-right font-medium ${(() => {
                             const amount = typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount;
-                            return amount > 0 ? 'text-green-500' : 'text-red-500';
+                            return amount > 0 ? 'text-positive' : 'text-negative';
                           })()
                             }`}
                         >

@@ -10,7 +10,7 @@ import {
 export interface NotificationRule {
   id: string;
   user_id: string | null;
-  rule_type: 'debt_due' | 'receivable_due' | 'budget_limit' | 'budget_empty' | 'balance_divergence' | 'daily_spending_exceeded';
+  rule_type: 'debt_due' | 'receivable_due' | 'budget_limit' | 'budget_empty' | 'balance_divergence' | 'daily_spending_exceeded' | 'expenses_above_budget';
   enabled: boolean;
   threshold_days?: number | null;
   threshold_percentage?: number | null;
@@ -572,6 +572,109 @@ export async function checkDailySpendingNotifications(
 }
 
 /**
+ * Check expenses above budget notifications
+ * Alerts when actual spending exceeds the planned budget for categories
+ */
+export async function checkExpensesAboveBudgetNotifications(
+  userId: string,
+  rules: NotificationRule[]
+): Promise<number> {
+  const supabase = await createClient();
+  const rule = rules.find((r) => r.rule_type === 'expenses_above_budget' && r.enabled);
+
+  if (!rule) return 0;
+
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1;
+
+  // Get budgets for current month with categories that are over budget
+  const { data: budgets, error } = await supabase
+    .from('budgets')
+    .select(`
+      id,
+      category_id,
+      year,
+      month,
+      amount_planned,
+      amount_actual,
+      categories!inner (
+        id,
+        name,
+        type
+      )
+    `)
+    .eq('user_id', userId)
+    .eq('year', currentYear)
+    .eq('month', currentMonth)
+    .gt('amount_planned', 0);
+
+  if (error) {
+    console.error('Error checking expenses above budget notifications:', error);
+    return 0;
+  }
+
+  if (!budgets || budgets.length === 0) return 0;
+
+  let count = 0;
+
+  for (const budget of budgets) {
+    const category = budget.categories as any;
+    
+    // Only check expense categories
+    if (category?.type !== 'expense') continue;
+
+    const plannedCents = Math.round((budget.amount_planned || 0) * 100);
+    const actualCents = Math.round((budget.amount_actual || 0) * 100);
+
+    // Check if actual exceeds planned
+    if (actualCents > plannedCents && plannedCents > 0) {
+      const excessCents = actualCents - plannedCents;
+      const excessPercentage = Math.round((excessCents / plannedCents) * 100);
+
+      const shouldSend = await shouldSendNotification(
+        userId,
+        'expenses_above_budget',
+        budget.id,
+        rule.frequency_hours
+      );
+
+      if (shouldSend) {
+        const categoryName = category?.name || 'Categoria';
+        const actual = formatCurrency(actualCents);
+        const planned = formatCurrency(plannedCents);
+        const excess = formatCurrency(excessCents);
+
+        const notificationId = await createNotification(userId, {
+          title: 'Despesas Acima do Orçamento',
+          message: `A categoria "${categoryName}" ultrapassou o orçamento em ${excess} (${excessPercentage}% acima). Gasto: ${actual} | Orçado: ${planned}. Considere ajustar seu orçamento.`,
+          type: 'error',
+          link: `/app/budgets?month=${budget.year}-${String(budget.month).padStart(2, '0')}`,
+          metadata: {
+            entity_type: 'budgets',
+            entity_id: budget.id,
+            rule_type: 'expenses_above_budget',
+            category_id: budget.category_id,
+            category_name: categoryName,
+            planned_cents: plannedCents,
+            actual_cents: actualCents,
+            excess_cents: excessCents,
+            excess_percentage: excessPercentage,
+          },
+        });
+
+        if (notificationId) {
+          await updateNotificationSentLog(userId, 'expenses_above_budget', budget.id, 'budgets');
+          count++;
+        }
+      }
+    }
+  }
+
+  return count;
+}
+
+/**
  * Run all notification checks for a user
  */
 export async function checkAllNotifications(userId: string): Promise<{
@@ -581,6 +684,7 @@ export async function checkAllNotifications(userId: string): Promise<{
   budget_empty: number;
   balance_divergence: number;
   daily_spending_exceeded: number;
+  expenses_above_budget: number;
   total: number;
 }> {
   const rules = await getUserNotificationRules(userId);
@@ -592,6 +696,7 @@ export async function checkAllNotifications(userId: string): Promise<{
     budget_empty,
     balance_divergence,
     daily_spending_exceeded,
+    expenses_above_budget,
   ] = await Promise.all([
     checkDebtDueNotifications(userId, rules),
     checkReceivableDueNotifications(userId, rules),
@@ -599,6 +704,7 @@ export async function checkAllNotifications(userId: string): Promise<{
     checkBudgetEmptyNotifications(userId, rules),
     checkBalanceDivergenceNotifications(userId, rules),
     checkDailySpendingNotifications(userId, rules),
+    checkExpensesAboveBudgetNotifications(userId, rules),
   ]);
 
   return {
@@ -608,12 +714,14 @@ export async function checkAllNotifications(userId: string): Promise<{
     budget_empty,
     balance_divergence,
     daily_spending_exceeded,
+    expenses_above_budget,
     total:
       debt_due +
       receivable_due +
       budget_limit +
       budget_empty +
       balance_divergence +
-      daily_spending_exceeded,
+      daily_spending_exceeded +
+      expenses_above_budget,
   };
 }

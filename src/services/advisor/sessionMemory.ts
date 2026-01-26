@@ -421,7 +421,7 @@ export function buildMessagesForLLM(
   // System prompt with financial context (full or summarized)
   const contextToUse = useFullContext ? financialContext : summarizedContext;
   const contextLabel = useFullContext 
-    ? 'DADOS FINANCEIROS DO USUÁRIO' 
+    ? 'SEUS DADOS FINANCEIROS' 
     : 'RESUMO FINANCEIRO (contexto completo enviado anteriormente)';
 
   messages.push({

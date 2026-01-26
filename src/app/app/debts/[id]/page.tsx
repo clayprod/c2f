@@ -673,11 +673,11 @@ export default function DebtDetailPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Valor Pago</p>
-                  <p className="text-2xl font-bold text-green-500">{formatCurrency(debt.paid_amount_cents)}</p>
+                  <p className="text-2xl font-bold text-positive">{formatCurrency(debt.paid_amount_cents)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Valor Restante</p>
-                  <p className="text-2xl font-bold text-red-500">{formatCurrency(debt.remaining_amount_cents)}</p>
+                  <p className="text-2xl font-bold text-negative">{formatCurrency(debt.remaining_amount_cents)}</p>
                 </div>
               </div>
             </div>

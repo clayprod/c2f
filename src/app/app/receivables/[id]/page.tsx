@@ -714,11 +714,11 @@ export default function ReceivableDetailPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Valor Recebido</p>
-                  <p className="text-2xl font-bold text-green-500">{formatCurrency(receivable.received_amount_cents)}</p>
+                  <p className="text-2xl font-bold text-positive">{formatCurrency(receivable.received_amount_cents)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Valor Restante</p>
-                  <p className="text-2xl font-bold text-orange-500">{formatCurrency(receivable.remaining_amount_cents)}</p>
+                  <p className="text-2xl font-bold text-warning">{formatCurrency(receivable.remaining_amount_cents)}</p>
                 </div>
               </div>
             </div>

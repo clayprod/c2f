@@ -59,7 +59,7 @@ const typeLabels: Record<string, string> = {
 
 const statusColors: Record<string, string> = {
   active: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-  sold: 'bg-green-500/10 text-green-500 border-green-500/20',
+  sold: 'bg-green-500/10 text-positive border-green-500/20',
   disposed: 'bg-gray-500/10 text-gray-500 border-gray-500/20',
 };
 
@@ -220,7 +220,7 @@ export default function AssetCard({ asset }: AssetCardProps) {
         <div className="pt-4 border-t border-border/50 space-y-3">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Valorização</span>
-            <span className={`font-medium ${appreciation >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            <span className={`font-medium ${appreciation >= 0 ? 'text-positive' : 'text-negative'}`}>
               {appreciation >= 0 ? '+' : ''}{formatCurrency(appreciation)} ({appreciationPercent}%)
             </span>
           </div>

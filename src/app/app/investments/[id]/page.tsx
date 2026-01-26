@@ -344,7 +344,7 @@ export default function InvestmentDetailPage() {
             </button>
             <button
               onClick={handleDeleteInvestment}
-              className="btn-secondary text-red-500 hover:text-red-500"
+              className="btn-secondary text-destructive hover:text-destructive"
               type="button"
             >
               <i className='bx bx-trash'></i>
@@ -745,7 +745,7 @@ export default function InvestmentDetailPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Ganho/Perda</p>
-                  <p className={`text-2xl font-bold ${gain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  <p className={`text-2xl font-bold ${gain >= 0 ? 'text-positive' : 'text-negative'}`}>
                     {formatCurrency(gain)} ({gain >= 0 ? '+' : ''}{gainPercentage}%)
                   </p>
                 </div>

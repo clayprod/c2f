@@ -5,7 +5,6 @@ import Navbar from '@/components/landing/Navbar';
 import Hero from '@/components/landing/Hero';
 import Metrics from '@/components/landing/Metrics';
 import Features from '@/components/landing/Features';
-import Demo from '@/components/landing/Demo';
 import Pricing from '@/components/landing/Pricing';
 import FAQ from '@/components/landing/FAQ';
 import CTA from '@/components/landing/CTA';
@@ -20,7 +19,6 @@ export default function HomePage() {
         <Hero />
         <Features />
         <Metrics />
-        <Demo />
         <Pricing />
         <FAQ />
         <CTA />

@@ -22,8 +22,6 @@ const Navbar = () => {
 
   const navLinks = [
     { label: 'Recursos', href: '/#features' },
-    { label: 'Depoimentos', href: '/#testimonials' },
-    { label: 'Demo', href: '/#demo' },
     { label: 'Preços', href: '/#pricing' },
     { label: 'FAQ', href: '/#faq' },
     { label: 'Blog', href: '/blog' },

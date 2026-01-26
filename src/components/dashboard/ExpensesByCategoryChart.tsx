@@ -65,9 +65,18 @@ interface Budget {
   is_projected?: boolean;
 }
 
+// Paleta de cores baseada no design system c2Finance
 const COLORS = [
-  '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444',
-  '#ec4899', '#6366f1', '#14b8a6', '#84cc16', '#f97316',
+  '#1FC0D2', // Strong Cyan (primary)
+  '#9448BC', // Amethyst (secondary)
+  '#73FBD3', // Aquamarine (accent)
+  '#59D2FE', // Sky Aqua
+  '#44E5E7', // Neon Ice
+  '#FED766', // Mustard (warning)
+  '#FE4A49', // Tomato (destructive)
+  '#7C5CBF', // Amethyst lighter
+  '#2DD4BF', // Teal variation
+  '#A78BFA', // Purple variation
 ];
 
 export function ExpensesByCategoryChart() {
@@ -255,7 +264,7 @@ export function ExpensesByCategoryChart() {
     <div className="glass-card px-3 md:px-4 py-1.5 md:py-2 h-full flex flex-col">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 mb-1.5 md:mb-2">
         <div className="flex items-center gap-2">
-          <h2 className="font-display font-semibold text-sm md:text-lg leading-none">Gastos por Categoria</h2>
+          <h2 className="font-display font-semibold text-sm md:text-lg leading-none animate-fade-in">Gastos por Categoria</h2>
           <InfoIcon
             content={
               <div className="space-y-2">
@@ -296,8 +305,9 @@ export function ExpensesByCategoryChart() {
         </div>
       ) : (
         <div className="flex-1 flex flex-col">
-          <div className="flex flex-col lg:flex-row lg:items-center gap-2 md:gap-3 lg:gap-4">
-            <div className="h-[160px] md:h-[200px] lg:h-[240px] xl:h-[280px] relative flex-shrink-0 lg:flex-1">
+          <div className="flex flex-col lg:flex-row lg:items-start gap-2 md:gap-3 lg:gap-4">
+            {/* Gráfico de rosca - desloca para esquerda em telas grandes */}
+            <div className="h-[160px] md:h-[200px] lg:h-[220px] xl:h-[240px] relative flex-shrink-0 lg:w-[180px] xl:w-[200px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -347,8 +357,9 @@ export function ExpensesByCategoryChart() {
               </ResponsiveContainer>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-1 gap-2 lg:w-[220px] lg:max-h-[300px] lg:overflow-y-auto lg:pr-2 scrollbar-thin">
-              {categoryExpenses.slice(0, 6).map((item, index) => (
+            {/* Legenda - distribuída em múltiplas colunas */}
+            <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 gap-x-3 gap-y-1.5 lg:gap-x-4 lg:gap-y-2 lg:max-h-[280px] lg:overflow-y-auto lg:pr-2 scrollbar-thin lg:content-start">
+              {categoryExpenses.slice(0, 9).map((item, index) => (
                 <div
                   key={item.categoryId}
                   className="group flex flex-col gap-0.5 p-1.5 md:p-2 rounded-lg hover:bg-muted/50 transition-colors"
@@ -378,9 +389,9 @@ export function ExpensesByCategoryChart() {
                   </div>
                 </div>
               ))}
-              {categoryExpenses.length > 6 && (
-                <p className="text-[9px] md:text-[10px] text-center text-muted-foreground pt-1 col-span-2 sm:col-span-3 lg:col-span-1">
-                  + {categoryExpenses.length - 6} outras categorias
+              {categoryExpenses.length > 9 && (
+                <p className="text-[9px] md:text-[10px] text-center text-muted-foreground pt-1 col-span-2 sm:col-span-3 lg:col-span-2 xl:col-span-3">
+                  + {categoryExpenses.length - 9} outras categorias
                 </p>
               )}
             </div>

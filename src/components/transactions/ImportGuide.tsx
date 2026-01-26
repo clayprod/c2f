@@ -126,9 +126,9 @@ export default function ImportGuide({ type }: ImportGuideProps) {
     <div className="space-y-4 text-sm">
       <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20">
         <div className="flex items-start gap-3">
-          <i className='bx bx-bank text-green-500 text-xl mt-0.5'></i>
+          <i className='bx bx-bank text-positive text-xl mt-0.5'></i>
           <div>
-            <h4 className="font-medium text-green-500 mb-1">Arquivo OFX</h4>
+            <h4 className="font-medium text-positive mb-1">Arquivo OFX</h4>
             <p className="text-muted-foreground">
               O formato OFX (Open Financial Exchange) é o padrão usado pelos bancos brasileiros
               para exportar extratos.

@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     const assignedTo = searchParams.get('assigned_to');
     const limit = parseInt(searchParams.get('limit') || '10');
     const offset = parseInt(searchParams.get('offset') || '0');
-    const sortBy = searchParams.get('sort_by') || 'posted_at';
+    const sortBy = searchParams.get('sort_by') || 'created_at';
     const sortOrder = searchParams.get('sort_order') || 'desc';
 
     const { supabase } = createClientFromRequest(request);
@@ -53,8 +53,10 @@ export async function GET(request: NextRequest) {
     const ascending = sortOrder === 'asc';
     if (sortBy === 'amount') {
       query = query.order('amount', { ascending });
+    } else if (sortBy === 'created_at') {
+      query = query.order('created_at', { ascending });
     } else {
-      // Default to posted_at
+      // Fallback to posted_at
       query = query.order('posted_at', { ascending });
     }
 

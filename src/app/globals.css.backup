@@ -1,0 +1,800 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222 47% 6%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 8%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 8%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 175 80% 50%;
+    --primary-foreground: 222 47% 6%;
+
+    --secondary: 260 60% 55%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 222 30% 15%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 175 80% 50%;
+    --accent-foreground: 222 47% 6%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 222 30% 18%;
+    --input: 222 30% 18%;
+    --ring: 175 80% 50%;
+
+    --radius: 0.75rem;
+
+    /* Custom tokens */
+    --gradient-primary: linear-gradient(135deg, hsl(175 80% 50%), hsl(200 80% 50%));
+    --gradient-secondary: linear-gradient(135deg, hsl(260 60% 55%), hsl(280 60% 55%));
+    --gradient-text: linear-gradient(135deg, hsl(175 80% 60%), hsl(200 80% 70%));
+    --gradient-hero: linear-gradient(180deg, hsl(222 47% 8%) 0%, hsl(222 47% 4%) 100%);
+
+    --glass-bg: hsl(222 47% 10% / 0.6);
+    --glass-border: hsl(175 80% 50% / 0.15);
+    --glass-blur: 20px;
+
+    --glow-primary: 0 0 40px hsl(175 80% 50% / 0.3);
+    --glow-secondary: 0 0 40px hsl(260 60% 55% / 0.3);
+
+    --shadow-card: 0 8px 32px hsl(0 0% 0% / 0.3);
+    --shadow-elevated: 0 20px 60px hsl(0 0% 0% / 0.4);
+
+    --sidebar-background: 222 47% 6%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 175 80% 50%;
+    --sidebar-primary-foreground: 222 47% 6%;
+    --sidebar-accent: 222 30% 15%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 222 30% 18%;
+    --sidebar-ring: 175 80% 50%;
+
+    /* Chart colors */
+    --chart-income: 142 71% 45%;
+    --chart-income-projected: 158 64% 52%;
+    --chart-expense: 0 84% 60%;
+    --chart-expense-projected: 0 45% 55%;
+    --chart-balance: 175 80% 50%;
+  }
+
+  :root[data-theme="light"] {
+    --background: 210 20% 98%;
+    --foreground: 222 47% 6%;
+
+    --card: 210 20% 98%;
+    --card-foreground: 222 47% 6%;
+
+    --popover: 210 20% 98%;
+    --popover-foreground: 222 47% 6%;
+
+    --primary: 200 85% 42%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 260 60% 55%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 210 20% 95%;
+    --muted-foreground: 215 16% 35%;
+
+    --accent: 175 80% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 20% 90%;
+    --input: 214 20% 90%;
+    --ring: 200 85% 42%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(200 85% 42%), hsl(210 80% 45%));
+    --gradient-secondary: linear-gradient(135deg, hsl(260 60% 55%), hsl(280 60% 55%));
+    --gradient-text: linear-gradient(135deg, hsl(200 85% 42%), hsl(210 80% 45%));
+    --gradient-hero: linear-gradient(180deg, hsl(210 20% 98%) 0%, hsl(210 20% 96%) 100%);
+
+    --glass-bg: hsl(0 0% 100% / 0.6);
+    --glass-border: hsl(200 85% 42% / 0.2);
+    --glass-blur: 20px;
+
+    --glow-primary: 0 0 40px hsl(200 85% 42% / 0.2);
+    --glow-secondary: 0 0 40px hsl(260 60% 55% / 0.2);
+
+    --shadow-card: 0 8px 32px hsl(222 47% 6% / 0.08);
+    --shadow-elevated: 0 20px 60px hsl(222 47% 6% / 0.12);
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 47% 6%;
+    --sidebar-primary: 200 85% 42%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 40% 96%;
+    --sidebar-accent-foreground: 222 47% 6%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 200 85% 42%;
+
+    /* Chart colors */
+    --chart-income: 142 71% 45%;
+    --chart-income-projected: 158 64% 52%;
+    --chart-expense: 0 84% 60%;
+    --chart-expense-projected: 0 45% 55%;
+    --chart-balance: 200 85% 42%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body {
+    @apply overflow-x-hidden;
+    max-width: 100vw;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: var(--font-inter), sans-serif;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-sora), sans-serif;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-card/60 backdrop-blur-xl border border-border/50 rounded-2xl;
+    box-shadow: var(--shadow-card);
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300;
+  }
+
+  .glass-card-hover:hover {
+    @apply border-primary/30 -translate-y-1;
+    box-shadow: var(--glow-primary), var(--shadow-elevated);
+  }
+
+  .gradient-text {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-text);
+  }
+
+  .gradient-border {
+    @apply relative;
+  }
+
+  .gradient-border::before {
+    content: '';
+    @apply absolute inset-0 rounded-2xl p-[1px];
+    background: var(--gradient-primary);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-semibold text-primary-foreground transition-all duration-300;
+    background: var(--gradient-primary);
+    box-shadow: var(--glow-primary);
+    min-width: fit-content;
+    white-space: nowrap;
+  }
+
+  .btn-primary:hover {
+    @apply scale-105;
+    box-shadow: 0 0 60px hsl(175 80% 50% / 0.5);
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-semibold border border-border bg-card/50 text-foreground transition-all duration-300 hover:border-primary/50 hover:bg-card;
+    min-width: fit-content;
+    white-space: nowrap;
+  }
+
+  .badge-pill {
+    @apply inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium bg-primary/10 text-primary border border-primary/20;
+  }
+
+  .section-padding {
+    @apply py-20 md:py-32;
+  }
+
+  .container-custom {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .fade-in-up {
+    animation: fadeInUp 0.6s ease-out forwards;
+    opacity: 0;
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .stagger-1 {
+    animation-delay: 0.1s;
+  }
+
+  .stagger-2 {
+    animation-delay: 0.2s;
+  }
+
+  .stagger-3 {
+    animation-delay: 0.3s;
+  }
+
+  .stagger-4 {
+    animation-delay: 0.4s;
+  }
+
+  .stagger-5 {
+    animation-delay: 0.5s;
+  }
+
+  .stagger-6 {
+    animation-delay: 0.6s;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Blog Content Styles - Ensure proper colors in both themes */
+.blog-content {
+  color: hsl(var(--foreground) / 0.9);
+}
+
+.blog-content h1,
+.blog-content h2,
+.blog-content h3,
+.blog-content h4,
+.blog-content h5,
+.blog-content h6 {
+  color: hsl(var(--foreground));
+  font-family: var(--font-sora), sans-serif;
+  margin-top: 2em;
+  margin-bottom: 0.75em;
+}
+
+.blog-content h2 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  border-bottom: 1px solid hsl(var(--border));
+  padding-bottom: 0.5rem;
+}
+
+.blog-content h3 {
+  font-size: 1.375rem;
+  font-weight: 600;
+}
+
+.blog-content p {
+  color: hsl(var(--foreground) / 0.85);
+  margin-bottom: 1.25em;
+  line-height: 1.8;
+}
+
+.blog-content strong,
+.blog-content b {
+  color: hsl(var(--foreground));
+  font-weight: 600;
+}
+
+.blog-content a {
+  color: hsl(var(--primary));
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.blog-content a:hover {
+  text-decoration: underline;
+  opacity: 0.8;
+}
+
+.blog-content ul,
+.blog-content ol {
+  color: hsl(var(--foreground) / 0.85);
+  margin: 1.25em 0;
+  padding-left: 1.5em;
+}
+
+.blog-content li {
+  margin: 0.5em 0;
+}
+
+.blog-content li::marker {
+  color: hsl(var(--primary));
+}
+
+.blog-content blockquote {
+  border-left: 4px solid hsl(var(--primary));
+  padding-left: 1.25em;
+  margin: 1.5em 0;
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+}
+
+.blog-content code {
+  color: hsl(var(--primary));
+  background-color: hsl(var(--muted));
+  padding: 0.125em 0.375em;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+}
+
+.blog-content pre {
+  background-color: hsl(var(--muted));
+  border-radius: 0.5rem;
+  padding: 1rem;
+  overflow-x: auto;
+  margin: 1.5em 0;
+}
+
+.blog-content pre code {
+  background: none;
+  padding: 0;
+  color: hsl(var(--foreground) / 0.9);
+}
+
+.blog-content img {
+  border-radius: 0.5rem;
+  margin: 1.5em 0;
+}
+
+.blog-content hr {
+  border-color: hsl(var(--border));
+  margin: 2em 0;
+}
+
+.blog-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0;
+}
+
+.blog-content th,
+.blog-content td {
+  border: 1px solid hsl(var(--border));
+  padding: 0.75em;
+  text-align: left;
+}
+
+.blog-content th {
+  background-color: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  font-weight: 600;
+}
+
+.blog-content td {
+  color: hsl(var(--foreground) / 0.85);
+}
+
+/* Custom Scrollbar Styles - Padronizado para toda a aplicação */
+@layer base {
+
+  /* Webkit browsers (Chrome, Safari, Edge) */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(175 80% 50% / 0.3) hsl(222 30% 15% / 0.5);
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: hsl(222 30% 15% / 0.3);
+    border-radius: 10px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: hsl(175 80% 50% / 0.4);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    transition: background 0.2s ease;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: hsl(175 80% 50% / 0.6);
+    background-clip: padding-box;
+  }
+
+  *::-webkit-scrollbar-thumb:active {
+    background: hsl(175 80% 50% / 0.8);
+    background-clip: padding-box;
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: hsl(222 30% 15% / 0.3);
+  }
+
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(175 80% 50% / 0.4) hsl(222 30% 15% / 0.3);
+  }
+
+  /* Scrollbar para elementos com overflow específico */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(175 80% 50% / 0.4) hsl(222 30% 15% / 0.3);
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: hsl(222 30% 15% / 0.2);
+    border-radius: 10px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(175 80% 50% / 0.3);
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: hsl(175 80% 50% / 0.5);
+  }
+
+  /* Classe custom-scrollbar para uso específico em componentes */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(175 80% 50% / 0.4) hsl(222 30% 15% / 0.3);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: hsl(222 30% 15% / 0.3);
+    border-radius: 10px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(175 80% 50% / 0.4);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    transition: background 0.2s ease;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(175 80% 50% / 0.6);
+    background-clip: padding-box;
+  }
+
+  /* Scrollbar para elementos com tema secundário (roxo) */
+  .scrollbar-secondary {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(260 60% 55% / 0.4) hsl(222 30% 15% / 0.3);
+  }
+
+  .scrollbar-secondary::-webkit-scrollbar-thumb {
+    background: hsl(260 60% 55% / 0.4);
+    background-clip: padding-box;
+  }
+
+  .scrollbar-secondary::-webkit-scrollbar-thumb:hover {
+    background: hsl(260 60% 55% / 0.6);
+    background-clip: padding-box;
+  }
+
+  /* Classe para esconder completamente a scrollbar */
+  .scrollbar-hide {
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* IE e Edge */
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+    /* Chrome, Safari, Opera */
+  }
+
+  /* Estilos para spinners de inputs numéricos - Padronizado com o tema */
+  /* Esconder spinners nativos e aplicar estilo consistente */
+  input[type="number"] {
+    -moz-appearance: textfield;
+    /* Remove spinners no Firefox */
+  }
+
+  /* Webkit browsers (Chrome, Safari, Edge) - esconder spinners nativos */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+  }
+
+  /* Estilos para inputs numéricos com tema da aplicação */
+  input[type="number"]:focus-visible {
+    border-color: hsl(175 80% 50%);
+  }
+
+  /* Estilos para selects nativos (incluindo dropdowns do calendário) */
+  select {
+    background-color: hsl(222 30% 15%);
+    color: hsl(210 40% 98%);
+    border-color: hsl(222 30% 18% / 0.5);
+  }
+
+  select:focus {
+    border-color: hsl(175 80% 50% / 0.5);
+    outline: none;
+  }
+
+  select option {
+    background-color: hsl(222 47% 10%);
+    color: hsl(210 40% 98%);
+    padding: 8px 12px;
+  }
+
+  select option:hover,
+  select option:focus,
+  select option:checked {
+    background-color: hsl(175 80% 50% / 0.2);
+    color: hsl(210 40% 98%);
+  }
+
+  select optgroup {
+    background-color: hsl(222 47% 8%);
+    color: hsl(215 20% 65%);
+    font-weight: 600;
+  }
+}
+
+/* React Day Picker v8 - Estilos completos */
+.rdp {
+  --rdp-cell-size: 36px;
+  --rdp-accent-color: hsl(175 80% 50%);
+  --rdp-background-color: hsl(175 80% 50% / 0.2);
+  --rdp-accent-color-dark: hsl(175 80% 50%);
+  --rdp-background-color-dark: hsl(175 80% 50% / 0.2);
+  --rdp-outline: 2px solid hsl(175 80% 50%);
+  --rdp-outline-selected: 2px solid hsl(175 80% 50%);
+}
+
+/* Caption (header with month/year and navigation) */
+.rdp-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.rdp-caption_label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: hsl(210 40% 98%);
+}
+
+/* Navigation buttons */
+.rdp-nav {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.rdp-nav_button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 0.375rem;
+  border: 1px solid hsl(222 30% 25%);
+  background-color: hsl(222 30% 15%);
+  color: hsl(210 40% 98%);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.rdp-nav_button:hover {
+  background-color: hsl(222 30% 20%);
+  border-color: hsl(175 80% 50% / 0.5);
+}
+
+.rdp-nav_button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px hsl(175 80% 50% / 0.3);
+}
+
+.rdp-nav_button svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Caption dropdowns (month/year selectors) */
+.rdp-caption_dropdowns {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.rdp-dropdown_month,
+.rdp-dropdown_year,
+.rdp-dropdown {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: hsl(222 30% 15%);
+  color: hsl(210 40% 98%);
+  border: 1px solid hsl(222 30% 25%);
+  border-radius: 0.375rem;
+  padding: 0.35rem 1.75rem 0.35rem 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.25rem center;
+  background-repeat: no-repeat;
+  background-size: 1.25rem 1.25rem;
+}
+
+.rdp-dropdown_month:hover,
+.rdp-dropdown_year:hover,
+.rdp-dropdown:hover {
+  background-color: hsl(222 30% 18%);
+  border-color: hsl(175 80% 50% / 0.5);
+}
+
+.rdp-dropdown_month:focus,
+.rdp-dropdown_year:focus,
+.rdp-dropdown:focus {
+  outline: none;
+  border-color: hsl(175 80% 50%);
+  box-shadow: 0 0 0 2px hsl(175 80% 50% / 0.2);
+}
+
+.rdp-dropdown_month option,
+.rdp-dropdown_year option,
+.rdp-dropdown option {
+  background-color: hsl(222 47% 10%);
+  color: hsl(210 40% 98%);
+  padding: 0.5rem;
+}
+
+/* Table (calendar grid) */
+.rdp-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.rdp-head_cell {
+  color: hsl(215 20% 65%);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  padding: 0.5rem 0;
+  text-align: center;
+  width: var(--rdp-cell-size);
+}
+
+.rdp-tbody {
+  /* Gap between rows */
+}
+
+.rdp-row {
+  margin-top: 0.125rem;
+}
+
+.rdp-cell {
+  width: var(--rdp-cell-size);
+  height: var(--rdp-cell-size);
+  text-align: center;
+  padding: 0;
+}
+
+/* Day buttons */
+.rdp-day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--rdp-cell-size);
+  height: var(--rdp-cell-size);
+  border-radius: 0.375rem;
+  border: none;
+  background: transparent;
+  color: hsl(210 40% 98%);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.rdp-day:hover:not(.rdp-day_selected):not(.rdp-day_disabled) {
+  background-color: hsl(222 30% 20%);
+}
+
+.rdp-day:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px hsl(175 80% 50% / 0.3);
+}
+
+/* Selected day */
+.rdp-day_selected {
+  background-color: hsl(175 80% 50%) !important;
+  color: hsl(222 47% 6%) !important;
+  font-weight: 600;
+}
+
+.rdp-day_selected:hover {
+  background-color: hsl(175 80% 45%) !important;
+}
+
+/* Today */
+.rdp-day_today:not(.rdp-day_selected) {
+  background-color: hsl(222 30% 20%);
+  border: 1px solid hsl(175 80% 50% / 0.5);
+  font-weight: 600;
+}
+
+/* Outside days (previous/next month) */
+.rdp-day_outside {
+  color: hsl(215 20% 45%);
+  opacity: 0.5;
+}
+
+/* Disabled days */
+.rdp-day_disabled {
+  color: hsl(215 20% 35%);
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Range selection */
+.rdp-day_range_middle {
+  background-color: hsl(175 80% 50% / 0.15);
+  border-radius: 0;
+}
+
+.rdp-day_range_start {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.rdp-day_range_end {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}

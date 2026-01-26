@@ -414,7 +414,7 @@ export default function AssetDetailPage() {
         <div className="glass-card p-5">
           <div className="text-sm text-muted-foreground mb-2">Valorização</div>
           <p className={`font-display text-2xl font-bold ${
-            appreciation >= 0 ? 'text-green-500' : 'text-red-500'
+            appreciation >= 0 ? 'text-positive' : 'text-negative'
           }`}>
             {appreciation >= 0 ? '+' : ''}{formatCurrency(appreciation)} ({appreciationPercent}%)
           </p>

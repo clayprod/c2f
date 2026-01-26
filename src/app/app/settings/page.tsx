@@ -941,7 +941,7 @@ function SettingsPageContent() {
                       <Button 
                         variant="outline" 
                         onClick={() => setShowCancelDialog(true)}
-                        className="w-full border-red-500/50 text-red-500 hover:bg-red-500/10 text-xs md:text-sm"
+                        className="w-full border-red-500/50 text-negative hover:bg-red-500/10 text-xs md:text-sm"
                       >
                         <i className='bx bx-x-circle mr-1.5 md:mr-2'></i>
                         Cancelar Assinatura
@@ -971,7 +971,7 @@ function SettingsPageContent() {
 
               {/* Danger Zone */}
               <div className="glass-card p-4 md:p-6 border-red-500/20">
-                <h2 className="font-display font-semibold text-base md:text-lg mb-3 md:mb-4 flex items-center gap-2 text-red-500">
+                <h2 className="font-display font-semibold text-base md:text-lg mb-3 md:mb-4 flex items-center gap-2 text-negative">
                   <i className='bx bx-error text-lg md:text-xl'></i>
                   Zona de Perigo
                 </h2>
@@ -981,7 +981,7 @@ function SettingsPageContent() {
                 <div className="flex flex-col gap-2">
                   <Button
                     variant="outline"
-                    className="border-red-500/50 text-red-500 hover:bg-red-500/10 w-full text-xs md:text-sm"
+                    className="border-red-500/50 text-negative hover:bg-red-500/10 w-full text-xs md:text-sm"
                     onClick={() => setShowDeleteDialog(true)}
                   >
                     <i className='bx bx-trash'></i>
@@ -1004,7 +1004,7 @@ function SettingsPageContent() {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-red-500 flex items-center gap-2">
+            <AlertDialogTitle className="text-negative flex items-center gap-2">
               <i className='bx bx-error-circle text-xl'></i>
               Confirmar Exclusão de Conta
             </AlertDialogTitle>
@@ -1013,7 +1013,7 @@ function SettingsPageContent() {
                 Esta ação é <strong>irreversível</strong> e irá excluir permanentemente sua conta e todos os dados associados.
               </p>
               <p>
-                Para confirmar, digite <strong className="text-red-500">EXCLUIR</strong> no campo abaixo:
+                Para confirmar, digite <strong className="text-negative">EXCLUIR</strong> no campo abaixo:
               </p>
               <input
                 type="text"
@@ -1089,7 +1089,7 @@ function SettingsPageContent() {
       <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-red-500 flex items-center gap-2">
+            <AlertDialogTitle className="text-negative flex items-center gap-2">
               <i className='bx bx-error-circle text-xl'></i>
               Cancelar Assinatura
             </AlertDialogTitle>

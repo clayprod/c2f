@@ -226,9 +226,9 @@ export default function BillDetailModal({
     const styles = {
       open: 'bg-blue-500/20 text-blue-500',
       closed: 'bg-yellow-500/20 text-yellow-500',
-      paid: 'bg-green-500/20 text-green-500',
+      paid: 'bg-green-500/20 text-positive',
       partial: 'bg-orange-500/20 text-orange-500',
-      overdue: 'bg-red-500/20 text-red-500',
+      overdue: 'bg-red-500/20 text-negative',
     };
     const labels = {
       open: 'Aberta',
@@ -374,7 +374,7 @@ export default function BillDetailModal({
                       <span className="text-muted-foreground">
                         Juros ({bill.interest_rate_applied || 0}% a.m.)
                       </span>
-                      <span className="font-medium text-red-500">{formatCurrency(bill.interest_cents)}</span>
+                      <span className="font-medium text-negative">{formatCurrency(bill.interest_cents)}</span>
                     </div>
                   )}
                 </div>
@@ -497,7 +497,7 @@ export default function BillDetailModal({
                             )}
                           </div>
                         </div>
-                        <p className={`font-semibold ${tx.amount_cents >= 0 ? 'text-red-500' : 'text-green-500'}`}>
+                        <p className={`font-semibold ${tx.amount_cents >= 0 ? 'text-negative' : 'text-positive'}`}>
                           {formatCurrency(Math.abs(tx.amount_cents))}
                         </p>
                       </div>

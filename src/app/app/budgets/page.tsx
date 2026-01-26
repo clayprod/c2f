@@ -612,13 +612,14 @@ export default function BudgetsPage() {
   const incomeCategories = categoriesWithoutBudget.filter(c => c.type === 'income');
   const expenseCategories = categoriesWithoutBudget.filter(c => !c.type || c.type === 'expense');
 
+  // Paleta de gradientes baseada no design system c2Finance
   const gradientColors = [
-    'from-orange-500 to-red-500',
-    'from-blue-500 to-cyan-500',
-    'from-purple-500 to-pink-500',
-    'from-green-500 to-emerald-500',
-    'from-yellow-500 to-orange-500',
-    'from-indigo-500 to-purple-500',
+    'from-[#1FC0D2] to-[#59D2FE]',   // Strong Cyan -> Sky Aqua
+    'from-[#9448BC] to-[#73FBD3]',   // Amethyst -> Aquamarine
+    'from-[#44E5E7] to-[#1FC0D2]',   // Neon Ice -> Strong Cyan
+    'from-[#73FBD3] to-[#44E5E7]',   // Aquamarine -> Neon Ice
+    'from-[#FED766] to-[#FE4A49]',   // Mustard -> Tomato
+    'from-[#59D2FE] to-[#9448BC]',   // Sky Aqua -> Amethyst
   ];
 
   // Helper to get source type icon
@@ -703,7 +704,7 @@ export default function BudgetsPage() {
               </>
             )}
             {!isIncome && (
-              <span className={`text-xs font-semibold min-w-[36px] text-right ${isOver ? 'text-red-500' : percentage >= 80 ? 'text-yellow-500' : 'text-muted-foreground'}`}>
+              <span className={`text-xs font-semibold min-w-[36px] text-right ${isOver ? 'text-destructive' : percentage >= 80 ? 'text-warning' : 'text-muted-foreground'}`}>
                 {percentage.toFixed(0)}%
               </span>
             )}
@@ -715,7 +716,7 @@ export default function BudgetsPage() {
           <div className="mb-2">
             <div className="h-1.5 bg-muted rounded-full overflow-hidden">
               <div
-                className={`h-full bg-gradient-to-r ${isOver ? 'from-red-500 to-red-600' : percentage >= 80 ? 'from-yellow-500 to-orange-500' : colorClass} transition-all`}
+                className={`h-full bg-gradient-to-r ${isOver ? 'from-[#FE4A49] to-[#E63946]' : percentage >= 80 ? 'from-[#FED766] to-[#FE4A49]' : colorClass} transition-all`}
                 style={{ width: `${Math.min(percentage, 100)}%` }}
               />
             </div>
@@ -726,7 +727,7 @@ export default function BudgetsPage() {
         <div className="flex items-center justify-between text-xs md:text-sm gap-2">
           <div className="flex items-center gap-1">
             <span className="text-muted-foreground">{isIncome ? 'Rec:' : 'Gasto:'}</span>
-            <span className={`font-medium ${isOver ? 'text-red-500' : ''}`}>{formatCurrencyReais(spent)}</span>
+            <span className={`font-medium ${isOver ? 'text-destructive' : ''}`}>{formatCurrencyReais(spent)}</span>
           </div>
           <div className="flex items-center gap-1">
             <span className="text-muted-foreground hidden sm:inline">{isIncome ? 'Plan:' : (isReadOnly ? 'Pendente:' : 'Limite:')}</span>
@@ -748,8 +749,8 @@ export default function BudgetsPage() {
 
         {/* Over budget alert - compact inline */}
         {!isIncome && isOver && (
-          <div className="mt-2 py-1.5 px-2 bg-red-500/10 border border-red-500/20 rounded-lg">
-            <p className="text-xs text-red-500 flex items-center gap-1">
+          <div className="mt-2 py-1.5 px-2 bg-destructive/10 border border-destructive/20 rounded-lg">
+            <p className="text-xs text-destructive flex items-center gap-1">
               <i className='bx bx-error-circle'></i>
               <span>+{formatCurrencyReais(spent - limit)} acima</span>
             </p>
@@ -936,18 +937,18 @@ export default function BudgetsPage() {
             {/* Summary inline - compact */}
             <div className="flex items-center gap-2 md:gap-3 lg:gap-4 text-[10px] sm:text-xs md:text-sm overflow-x-auto scrollbar-hide flex-shrink-0">
               <div className="flex items-center gap-1 flex-shrink-0">
-                <i className='bx bx-trending-up text-green-500 text-xs md:text-sm'></i>
+                <i className='bx bx-trending-up text-positive text-xs md:text-sm'></i>
                 <span className="text-muted-foreground hidden sm:inline">Receitas:</span>
-                <span className="font-semibold text-green-500 whitespace-nowrap">{formatCurrencyReais(incomeActual)}</span>
+                <span className="font-semibold text-positive whitespace-nowrap">{formatCurrencyReais(incomeActual)}</span>
                 <span className="text-muted-foreground whitespace-nowrap hidden md:inline">/ {formatCurrencyReais(incomePlanned)}</span>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
-                <i className='bx bx-trending-down text-red-500 text-xs md:text-sm'></i>
+                <i className='bx bx-trending-down text-negative text-xs md:text-sm'></i>
                 <span className="text-muted-foreground hidden sm:inline">Despesas:</span>
-                <span className="font-semibold text-red-500 whitespace-nowrap">{formatCurrencyReais(expenseActual)}</span>
+                <span className="font-semibold text-negative whitespace-nowrap">{formatCurrencyReais(expenseActual)}</span>
                 <span className="text-muted-foreground whitespace-nowrap hidden md:inline">/ {formatCurrencyReais(expensePlanned)}</span>
               </div>
-              <div className={`flex items-center gap-1 font-semibold flex-shrink-0 ${(expensePlanned - expenseActual) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              <div className={`flex items-center gap-1 font-semibold flex-shrink-0 ${(expensePlanned - expenseActual) >= 0 ? 'text-positive' : 'text-negative'}`}>
                 <span className="text-muted-foreground hidden sm:inline">Livre:</span>
                 <span className="whitespace-nowrap">{formatCurrencyReais(expensePlanned - expenseActual)}</span>
               </div>
@@ -960,10 +961,10 @@ export default function BudgetsPage() {
           <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-300">
             <div className="flex items-center gap-2">
               <h2 className="font-display text-sm md:text-lg font-semibold flex items-center gap-2">
-                <i className='bx bx-trending-up text-green-500'></i>
+                <i className='bx bx-trending-up text-positive'></i>
                 Orçamentos de Receita
               </h2>
-              <span className="text-xs text-muted-foreground bg-green-500/20 px-2 py-0.5 rounded-full">
+              <span className="text-xs text-muted-foreground bg-positive/20 px-2 py-0.5 rounded-full">
                 {incomeBudgets.length}
               </span>
             </div>
@@ -978,10 +979,10 @@ export default function BudgetsPage() {
           <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-300">
             <div className="flex items-center gap-2">
               <h2 className="font-display text-sm md:text-lg font-semibold flex items-center gap-2">
-                <i className='bx bx-trending-down text-red-500'></i>
+                <i className='bx bx-trending-down text-negative'></i>
                 Orçamentos de Despesa
               </h2>
-              <span className="text-xs text-muted-foreground bg-red-500/20 px-2 py-0.5 rounded-full">
+              <span className="text-xs text-muted-foreground bg-negative/20 px-2 py-0.5 rounded-full">
                 {expenseBudgets.length}
               </span>
             </div>
@@ -1011,7 +1012,7 @@ export default function BudgetsPage() {
               {/* Income Categories */}
               {incomeCategories.length > 0 && (
                 <div className="space-y-2">
-                  <h3 className="text-xs font-medium text-green-500 flex items-center gap-1.5 px-1">
+                  <h3 className="text-xs font-medium text-positive flex items-center gap-1.5 px-1">
                     <i className='bx bx-trending-up'></i>
                     Receitas ({incomeCategories.length})
                   </h3>
@@ -1024,7 +1025,7 @@ export default function BudgetsPage() {
               {/* Expense Categories */}
               {expenseCategories.length > 0 && (
                 <div className="space-y-2">
-                  <h3 className="text-xs font-medium text-red-500 flex items-center gap-1.5 px-1">
+                  <h3 className="text-xs font-medium text-negative flex items-center gap-1.5 px-1">
                     <i className='bx bx-trending-down'></i>
                     Despesas ({expenseCategories.length})
                   </h3>
@@ -1167,7 +1168,7 @@ export default function BudgetsPage() {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2">
-                <i className='bx bx-info-circle text-yellow-500'></i>
+                <i className='bx bx-info-circle text-warning'></i>
                 Categorias sem Orçamento
               </AlertDialogTitle>
               <AlertDialogDescription className="pt-2">

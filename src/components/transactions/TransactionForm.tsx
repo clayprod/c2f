@@ -267,7 +267,7 @@ export default function TransactionForm({
                 onClick={() => setTransactionType('expense')}
                 className={`flex-1 py-3 px-4 rounded-xl border transition-all ${
                   transactionType === 'expense'
-                    ? 'border-red-500 bg-red-500/10 text-red-500'
+                    ? 'border-red-500 bg-red-500/10 text-negative'
                     : 'border-border bg-muted/30 text-muted-foreground hover:bg-muted/50'
                 }`}
               >
@@ -279,7 +279,7 @@ export default function TransactionForm({
                 onClick={() => setTransactionType('income')}
                 className={`flex-1 py-3 px-4 rounded-xl border transition-all ${
                   transactionType === 'income'
-                    ? 'border-green-500 bg-green-500/10 text-green-500'
+                    ? 'border-green-500 bg-green-500/10 text-positive'
                     : 'border-border bg-muted/30 text-muted-foreground hover:bg-muted/50'
                 }`}
               >

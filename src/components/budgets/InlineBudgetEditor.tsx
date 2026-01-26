@@ -327,7 +327,7 @@ export function InlineBudgetEditor({
           <i className="bx bx-list-ul text-xs"></i>
         </Button>
         {error && (
-          <span className="absolute -bottom-4 left-0 text-[10px] text-red-500 whitespace-nowrap">{error}</span>
+          <span className="absolute -bottom-4 left-0 text-[10px] text-negative whitespace-nowrap">{error}</span>
         )}
 
         <BudgetBreakdownModal
@@ -427,7 +427,7 @@ export function InlineBudgetEditor({
         </Button>
       </div>
       {error && (
-        <p className="text-[10px] text-red-500">{error}</p>
+        <p className="text-[10px] text-negative">{error}</p>
       )}
       {minimumValue > 0 && (
         <p className="text-[10px] text-muted-foreground">

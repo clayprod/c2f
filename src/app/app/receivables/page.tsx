@@ -84,11 +84,11 @@ export default function ReceivablesPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'negociada':
-        return 'bg-blue-400/10 text-blue-400 border-blue-400/20';
+        return 'bg-info/10 text-info border-info/20';
       case 'pendente':
-        return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
+        return 'bg-warning/10 text-warning border-warning/20';
       default:
-        return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+        return 'bg-primary/10 text-primary border-primary/20';
     }
   };
 
@@ -103,11 +103,11 @@ export default function ReceivablesPage() {
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'urgent':
-        return 'text-red-500';
+        return 'text-destructive';
       case 'high':
-        return 'text-orange-500';
+        return 'text-warning';
       case 'medium':
-        return 'text-yellow-500';
+        return 'text-warning/80';
       default:
         return 'text-muted-foreground';
     }
@@ -316,13 +316,13 @@ export default function ReceivablesPage() {
                     </div>
                     <div>
                       <p className="text-muted-foreground">Recebido</p>
-                      <p className="font-semibold text-green-500">
+                      <p className="font-semibold text-positive">
                         {formatCurrency(receivable.received_amount_cents)}
                       </p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Restante</p>
-                      <p className="font-semibold text-orange-500">
+                      <p className="font-semibold text-warning">
                         {formatCurrency(receivable.remaining_amount_cents)}
                       </p>
                     </div>

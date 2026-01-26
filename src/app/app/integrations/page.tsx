@@ -316,11 +316,11 @@ export default function IntegrationsPage() {
 
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { color: string; label: string }> = {
-      SUCCESS: { color: 'bg-green-500/10 text-green-500 border-green-500/20', label: 'Conectado' },
-      UPDATED: { color: 'bg-green-500/10 text-green-500 border-green-500/20', label: 'Atualizado' },
+      SUCCESS: { color: 'bg-green-500/10 text-positive border-green-500/20', label: 'Conectado' },
+      UPDATED: { color: 'bg-green-500/10 text-positive border-green-500/20', label: 'Atualizado' },
       UPDATING: { color: 'bg-blue-500/10 text-blue-500 border-blue-500/20', label: 'Atualizando' },
       WAITING_USER_INPUT: { color: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20', label: 'Aguardando' },
-      LOGIN_ERROR: { color: 'bg-red-500/10 text-red-500 border-red-500/20', label: 'Erro de Login' },
+      LOGIN_ERROR: { color: 'bg-red-500/10 text-negative border-red-500/20', label: 'Erro de Login' },
       OUTDATED: { color: 'bg-orange-500/10 text-orange-500 border-orange-500/20', label: 'Desatualizado' },
     };
 
@@ -484,7 +484,7 @@ export default function IntegrationsPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleDisconnect(item.item_id)}
-                          className="text-red-500 hover:text-red-600 hover:border-red-500"
+                          className="text-negative hover:text-red-600 hover:border-red-500"
                         >
                           <i className='bx bx-unlink'></i>
                         </Button>
@@ -526,7 +526,7 @@ export default function IntegrationsPage() {
           <div className="grid sm:grid-cols-3 gap-4">
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                <i className='bx bx-shield text-green-500'></i>
+                <i className='bx bx-shield text-positive'></i>
               </div>
               <div>
                 <h4 className="font-medium text-sm">Seguro</h4>
@@ -565,7 +565,7 @@ export default function IntegrationsPage() {
           <div className="glass-card p-6 border-yellow-500/20 bg-yellow-500/5">
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                <i className='bx bxl-whatsapp text-xl text-green-500'></i>
+                <i className='bx bxl-whatsapp text-xl text-positive'></i>
               </div>
               <div>
                 <h3 className="font-semibold mb-1">Recurso Pro/Premium</h3>

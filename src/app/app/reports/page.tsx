@@ -115,9 +115,18 @@ interface Category {
   type: string;
 }
 
+// Paleta de cores baseada no design system c2Finance
 const COLORS = [
-  '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444',
-  '#ec4899', '#6366f1', '#14b8a6', '#84cc16', '#f97316',
+  '#1FC0D2', // Strong Cyan (primary)
+  '#9448BC', // Amethyst (secondary)
+  '#73FBD3', // Aquamarine (accent)
+  '#59D2FE', // Sky Aqua
+  '#44E5E7', // Neon Ice
+  '#FED766', // Mustard (warning)
+  '#FE4A49', // Tomato (destructive)
+  '#7C5CBF', // Amethyst lighter
+  '#2DD4BF', // Teal variation
+  '#A78BFA', // Purple variation
 ];
 
 const TYPE_LABELS: Record<string, string> = {
@@ -559,38 +568,38 @@ export default function ReportsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="glass-card p-5">
                     <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
-                        <i className='bx bx-trending-up text-xl text-green-500'></i>
+                      <div className="w-10 h-10 rounded-xl bg-positive/10 flex items-center justify-center">
+                        <i className='bx bx-trending-up text-xl text-positive'></i>
                       </div>
                       <span className="text-sm text-muted-foreground">Receitas</span>
                     </div>
-                    <p className="font-display text-2xl font-bold text-green-500">
+                    <p className="font-display text-2xl font-bold text-positive">
                       {formatCurrency(overviewData.summary.total_income_cents)}
                     </p>
                   </div>
 
                   <div className="glass-card p-5">
                     <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
-                        <i className='bx bx-trending-down text-xl text-red-500'></i>
+                      <div className="w-10 h-10 rounded-xl bg-negative/10 flex items-center justify-center">
+                        <i className='bx bx-trending-down text-xl text-negative'></i>
                       </div>
                       <span className="text-sm text-muted-foreground">Despesas</span>
                     </div>
-                    <p className="font-display text-2xl font-bold text-red-500">
+                    <p className="font-display text-2xl font-bold text-negative">
                       {formatCurrency(overviewData.summary.total_expense_cents)}
                     </p>
                   </div>
 
                   <div className="glass-card p-5">
                     <div className="flex items-center gap-3 mb-2">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${overviewData.summary.balance_cents >= 0 ? 'bg-primary/10' : 'bg-red-500/10'
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${overviewData.summary.balance_cents >= 0 ? 'bg-primary/10' : 'bg-negative/10'
                         }`}>
-                        <i className={`bx bx-wallet text-xl ${overviewData.summary.balance_cents >= 0 ? 'text-primary' : 'text-red-500'
+                        <i className={`bx bx-wallet text-xl ${overviewData.summary.balance_cents >= 0 ? 'text-primary' : 'text-negative'
                           }`}></i>
                       </div>
                       <span className="text-sm text-muted-foreground">Saldo</span>
                     </div>
-                    <p className={`font-display text-2xl font-bold ${overviewData.summary.balance_cents >= 0 ? 'text-primary' : 'text-red-500'
+                    <p className={`font-display text-2xl font-bold ${overviewData.summary.balance_cents >= 0 ? 'text-primary' : 'text-negative'
                       }`}>
                       {formatCurrency(overviewData.summary.balance_cents)}
                     </p>
@@ -851,7 +860,7 @@ export default function ReportsPage() {
 
                   <div className="glass-card p-5">
                     <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center">
                         <i className='bx bx-credit-card text-xl text-yellow-500'></i>
                       </div>
                       <span className="text-sm text-muted-foreground">Total Gasto</span>
@@ -863,14 +872,14 @@ export default function ReportsPage() {
 
                   <div className="glass-card p-5">
                     <div className="flex items-center gap-3 mb-2">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${budgetsData.summary.total_remaining_cents >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${budgetsData.summary.total_remaining_cents >= 0 ? 'bg-positive/10' : 'bg-negative/10'
                         }`}>
-                        <i className={`bx bx-check-circle text-xl ${budgetsData.summary.total_remaining_cents >= 0 ? 'text-green-500' : 'text-red-500'
+                        <i className={`bx bx-check-circle text-xl ${budgetsData.summary.total_remaining_cents >= 0 ? 'text-positive' : 'text-negative'
                           }`}></i>
                       </div>
                       <span className="text-sm text-muted-foreground">Disponivel</span>
                     </div>
-                    <p className={`font-display text-2xl font-bold ${budgetsData.summary.total_remaining_cents >= 0 ? 'text-green-500' : 'text-red-500'
+                    <p className={`font-display text-2xl font-bold ${budgetsData.summary.total_remaining_cents >= 0 ? 'text-positive' : 'text-negative'
                       }`}>
                       {formatCurrency(budgetsData.summary.total_remaining_cents)}
                     </p>
@@ -974,23 +983,23 @@ export default function ReportsPage() {
                             <td className="py-4 px-6 font-medium">{budget.category}</td>
                             <td className="py-4 px-6 text-right">{formatCurrency(budget.budgeted_cents)}</td>
                             <td className="py-4 px-6 text-right">{formatCurrency(budget.spent_cents)}</td>
-                            <td className={`py-4 px-6 text-right ${budget.remaining_cents < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                            <td className={`py-4 px-6 text-right ${budget.remaining_cents < 0 ? 'text-negative' : 'text-positive'}`}>
                               {formatCurrency(budget.remaining_cents)}
                             </td>
                             <td className="py-4 px-6">
                               <div className="w-full bg-muted rounded-full h-2">
                                 <div
-                                  className={`h-2 rounded-full ${budget.status === 'over' ? 'bg-red-500' :
-                                    budget.status === 'near' ? 'bg-yellow-500' : 'bg-green-500'
+                                  className={`h-2 rounded-full ${budget.status === 'over' ? 'bg-negative' :
+                                    budget.status === 'near' ? 'bg-warning' : 'bg-positive'
                                     }`}
                                   style={{ width: `${Math.min(budget.percentage, 100)}%` }}
                                 />
                               </div>
                             </td>
                             <td className="py-4 px-6 text-center">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${budget.status === 'over' ? 'bg-red-500/10 text-red-500' :
-                                budget.status === 'near' ? 'bg-yellow-500/10 text-yellow-500' :
-                                  'bg-green-500/10 text-green-500'
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${budget.status === 'over' ? 'bg-negative/10 text-negative' :
+                                budget.status === 'near' ? 'bg-warning/10 text-yellow-500' :
+                                  'bg-positive/10 text-positive'
                                 }`}>
                                 {budget.percentage.toFixed(0)}%
                               </span>
@@ -1038,12 +1047,12 @@ export default function ReportsPage() {
 
                   <div className="glass-card p-5">
                     <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
-                        <i className='bx bx-coin-stack text-xl text-green-500'></i>
+                      <div className="w-10 h-10 rounded-xl bg-positive/10 flex items-center justify-center">
+                        <i className='bx bx-coin text-xl text-positive'></i>
                       </div>
                       <span className="text-sm text-muted-foreground">Acumulado</span>
                     </div>
-                    <p className="font-display text-2xl font-bold text-green-500">
+                    <p className="font-display text-2xl font-bold text-positive">
                       {formatCurrency(goalsData.summary.total_current_cents || 0)}
                     </p>
                   </div>
@@ -1080,7 +1089,7 @@ export default function ReportsPage() {
                         <div key={goal.id} className="p-4 bg-muted/30 rounded-xl">
                           <div className="flex items-center justify-between mb-2">
                             <h4 className="font-medium">{goal.name}</h4>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${goal.status === 'completed' ? 'bg-green-500/10 text-green-500' :
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${goal.status === 'completed' ? 'bg-positive/10 text-positive' :
                               goal.status === 'active' ? 'bg-primary/10 text-primary' :
                                 'bg-muted text-muted-foreground'
                               }`}>
@@ -1124,14 +1133,14 @@ export default function ReportsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                   <div className="glass-card p-5">
                     <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
-                        <i className='bx bx-credit-card text-xl text-red-500'></i>
+                      <div className="w-10 h-10 rounded-xl bg-negative/10 flex items-center justify-center">
+                        <i className='bx bx-credit-card text-xl text-negative'></i>
                       </div>
                       <span className="text-sm text-muted-foreground">Dívidas Ativas</span>
                     </div>
                     <p className="font-display text-2xl font-bold">{debtsData.summary.active_debts}</p>
                     {debtsData.summary.overdue_debts > 0 && (
-                      <p className="text-xs text-red-500 mt-1">{debtsData.summary.overdue_debts} em atraso</p>
+                      <p className="text-xs text-negative mt-1">{debtsData.summary.overdue_debts} em atraso</p>
                     )}
                   </div>
 
@@ -1149,19 +1158,19 @@ export default function ReportsPage() {
 
                   <div className="glass-card p-5">
                     <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
-                        <i className='bx bx-check text-xl text-green-500'></i>
+                      <div className="w-10 h-10 rounded-xl bg-positive/10 flex items-center justify-center">
+                        <i className='bx bx-check text-xl text-positive'></i>
                       </div>
                       <span className="text-sm text-muted-foreground">Total Pago</span>
                     </div>
-                    <p className="font-display text-2xl font-bold text-green-500">
+                    <p className="font-display text-2xl font-bold text-positive">
                       {formatCurrency(debtsData.summary.total_paid_cents)}
                     </p>
                   </div>
 
                   <div className="glass-card p-5">
                     <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center">
                         <i className='bx bx-timer text-xl text-yellow-500'></i>
                       </div>
                       <span className="text-sm text-muted-foreground">Restante</span>
@@ -1196,16 +1205,16 @@ export default function ReportsPage() {
                                 <p className="text-xs text-muted-foreground">
                                   Vencimento: {new Date(debt.due_date).toLocaleDateString('pt-BR')}
                                   {debt.days_until_due !== null && (
-                                    <span className={debt.days_until_due < 0 ? ' text-red-500' : ''}>
+                                    <span className={debt.days_until_due < 0 ? ' text-negative' : ''}>
                                       {' '}({debt.days_until_due < 0 ? `${Math.abs(debt.days_until_due)} dias atrasado` : `${debt.days_until_due} dias`})
                                     </span>
                                   )}
                                 </p>
                               )}
                             </div>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${debt.status === 'paid' ? 'bg-green-500/10 text-green-500' :
-                              debt.status === 'overdue' ? 'bg-red-500/10 text-red-500' :
-                                debt.status === 'negotiating' ? 'bg-yellow-500/10 text-yellow-500' :
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${debt.status === 'paid' ? 'bg-positive/10 text-positive' :
+                              debt.status === 'overdue' ? 'bg-negative/10 text-negative' :
+                                debt.status === 'negotiating' ? 'bg-warning/10 text-yellow-500' :
                                   'bg-primary/10 text-primary'
                               }`}>
                               {debt.status === 'paid' ? 'Pago' :
@@ -1219,8 +1228,8 @@ export default function ReportsPage() {
                           </div>
                           <div className="w-full bg-muted rounded-full h-3">
                             <div
-                              className={`h-3 rounded-full ${debt.status === 'paid' ? 'bg-green-500' :
-                                debt.status === 'overdue' ? 'bg-red-500' : 'bg-gradient-to-r from-orange-500 to-yellow-500'
+                              className={`h-3 rounded-full ${debt.status === 'paid' ? 'bg-positive' :
+                                debt.status === 'overdue' ? 'bg-negative' : 'bg-gradient-to-r from-orange-500 to-yellow-500'
                                 }`}
                               style={{ width: `${Math.min(debt.progress, 100)}%` }}
                             />
@@ -1269,14 +1278,14 @@ export default function ReportsPage() {
 
                   <div className="glass-card p-5">
                     <div className="flex items-center gap-3 mb-2">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${investmentsData.summary.total_return_cents >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${investmentsData.summary.total_return_cents >= 0 ? 'bg-positive/10' : 'bg-negative/10'
                         }`}>
-                        <i className={`bx bx-trending-up text-xl ${investmentsData.summary.total_return_cents >= 0 ? 'text-green-500' : 'text-red-500'
+                        <i className={`bx bx-trending-up text-xl ${investmentsData.summary.total_return_cents >= 0 ? 'text-positive' : 'text-negative'
                           }`}></i>
                       </div>
                       <span className="text-sm text-muted-foreground">Retorno</span>
                     </div>
-                    <p className={`font-display text-2xl font-bold ${investmentsData.summary.total_return_cents >= 0 ? 'text-green-500' : 'text-red-500'
+                    <p className={`font-display text-2xl font-bold ${investmentsData.summary.total_return_cents >= 0 ? 'text-positive' : 'text-negative'
                       }`}>
                       {formatCurrency(investmentsData.summary.total_return_cents)}
                     </p>
@@ -1284,13 +1293,13 @@ export default function ReportsPage() {
 
                   <div className="glass-card p-5">
                     <div className="flex items-center gap-3 mb-2">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${investmentsData.summary.total_return_percentage >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${investmentsData.summary.total_return_percentage >= 0 ? 'bg-positive/10' : 'bg-negative/10'
                         }`}>
-                        <i className={`bx bx-percentage text-xl ${investmentsData.summary.total_return_percentage >= 0 ? 'text-green-500' : 'text-red-500'}`}></i>
+                        <i className={`bx bx-percentage text-xl ${investmentsData.summary.total_return_percentage >= 0 ? 'text-positive' : 'text-negative'}`}></i>
                       </div>
                       <span className="text-sm text-muted-foreground">% Retorno</span>
                     </div>
-                    <p className={`font-display text-2xl font-bold ${investmentsData.summary.total_return_percentage >= 0 ? 'text-green-500' : 'text-red-500'
+                    <p className={`font-display text-2xl font-bold ${investmentsData.summary.total_return_percentage >= 0 ? 'text-positive' : 'text-negative'
                       }`}>
                       {investmentsData.summary.total_return_percentage >= 0 ? '+' : ''}{investmentsData.summary.total_return_percentage.toFixed(2)}%
                     </p>
@@ -1355,7 +1364,7 @@ export default function ReportsPage() {
                           </div>
                           <div className="text-right">
                             <p className="font-medium">{formatCurrency(type.current_value_cents)}</p>
-                            <p className={`text-sm ${type.return_percentage >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            <p className={`text-sm ${type.return_percentage >= 0 ? 'text-positive' : 'text-negative'}`}>
                               {type.return_percentage >= 0 ? '+' : ''}{type.return_percentage.toFixed(2)}%
                             </p>
                           </div>
@@ -1386,13 +1395,13 @@ export default function ReportsPage() {
                             <td className="py-4 px-6">{TYPE_LABELS[inv.type] || inv.type}</td>
                             <td className="py-4 px-6 text-right">{formatCurrency(inv.invested_cents)}</td>
                             <td className="py-4 px-6 text-right">{formatCurrency(inv.current_value_cents)}</td>
-                            <td className={`py-4 px-6 text-right ${inv.return_percentage >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            <td className={`py-4 px-6 text-right ${inv.return_percentage >= 0 ? 'text-positive' : 'text-negative'}`}>
                               {inv.return_percentage >= 0 ? '+' : ''}{inv.return_percentage.toFixed(2)}%
                             </td>
                             <td className="py-4 px-6 text-center">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${inv.status === 'active' ? 'bg-green-500/10 text-green-500' :
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${inv.status === 'active' ? 'bg-positive/10 text-positive' :
                                 inv.status === 'sold' ? 'bg-muted text-muted-foreground' :
-                                  'bg-yellow-500/10 text-yellow-500'
+                                  'bg-warning/10 text-yellow-500'
                                 }`}>
                                 {inv.status === 'active' ? 'Ativo' : inv.status === 'sold' ? 'Vendido' : 'Vencido'}
                               </span>

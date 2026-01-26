@@ -116,9 +116,9 @@ export function ContactSupport() {
               <Button
                 onClick={handleWhatsAppClick}
                 variant="outline"
-                className="w-full justify-start gap-3 h-auto py-3 border-green-500/50 hover:bg-green-500/10"
+                className="w-full justify-start gap-3 h-auto py-3 border-success/50 hover:bg-success/10"
               >
-                <i className="bxl bx-whatsapp text-xl text-green-500"></i>
+                <i className="bxl bx-whatsapp text-xl text-success"></i>
                 <div className="text-left flex-1">
                   <div className="font-medium">WhatsApp</div>
                   <div className="text-sm text-muted-foreground">{contacts.whatsapp}</div>
