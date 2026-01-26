@@ -9,11 +9,11 @@ const Hero = () => {
     offset: ["start start", "end start"],
   });
 
-  // Animation transforms - responds immediately to scroll
-  const rotate = useTransform(scrollYProgress, [0, 0.5], [20, 0]);
-  const scale = useTransform(scrollYProgress, [0, 0.5], [0.9, 1]);
-  const translateY = useTransform(scrollYProgress, [0, 0.5], [100, 0]);
-  const opacity = useTransform(scrollYProgress, [0, 0.3], [0.6, 1]);
+  // Animation transforms - faster rotation and expansion on scroll
+  const rotate = useTransform(scrollYProgress, [0, 0.25], [20, 0]);
+  const scale = useTransform(scrollYProgress, [0, 0.4], [1, 1.15]);
+  const translateY = useTransform(scrollYProgress, [0, 0.3], [80, 0]);
+  const opacity = useTransform(scrollYProgress, [0, 0.2], [0.7, 1]);
 
   return (
     <section 
@@ -43,7 +43,7 @@ const Hero = () => {
           </h1>
 
           {/* Subtitle */}
-          <p className="fade-in-up stagger-3 text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-12 text-balance">
+          <p className="fade-in-up stagger-3 text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-4 text-balance">
             Transações, orçamentos, projeções e insights acionáveis — tudo em um painel simples.
             Utilize o <span className="inline-flex items-center gap-1 font-semibold text-emerald-400 ml-1.5">
               <svg
@@ -70,22 +70,18 @@ const Hero = () => {
                 y: translateY,
                 opacity,
               }}
-              className="h-[28rem] md:h-[38rem] w-full border-4 border-primary/30 p-2 md:p-6 bg-card rounded-[30px] shadow-2xl"
+              className="w-full aspect-video border-4 border-primary/30 bg-card rounded-[30px] shadow-2xl overflow-hidden"
             >
-              <div className="h-full w-full overflow-hidden rounded-2xl bg-background md:rounded-2xl md:p-4">
-                {/* YouTube Video - autoplay, loop, no UI */}
-                <div className="relative w-full h-full rounded-xl overflow-hidden">
-                  <iframe
-                    className="absolute inset-0 w-full h-full"
-                    src="https://www.youtube.com/embed/zxjHLiZcqtY?autoplay=1&mute=1&loop=1&playlist=zxjHLiZcqtY&controls=0&showinfo=0&rel=0&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0&playsinline=1"
-                    title="c2Finance Demo"
-                    allow="autoplay; encrypted-media"
-                    allowFullScreen={false}
-                    frameBorder="0"
-                    style={{ pointerEvents: 'none' }}
-                  />
-                </div>
-              </div>
+              {/* YouTube Video - autoplay, loop, no UI */}
+              <iframe
+                className="w-full h-full"
+                src="https://www.youtube-nocookie.com/embed/zxjHLiZcqtY?autoplay=1&mute=1&loop=1&playlist=zxjHLiZcqtY&controls=0&showinfo=0&rel=0&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0&playsinline=1&start=1&hd=1&vq=hd1080"
+                title="c2Finance Demo"
+                allow="autoplay; encrypted-media"
+                allowFullScreen={false}
+                frameBorder="0"
+                style={{ pointerEvents: 'none' }}
+              />
             </motion.div>
           </div>
 
