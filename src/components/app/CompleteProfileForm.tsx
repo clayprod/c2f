@@ -51,6 +51,7 @@ export default function CompleteProfileForm({
   const [estados, setEstados] = useState<Estado[]>([]);
   const [cidades, setCidades] = useState<Cidade[]>([]);
   const [hasAutoFilledFromCep, setHasAutoFilledFromCep] = useState(false);
+  const [pendingCityFromCep, setPendingCityFromCep] = useState<string>('');
   const router = useRouter();
   const { toast } = useToast();
 
@@ -99,12 +100,20 @@ export default function CompleteProfileForm({
       if (!state) {
         setCidades([]);
         setCity('');
+        setPendingCityFromCep('');
+        return;
+      }
+
+      // Se o estado foi preenchido pelo CEP, não recarregar as cidades
+      // pois o lookupCep já fez isso e definiu a cidade corretamente
+      if (hasAutoFilledFromCep) {
         return;
       }
 
       try {
         const cidadesData = await buscarCidadesPorEstado(state);
-        setCidades(cidadesData.sort((a, b) => a.nome.localeCompare(b.nome)));
+        const cidadesSorted = cidadesData.sort((a, b) => a.nome.localeCompare(b.nome));
+        setCidades(cidadesSorted);
         setCity((prevCity) => {
           if (prevCity && !cidadesData.some(c => c.nome === prevCity)) {
             return '';
@@ -117,7 +126,23 @@ export default function CompleteProfileForm({
       }
     }
     loadCidades();
-  }, [state]);
+  }, [state, hasAutoFilledFromCep]);
+
+  // Preencher cidade automaticamente quando as cidades estiverem carregadas e houver uma cidade pendente do CEP
+  useEffect(() => {
+    if (pendingCityFromCep && cidades.length > 0 && hasAutoFilledFromCep && !city) {
+      // Verifica se a cidade pendente existe na lista de cidades (com comparação normalizada)
+      const cidadeExiste = cidades.some(c => 
+        normalizeCityName(c.nome) === normalizeCityName(pendingCityFromCep) ||
+        c.nome === pendingCityFromCep
+      );
+      if (cidadeExiste || pendingCityFromCep) {
+        // Se a cidade existe na lista ou foi adicionada como fallback, preenche
+        setCity(pendingCityFromCep);
+        setPendingCityFromCep('');
+      }
+    }
+  }, [cidades, pendingCityFromCep, hasAutoFilledFromCep, city]);
 
   const normalizeCityName = (name: string): string => {
     return name
@@ -168,10 +193,23 @@ export default function CompleteProfileForm({
             cidadeParaPreencher = cidadeDoCep;
           }
 
-          setCidades(cidadesFinal);
-          setState(dados.state);
-          setCity(cidadeParaPreencher);
+          // Define tudo de uma vez: estado, cidades e cidade
+          // Primeiro seta o estado e as cidades, depois preenche a cidade
           setHasAutoFilledFromCep(true);
+          setState(dados.state);
+          setCidades(cidadesFinal);
+          
+          // Preenche a cidade imediatamente após definir as cidades
+          // Usa um pequeno delay para garantir que o React atualize o estado do Select
+          if (cidadeParaPreencher) {
+            // Sempre preenche a cidade, já que ela está na lista (ou foi adicionada como fallback)
+            // Usa setTimeout para garantir que o Select reconheça o valor após o estado ser atualizado
+            setTimeout(() => {
+              setCity(cidadeParaPreencher);
+              setPendingCityFromCep('');
+            }, 150);
+          }
+          
           return { ok: true, state: dados.state, city: cidadeParaPreencher };
         }
 
@@ -186,6 +224,7 @@ export default function CompleteProfileForm({
         setCity('');
         setState('');
         setCidades([]);
+        setPendingCityFromCep('');
         return { ok: false };
       } catch (error) {
         console.error('Erro ao buscar CEP:', error);
@@ -215,6 +254,7 @@ export default function CompleteProfileForm({
     if (loadingCep) return;
     if (cepLimpo.length !== 8) {
       setHasAutoFilledFromCep(false);
+      setPendingCityFromCep('');
       return;
     }
     if (hasAutoFilledFromCep) return;
@@ -344,6 +384,7 @@ export default function CompleteProfileForm({
               const value = e.target.value.replace(/\D/g, '');
               if (value.length <= 8) {
                 setCep(value);
+                setHasAutoFilledFromCep(false);
               }
             }}
             onBlur={handleCepBlur}
@@ -361,7 +402,15 @@ export default function CompleteProfileForm({
           <label htmlFor="state" className="block text-sm font-medium mb-2">
             Estado <span className="text-destructive">*</span>
           </label>
-          <Select value={state} onValueChange={setState} disabled={loading || loadingCep} required>
+          <Select 
+            value={state} 
+            onValueChange={(value) => {
+              setHasAutoFilledFromCep(false);
+              setState(value);
+            }} 
+            disabled={loading || loadingCep} 
+            required
+          >
             <SelectTrigger className="w-full px-4 py-3 h-auto rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors">
               <SelectValue placeholder="Selecione o estado" />
             </SelectTrigger>

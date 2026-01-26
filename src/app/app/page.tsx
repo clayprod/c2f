@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { CashFlowChart } from '@/components/dashboard/CashFlowChart';
 import { ExpensesByCategoryChart } from '@/components/dashboard/ExpensesByCategoryChart';
@@ -11,6 +11,8 @@ import { InfoIcon } from '@/components/ui/InfoIcon';
 import { useProfile } from '@/hooks/useProfile';
 import { PlanGuard } from '@/components/app/PlanGuard';
 import { useAccountContext } from '@/hooks/useAccountContext';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import type { PlanFeatures } from '@/services/admin/globalSettings';
 import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
 import { formatCurrencyValue } from '@/lib/utils';
 
@@ -80,6 +82,93 @@ const getCurrentMonthName = () => {
   return brazilDate.toLocaleDateString('pt-BR', { month: 'long' });
 };
 
+// Component to wrap features with lock visual when not available
+function LockedFeatureWrapper({
+  children,
+  featureId,
+  minPlan,
+  planFeatures,
+  userPlan,
+}: {
+  children: React.ReactNode;
+  featureId: string;
+  minPlan: 'free' | 'pro' | 'premium';
+  planFeatures: PlanFeatures | null;
+  userPlan?: 'free' | 'pro' | 'premium';
+}) {
+  const isAvailable = (() => {
+    if (planFeatures) {
+      const enabled = planFeatures[featureId]?.enabled;
+      if (enabled !== undefined) return enabled;
+    }
+    if (!userPlan) return minPlan === 'free';
+    const planOrder: Record<'free' | 'pro' | 'premium', number> = { free: 0, pro: 1, premium: 2 };
+    return planOrder[userPlan] >= planOrder[minPlan];
+  })();
+
+  if (isAvailable) {
+    return <>{children}</>;
+  }
+
+  const planLabel = minPlan === 'pro' ? 'Pro' : minPlan === 'premium' ? 'Premium' : 'Free';
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="relative cursor-not-allowed locked-feature-wrapper">
+            <style dangerouslySetInnerHTML={{__html: `
+              .locked-feature-wrapper > div:first-child {
+                opacity: 0.3 !important;
+                filter: blur(4px) !important;
+              }
+              .locked-feature-wrapper h2,
+              .locked-feature-wrapper .font-display,
+              .locked-feature-wrapper h2 *,
+              .locked-feature-wrapper .font-display * {
+                opacity: 1 !important;
+                filter: blur(0) !important;
+                position: relative !important;
+                z-index: 30 !important;
+              }
+            `}} />
+            <div className="pointer-events-none" style={{ opacity: 0.3, filter: 'blur(4px)' }}>
+              {children}
+            </div>
+            {/* Cadeado centralizado - fica na frente */}
+            <div className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none">
+              <div className="flex flex-col items-center gap-2">
+                <i className="bx bx-lock text-4xl text-muted-foreground drop-shadow-lg"></i>
+              </div>
+            </div>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent 
+          side="top" 
+          sideOffset={8}
+          align={featureId === 'ai_advisor' ? 'start' : 'center'}
+          collisionPadding={32}
+          avoidCollisions={true}
+          className="p-3 max-w-[280px] w-auto z-50"
+        >
+          <div className="flex flex-col gap-2">
+            <p className="text-sm font-medium text-foreground whitespace-nowrap">Assine o plano {planLabel} para liberar</p>
+            <Link
+              href="/pricing"
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
+              className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
+            >
+              Ver planos
+            </Link>
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 // Updated: 2026-01-18 - Melhorias na indicação do mês corrente
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -89,8 +178,9 @@ export default function DashboardPage() {
   const [cashFlowLoading, setCashFlowLoading] = useState(false);
   const [groupBy, setGroupBy] = useState<GroupByType>('month');
   const [selectedPeriod, setSelectedPeriod] = useState(12); // Default: 1 year (or first option of group)
-  const { isFree, loading: profileLoading } = useProfile();
+  const { isFree, loading: profileLoading, userProfile } = useProfile();
   const { context: accountContext, activeAccountId } = useAccountContext();
+  const [planFeatures, setPlanFeatures] = useState<PlanFeatures | null>(null);
   const maxVisibleItems = 9; // Número fixo de transações visíveis
   const budgetsContainerRef = useRef<HTMLDivElement>(null);
   const ownerId = activeAccountId || accountContext?.currentUserId || null;
@@ -245,8 +335,21 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchDashboardData();
+    fetchPlanFeatures();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const fetchPlanFeatures = async () => {
+    try {
+      const res = await fetch('/api/billing/plan');
+      if (res.ok) {
+        const data = await res.json();
+        setPlanFeatures(data.features || null);
+      }
+    } catch (error) {
+      console.error('Error fetching plan features:', error);
+    }
+  };
 
   useEffect(() => {
     fetchCashFlowData();
@@ -688,9 +791,14 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <PlanGuard minPlan="pro" showFallback={false}>
+        <LockedFeatureWrapper
+          featureId="ai_advisor"
+          minPlan="pro"
+          planFeatures={planFeatures}
+          userPlan={userProfile?.plan}
+        >
           <AdvisorTips />
-        </PlanGuard>
+        </LockedFeatureWrapper>
       </div>
 
       <div className="animate-slide-in-up delay-400">
@@ -698,11 +806,16 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 lg:items-stretch items-start w-full">
-        <PlanGuard minPlan="pro" showFallback={false}>
+        <LockedFeatureWrapper
+          featureId="budgets"
+          minPlan="pro"
+          planFeatures={planFeatures}
+          userPlan={userProfile?.plan}
+        >
           <div ref={budgetsContainerRef} className="w-full min-w-0 animate-slide-in-left delay-500">
             <BudgetsByCategory />
           </div>
-        </PlanGuard>
+        </LockedFeatureWrapper>
         <div className="glass-card p-3 md:p-6 flex flex-col w-full min-w-0 animate-slide-in-right delay-500 hover-lift">
           <div className="flex items-center justify-between mb-4 flex-shrink-0">
             <div className="flex items-center gap-2 min-w-0">

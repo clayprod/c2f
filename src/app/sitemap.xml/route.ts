@@ -61,7 +61,7 @@ export async function GET() {
     <loc>${escapeXml(`${baseUrl}/blog/${post.slug}`)}</loc>
     <lastmod>${new Date(lastmod).toISOString()}</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.95</priority>
   </url>
 `;
   }

@@ -84,3 +84,5 @@ COMMENT ON VIEW public.transactions_decrypted IS 'View with decrypted transactio
 -- ALTER TABLE public.transactions DROP COLUMN IF EXISTS description;
 -- ALTER TABLE public.transactions DROP COLUMN IF EXISTS notes;
 
+
+

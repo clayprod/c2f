@@ -214,3 +214,5 @@ COMMENT ON COLUMN public.audit_logs.metadata IS 'Additional context (IP, user ag
 COMMENT ON FUNCTION public.create_audit_log IS 'Manually create an audit log entry';
 COMMENT ON FUNCTION public.audit_trigger_function IS 'Trigger function for automatic audit logging';
 
+
+

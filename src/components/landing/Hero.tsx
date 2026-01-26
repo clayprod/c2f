@@ -1,6 +1,7 @@
 "use client";
 import React, { useRef } from "react";
 import { useScroll, useTransform, motion } from "framer-motion";
+import Link from "next/link";
 
 const Hero = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -18,7 +19,7 @@ const Hero = () => {
   return (
     <section 
       ref={containerRef}
-      className="min-h-[150vh] pt-16 md:pt-24 relative overflow-hidden"
+      className="min-h-[150vh] pt-16 md:pt-24 pb-8 md:pb-12 relative overflow-hidden"
     >
       {/* Background Effects */}
       <div className="absolute inset-0 pointer-events-none">
@@ -58,9 +59,17 @@ const Hero = () => {
             </span> para inserir novas compras e fazer consultas.
           </p>
 
+          {/* CTA Button */}
+          <div className="fade-in-up stagger-4 mb-8 md:mb-12">
+            <Link href="/signup" className="btn-primary inline-flex items-center gap-2">
+              <i className='bx bx-rocket'></i>
+              Começar grátis
+            </Link>
+          </div>
+
           {/* Animated Frame */}
           <div 
-            className="w-full max-w-5xl mx-auto"
+            className="w-full max-w-5xl mx-auto mb-4 md:mb-8"
             style={{ perspective: "1000px" }}
           >
             <motion.div
@@ -70,16 +79,17 @@ const Hero = () => {
                 y: translateY,
                 opacity,
               }}
-              className="w-full aspect-video border-4 border-primary/30 bg-card rounded-[30px] shadow-2xl overflow-hidden"
+              className="w-full aspect-video border-4 border-primary/30 bg-card rounded-[30px] shadow-2xl overflow-hidden relative min-h-[400px] md:min-h-[500px]"
             >
-              {/* YouTube Video - autoplay, loop, no UI */}
+              {/* YouTube Video - autoplay, loop, no UI, high quality */}
               <iframe
-                className="w-full h-full"
-                src="https://www.youtube-nocookie.com/embed/zxjHLiZcqtY?autoplay=1&mute=1&loop=1&playlist=zxjHLiZcqtY&controls=0&showinfo=0&rel=0&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0&playsinline=1&start=1&hd=1&vq=hd1080"
+                className="w-full h-full absolute inset-0"
+                src="https://www.youtube-nocookie.com/embed/zxjHLiZcqtY?autoplay=1&mute=1&loop=1&playlist=zxjHLiZcqtY&controls=0&showinfo=0&rel=0&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0&playsinline=1&start=1&enablejsapi=1&origin=https://c2finance.com.br"
                 title="c2Finance Demo"
-                allow="autoplay; encrypted-media"
+                allow="autoplay; encrypted-media; picture-in-picture"
                 allowFullScreen={false}
                 frameBorder="0"
+                loading="eager"
                 style={{ pointerEvents: 'none' }}
               />
             </motion.div>

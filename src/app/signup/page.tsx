@@ -50,10 +50,21 @@ function SignupPageContent() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const [hasAutoFilledFromCep, setHasAutoFilledFromCep] = useState(false);
+  const [pendingCityFromCep, setPendingCityFromCep] = useState<string>('');
   const inviteToken = searchParams?.get('invite');
   const logo = useLogo();
   const isPasswordMismatch =
     password.length > 0 && confirmPassword.length > 0 && password !== confirmPassword;
+
+  // Validação de senha
+  const passwordRequirements = {
+    minLength: password.length >= 8,
+    hasUppercase: /[A-Z]/.test(password),
+    hasLowercase: /[a-z]/.test(password),
+    hasNumber: /\d/.test(password),
+    hasSpecial: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+  };
+  const isPasswordValid = Object.values(passwordRequirements).every(Boolean);
 
   // If user already has a session, don't force them through signup.
   // Redirect to accept page (existing user flow).
@@ -98,18 +109,20 @@ function SignupPageContent() {
       if (!state) {
         setCidades([]);
         setCity('');
+        setPendingCityFromCep('');
         return;
       }
 
       // Se o estado foi preenchido pelo CEP, não recarregar as cidades
-      // pois o lookupCep já fez isso e pode ter adicionado cidade como fallback
-      if (hasAutoFilledFromCep && cidades.length > 0) {
+      // pois o lookupCep já fez isso e definiu a cidade corretamente
+      if (hasAutoFilledFromCep) {
         return;
       }
 
       try {
         const cidadesData = await buscarCidadesPorEstado(state);
-        setCidades(cidadesData.sort((a, b) => a.nome.localeCompare(b.nome)));
+        const cidadesSorted = cidadesData.sort((a, b) => a.nome.localeCompare(b.nome));
+        setCidades(cidadesSorted);
         // Limpar cidade se não existir na nova lista de cidades
         setCity((prevCity) => {
           if (prevCity && !cidadesData.some(c => c.nome === prevCity)) {
@@ -123,7 +136,23 @@ function SignupPageContent() {
       }
     }
     loadCidades();
-  }, [state, hasAutoFilledFromCep, cidades.length]);
+  }, [state, hasAutoFilledFromCep]);
+
+  // Preencher cidade automaticamente quando as cidades estiverem carregadas e houver uma cidade pendente do CEP
+  useEffect(() => {
+    if (pendingCityFromCep && cidades.length > 0 && hasAutoFilledFromCep && !city) {
+      // Verifica se a cidade pendente existe na lista de cidades (com comparação normalizada)
+      const cidadeExiste = cidades.some(c => 
+        normalizeCityName(c.nome) === normalizeCityName(pendingCityFromCep) ||
+        c.nome === pendingCityFromCep
+      );
+      if (cidadeExiste || pendingCityFromCep) {
+        // Se a cidade existe na lista ou foi adicionada como fallback, preenche
+        setCity(pendingCityFromCep);
+        setPendingCityFromCep('');
+      }
+    }
+  }, [cidades, pendingCityFromCep, hasAutoFilledFromCep, city]);
 
   // Função para normalizar nome de cidade (remove acentos, converte para minúsculas)
   const normalizeCityName = (name: string): string => {
@@ -180,13 +209,23 @@ function SignupPageContent() {
             cidadeParaPreencher = cidadeDoCep;
           }
 
-          // Preencher a lista de cidades AGORA para o Select conseguir renderizar o valor
-          setCidades(cidadesFinal);
-
-          // Define estado e cidade
-          setState(dados.state);
-          setCity(cidadeParaPreencher);
+          // Define tudo de uma vez: estado, cidades e cidade
+          // Primeiro seta o estado e as cidades, depois preenche a cidade
           setHasAutoFilledFromCep(true);
+          setState(dados.state);
+          setCidades(cidadesFinal);
+          
+          // Preenche a cidade imediatamente após definir as cidades
+          // Usa um pequeno delay para garantir que o React atualize o estado do Select
+          if (cidadeParaPreencher) {
+            // Sempre preenche a cidade, já que ela está na lista (ou foi adicionada como fallback)
+            // Usa setTimeout para garantir que o Select reconheça o valor após o estado ser atualizado
+            setTimeout(() => {
+              setCity(cidadeParaPreencher);
+              setPendingCityFromCep('');
+            }, 150);
+          }
+          
           return { ok: true, state: dados.state, city: cidadeParaPreencher };
         } else {
           // CEP não encontrado ou inválido
@@ -201,6 +240,7 @@ function SignupPageContent() {
           setCity('');
           setState('');
           setCidades([]);
+          setPendingCityFromCep('');
           return { ok: false };
         }
       } catch (error) {
@@ -232,6 +272,7 @@ function SignupPageContent() {
     if (loadingCep) return;
     if (cepLimpo.length !== 8) {
       setHasAutoFilledFromCep(false);
+      setPendingCityFromCep('');
       return;
     }
     if (hasAutoFilledFromCep) return;
@@ -456,49 +497,99 @@ function SignupPageContent() {
               <label htmlFor="password" className="block text-sm font-medium mb-2">
                 Senha
               </label>
-              <input
-                type={showPasswords ? 'text' : 'password'}
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
-                placeholder="Mínimo 8 caracteres"
-                required
-                disabled={loading}
-              />
+              <div className="relative">
+                <input
+                  type={showPasswords ? 'text' : 'password'}
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 pr-12 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                  placeholder="Mínimo 8 caracteres"
+                  required
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPasswords(!showPasswords)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPasswords ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+              {password.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  <div className={`flex items-center gap-2 text-xs ${passwordRequirements.minLength ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+                    <i className={`bx ${passwordRequirements.minLength ? 'bx-check-circle' : 'bx-circle'} text-sm`} />
+                    <span>Mínimo 8 caracteres</span>
+                  </div>
+                  <div className={`flex items-center gap-2 text-xs ${passwordRequirements.hasUppercase ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+                    <i className={`bx ${passwordRequirements.hasUppercase ? 'bx-check-circle' : 'bx-circle'} text-sm`} />
+                    <span>Pelo menos 1 letra maiúscula</span>
+                  </div>
+                  <div className={`flex items-center gap-2 text-xs ${passwordRequirements.hasLowercase ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+                    <i className={`bx ${passwordRequirements.hasLowercase ? 'bx-check-circle' : 'bx-circle'} text-sm`} />
+                    <span>Pelo menos 1 letra minúscula</span>
+                  </div>
+                  <div className={`flex items-center gap-2 text-xs ${passwordRequirements.hasNumber ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+                    <i className={`bx ${passwordRequirements.hasNumber ? 'bx-check-circle' : 'bx-circle'} text-sm`} />
+                    <span>Pelo menos 1 número</span>
+                  </div>
+                  <div className={`flex items-center gap-2 text-xs ${passwordRequirements.hasSpecial ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+                    <i className={`bx ${passwordRequirements.hasSpecial ? 'bx-check-circle' : 'bx-circle'} text-sm`} />
+                    <span>Pelo menos 1 caractere especial (!@#$%^&*)</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium mb-2">
                 Confirmar Senha
               </label>
-              <input
-                type={showPasswords ? 'text' : 'password'}
-                id="confirmPassword"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
-                placeholder="Digite a senha novamente"
-                required
-                disabled={loading}
-              />
+              <div className="relative">
+                <input
+                  type={showPasswords ? 'text' : 'password'}
+                  id="confirmPassword"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-4 py-3 pr-12 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                  placeholder="Digite a senha novamente"
+                  required
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPasswords(!showPasswords)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPasswords ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
               {isPasswordMismatch && (
                 <p className="text-xs text-destructive mt-2">
-                  As senhas nao coincidem.
+                  As senhas não coincidem.
                 </p>
               )}
-            </div>
-
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Checkbox
-                id="showPasswords"
-                checked={showPasswords}
-                onCheckedChange={(checked) => setShowPasswords(checked === true)}
-                disabled={loading}
-              />
-              <label htmlFor="showPasswords" className="cursor-pointer">
-                Mostrar senhas
-              </label>
             </div>
 
             <div>
@@ -678,7 +769,7 @@ function SignupPageContent() {
             <button
               type="submit"
               className="btn-primary w-full"
-              disabled={loading || !acceptedTerms || isPasswordMismatch}
+              disabled={loading || !acceptedTerms || isPasswordMismatch || !isPasswordValid}
             >
               <i className='bx bx-rocket'></i>
               {loading ? 'Criando conta...' : 'Criar conta grátis'}

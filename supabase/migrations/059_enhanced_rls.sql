@@ -109,3 +109,5 @@ CREATE POLICY "Admins can view all audit logs" ON public.audit_logs
 COMMENT ON FUNCTION is_admin(UUID) IS 'Check if user has admin role';
 COMMENT ON FUNCTION log_admin_data_access IS 'Log when admin accesses encrypted data for audit purposes';
 
+
+

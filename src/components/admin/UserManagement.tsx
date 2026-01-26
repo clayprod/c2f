@@ -60,6 +60,7 @@ export default function UserManagement() {
       const params = new URLSearchParams({
         page: page.toString(),
         limit: '50',
+        _t: Date.now().toString(), // Add timestamp to prevent caching
       });
 
       if (planFilter !== 'all') params.append('plan', planFilter);
@@ -67,11 +68,25 @@ export default function UserManagement() {
       if (isManualFilter !== 'all') params.append('is_manual', isManualFilter === 'manual' ? 'true' : 'false');
       if (searchQuery) params.append('search', searchQuery);
 
-      const res = await fetch(`/api/admin/users?${params}`);
-      if (!res.ok) throw new Error('Failed to fetch users');
+      console.log('Fetching users with params:', params.toString());
+      const res = await fetch(`/api/admin/users?${params}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('Failed to fetch users:', res.status, errorText);
+        throw new Error('Failed to fetch users');
+      }
       
       const data: ListUsersResult = await res.json();
-      setUsers(data.users);
+      console.log('Fetched users:', data.users.length, 'total:', data.total);
+      console.log('Users data:', data.users.map(u => ({ email: u.email, plan: u.plan, status: u.status })));
+      
+      // Force state update
+      setUsers([...data.users]);
       setTotalPages(data.totalPages);
       setTotal(data.total);
     } catch (error) {
@@ -95,7 +110,11 @@ export default function UserManagement() {
     setGrantModalOpen(false);
     setRevokeModalOpen(false);
     setSelectedUser(null);
-    fetchUsers(); // Refresh list
+    // Force refresh list after a small delay to ensure modal is closed
+    setTimeout(() => {
+      console.log('Refreshing user list after plan change...');
+      fetchUsers();
+    }, 200);
   };
 
   const formatDate = (date: Date | string | null) => {

@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 
 interface AppLayoutProps {
@@ -140,10 +141,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
     window.scrollTo(0, 0);
   }, [pathname]);
 
-  // Filter menu items:
-  // - Own account: based on user's plan (current behavior)
-  // - Shared account: ignore invited user's plan and respect shared permissions instead
-  const visibleMenuItems = menuItems.filter((item) => {
+  // Helper function to check if a menu item is available
+  const isItemAvailable = (item: typeof menuItems[0]): boolean => {
     if (isViewingSharedAccount) {
       const resource = (() => {
         switch (item.path) {
@@ -195,12 +194,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
       }
     }
 
+    // Fallback para minPlan
     if (!userProfile) return item.minPlan === 'free';
     if (item.minPlan === 'free') return true;
-    if (item.minPlan === 'pro') return userProfile.plan === 'pro' || userProfile.plan === 'premium';
-    if (item.minPlan === 'premium') return userProfile.plan === 'premium';
-    return true;
-  });
+    const planOrder: Record<'free' | 'pro' | 'premium', number> = { free: 0, pro: 1, premium: 2 };
+    return planOrder[userProfile.plan] >= planOrder[item.minPlan];
+  };
+
+  // Show all menu items (no filtering)
+  const visibleMenuItems = menuItems;
 
   useEffect(() => {
     if (isViewingSharedAccount || !planFeatures) return;
@@ -254,14 +256,29 @@ export default function AppLayout({ children }: AppLayoutProps) {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (user) {
+        const identities = user.identities || [];
+        const isOAuthUser = identities.some((identity: any) => identity.provider === 'google');
+        
         // Buscar perfil e plano em paralelo
         // Use /api/billing/plan to get the correct plan (owner's plan when viewing shared account)
-        const [profileResult, planResponse] = await Promise.all([
-          supabase
+        let profileResult = await supabase
+          .from('profiles')
+          .select('full_name, email, avatar_url, role, city, state, monthly_income_cents')
+          .eq('id', user.id)
+          .single();
+
+        // Se o perfil não existe e é usuário OAuth, aguardar um pouco e tentar novamente
+        // (o trigger pode estar criando o perfil)
+        if (!profileResult.data && isOAuthUser) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          profileResult = await supabase
             .from('profiles')
             .select('full_name, email, avatar_url, role, city, state, monthly_income_cents')
             .eq('id', user.id)
-            .single(),
+            .single();
+        }
+
+        const [planResponse] = await Promise.all([
           fetch('/api/billing/plan')
         ]);
 
@@ -275,9 +292,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
         }
         setPlanFeatures(fetchedFeatures);
 
-        const identities = user.identities || [];
-        const isOAuthUser = identities.some((identity: any) => identity.provider === 'google');
-        const isProfileIncomplete = !profile?.city || !profile?.state || !profile?.monthly_income_cents;
+        // Verificar se o perfil não existe ou está incompleto
+        // Se o profile não existe (null), também considerar incompleto
+        const isProfileIncomplete = !profile || !profile.city || !profile.state || !profile.monthly_income_cents;
         setShowCompleteProfile(isOAuthUser && isProfileIncomplete);
 
         if (profile) {
@@ -381,24 +398,76 @@ export default function AppLayout({ children }: AppLayoutProps) {
               ref={menuListRef}
               className="space-y-2 h-full overflow-y-auto max-h-[calc(100vh-200px)] scrollbar-hide"
             >
-              {visibleMenuItems.map((item) => {
-                const isActive = pathname === item.path;
-                return (
-                  <li key={item.path}>
-                    <Link
-                      href={item.path}
-                      onClick={() => setSidebarOpen(false)}
-                      className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${isActive
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                        }`}
-                    >
+              <TooltipProvider>
+                {visibleMenuItems.map((item) => {
+                  const isAvailable = isItemAvailable(item);
+                  const isActive = pathname === item.path;
+                  
+                  const linkContent = (
+                    <>
                       <i className={`bx ${item.icon} text-xl`}></i>
                       <span className="font-medium">{item.label}</span>
-                    </Link>
-                  </li>
-                );
-              })}
+                      {!isAvailable && <i className="bx bx-lock text-sm ml-auto text-muted-foreground" />}
+                    </>
+                  );
+
+                  if (isAvailable) {
+                    return (
+                      <li key={item.path}>
+                        <Link
+                          href={item.path}
+                          onClick={() => setSidebarOpen(false)}
+                          className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${isActive
+                            ? 'bg-primary/10 text-primary'
+                            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                            }`}
+                        >
+                          {linkContent}
+                        </Link>
+                      </li>
+                    );
+                  } else {
+                    const planLabel = item.minPlan === 'pro' ? 'Pro' : item.minPlan === 'premium' ? 'Premium' : 'Free';
+                    return (
+                      <li key={item.path}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div
+                              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors opacity-50 cursor-not-allowed ${isActive
+                                ? 'bg-primary/10 text-primary'
+                                : 'text-muted-foreground'
+                                }`}
+                            >
+                              {linkContent}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent 
+                            side="right" 
+                            sideOffset={8}
+                            align="start"
+                            collisionPadding={16}
+                            className="p-3 max-w-[calc(100vw-2rem)] sm:max-w-none w-auto"
+                          >
+                            <div className="flex flex-col gap-2">
+                              <p className="text-sm font-medium text-foreground whitespace-nowrap">Assine o plano {planLabel} para liberar</p>
+                              <Link
+                                href="/pricing"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSidebarOpen(false);
+                                }}
+                                className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
+                              >
+                                Ver planos
+                              </Link>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </li>
+                    );
+                  }
+                })}
+              </TooltipProvider>
               {/* Admin menu - only for admins */}
               {userProfile?.role === 'admin' && (
                 <li>
@@ -485,41 +554,90 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </button>
 
           <div className="flex items-center gap-2 md:gap-4 flex-1 min-w-0">
-            {userProfile && userProfile.plan !== 'free' && (
-              <div className="p-[1px] rounded-md transition-all duration-300 group"
-                style={{
-                  background: 'linear-gradient(to right, #9333ea, #3b82f6)',
-                  boxShadow: '0 0 0 0 rgba(147, 51, 234, 0)',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = '0 0 10px 2px rgba(147, 51, 234, 0.5)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = '0 0 0 0 rgba(147, 51, 234, 0)';
-                }}>
-                <button
-                  onClick={() => setAdvisorOpen(true)}
-                  className="px-2 md:px-3 py-1 rounded-md flex items-center gap-1.5 md:gap-2 bg-background text-xs md:text-sm transition-all duration-300"
-                >
-                  <i
-                    className='bx bx-sparkles text-sm md:text-base'
+            {(() => {
+              const isAdvisorAvailable = (() => {
+                if (planFeatures) {
+                  const enabled = planFeatures.ai_advisor?.enabled;
+                  if (enabled !== undefined) return enabled;
+                }
+                if (!userProfile) return false;
+                return userProfile.plan === 'pro' || userProfile.plan === 'premium';
+              })();
+
+              if (isAdvisorAvailable) {
+                return (
+                  <div className="p-[1px] rounded-md transition-all duration-300 group"
                     style={{
                       background: 'linear-gradient(to right, #9333ea, #3b82f6)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
+                      boxShadow: '0 0 0 0 rgba(147, 51, 234, 0)',
                     }}
-                  ></i>
-                  <span
-                    className="hidden sm:inline font-medium"
-                    style={{
-                      background: 'linear-gradient(to right, #9333ea, #3b82f6)',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.boxShadow = '0 0 10px 2px rgba(147, 51, 234, 0.5)';
                     }}
-                  >Advisor I.A</span>
-                </button>
-              </div>
-            )}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.boxShadow = '0 0 0 0 rgba(147, 51, 234, 0)';
+                    }}>
+                    <button
+                      onClick={() => setAdvisorOpen(true)}
+                      className="px-2 md:px-3 py-1 rounded-md flex items-center gap-1.5 md:gap-2 bg-background text-xs md:text-sm transition-all duration-300"
+                    >
+                      <i
+                        className='bx bx-sparkles text-sm md:text-base'
+                        style={{
+                          background: 'linear-gradient(to right, #9333ea, #3b82f6)',
+                          WebkitBackgroundClip: 'text',
+                          WebkitTextFillColor: 'transparent',
+                        }}
+                      ></i>
+                      <span
+                        className="hidden sm:inline font-medium"
+                        style={{
+                          background: 'linear-gradient(to right, #9333ea, #3b82f6)',
+                          WebkitBackgroundClip: 'text',
+                          WebkitTextFillColor: 'transparent',
+                        }}
+                      >Advisor I.A</span>
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="p-[1px] rounded-md opacity-50 cursor-not-allowed">
+                        <div className="px-2 md:px-3 py-1 rounded-md flex items-center gap-1.5 md:gap-2 bg-background text-xs md:text-sm relative">
+                          <i className='bx bx-sparkles text-sm md:text-base text-muted-foreground'></i>
+                          <span className="hidden sm:inline font-medium text-muted-foreground">Advisor I.A</span>
+                          <i className="bx bx-lock text-xs ml-1 text-muted-foreground"></i>
+                        </div>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent 
+                      side="bottom" 
+                      sideOffset={8}
+                      align="center"
+                      collisionPadding={16}
+                      className="p-3 max-w-[calc(100vw-2rem)] sm:max-w-none w-auto"
+                    >
+                      <div className="flex flex-col gap-2">
+                        <p className="text-sm font-medium text-foreground whitespace-nowrap">Assine o plano Pro para liberar</p>
+                        <Link
+                          href="/pricing"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                          className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
+                        >
+                          Ver planos
+                        </Link>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              );
+            })()}
             <div className="flex-1 min-w-0" />
             <div className="flex items-center gap-0.5 md:gap-2 flex-shrink-0">
               {accountContext && (
@@ -665,10 +783,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
       <Dialog
         open={showCompleteProfile}
-        onOpenChange={(open) => {
-          if (open) {
-            setShowCompleteProfile(true);
-          }
+        onOpenChange={() => {
+          // Não permitir fechar o dialog até que o perfil seja completado
+          // O dialog só será fechado quando onCompleted for chamado no CompleteProfileForm
         }}
       >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto [&>button]:hidden">

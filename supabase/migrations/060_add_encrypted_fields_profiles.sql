@@ -118,3 +118,5 @@ COMMENT ON VIEW public.profiles_decrypted IS 'View with decrypted profile data f
 -- ALTER TABLE public.profiles DROP COLUMN IF EXISTS monthly_income_cents;
 -- But keep email for now as it's used in unique constraint and auth
 
+
+

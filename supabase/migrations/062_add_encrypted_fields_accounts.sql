@@ -172,3 +172,5 @@ COMMENT ON COLUMN public.pluggy_transactions.description_encrypted IS 'Encrypted
 
 -- Note: After migration is complete and verified, you can drop the original columns
 
+
+

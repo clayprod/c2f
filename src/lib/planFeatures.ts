@@ -245,7 +245,55 @@ export function buildPlanFeatureListWithInheritanceSync(
   }
 
   const includesAll = planIncludesAllFeatures(current, previous);
+  
+  // Se não inclui todas explicitamente, ainda tentamos mostrar formato compacto
+  // se o plano atual tem pelo menos algumas features do plano anterior
   if (!includesAll) {
+    const previousEnabledFeatures = Object.keys(previous || {}).filter(
+      key => previous?.[key]?.enabled
+    );
+    const hasSomePreviousFeatures = previousEnabledFeatures.length > 0 && 
+      previousEnabledFeatures.some(key => current?.[key]?.enabled);
+    
+    // Se tem features do previous habilitadas no current, mostra formato compacto
+    if (hasSomePreviousFeatures) {
+      const additionalItems: Array<{ id: string; text: string; enabled: boolean }> = [];
+
+      PLAN_MODULES.forEach((planModule) => {
+        const currentFeature = current?.[planModule.id];
+        const previousFeature = previous?.[planModule.id];
+
+        if (!currentFeature?.enabled) return;
+        if (!previousFeature?.enabled) {
+          additionalItems.push({
+            id: planModule.id,
+            text: formatFeatureTextSync(planModule.id, currentFeature),
+            enabled: true,
+          });
+          return;
+        }
+
+        if (planModule.id === 'transactions' || planModule.id === 'ai_advisor') {
+          if (isLimitUpgrade(currentFeature, previousFeature)) {
+            additionalItems.push({
+              id: planModule.id,
+              text: formatFeatureTextSync(planModule.id, currentFeature),
+              enabled: true,
+            });
+          }
+        }
+      });
+
+      return [
+        {
+          id: `all_${previousLabel.toLowerCase()}`,
+          text: `Tudo do plano ${previousLabel}`,
+          enabled: true,
+        },
+        ...additionalItems,
+      ];
+    }
+    
     return currentList;
   }
 
@@ -300,7 +348,57 @@ export async function buildPlanFeatureListWithInheritance(
   }
 
   const includesAll = planIncludesAllFeatures(current, previous);
+  
+  // Se não inclui todas explicitamente, ainda tentamos mostrar formato compacto
+  // se o plano atual tem pelo menos algumas features do plano anterior
   if (!includesAll) {
+    const previousEnabledFeatures = Object.keys(previous || {}).filter(
+      key => previous?.[key]?.enabled
+    );
+    const hasSomePreviousFeatures = previousEnabledFeatures.length > 0 && 
+      previousEnabledFeatures.some(key => current?.[key]?.enabled);
+    
+    // Se tem features do previous habilitadas no current, mostra formato compacto
+    if (hasSomePreviousFeatures) {
+      const additionalItems: Array<{ id: string; text: string; enabled: boolean }> = [];
+
+      for (const planModule of PLAN_MODULES) {
+        const currentFeature = current?.[planModule.id];
+        const previousFeature = previous?.[planModule.id];
+
+        if (!currentFeature?.enabled) continue;
+        if (!previousFeature?.enabled) {
+          const text = await formatFeatureText(planModule.id, currentFeature);
+          additionalItems.push({
+            id: planModule.id,
+            text,
+            enabled: true,
+          });
+          continue;
+        }
+
+        if (planModule.id === 'transactions' || planModule.id === 'ai_advisor') {
+          if (isLimitUpgrade(currentFeature, previousFeature)) {
+            const text = await formatFeatureText(planModule.id, currentFeature);
+            additionalItems.push({
+              id: planModule.id,
+              text,
+              enabled: true,
+            });
+          }
+        }
+      }
+
+      return [
+        {
+          id: `all_${previousLabel.toLowerCase()}`,
+          text: `Tudo do plano ${previousLabel}`,
+          enabled: true,
+        },
+        ...additionalItems,
+      ];
+    }
+    
     return currentList;
   }
 

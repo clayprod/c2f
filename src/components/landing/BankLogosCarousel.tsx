@@ -1,3 +1,5 @@
+'use client';
+
 import Image from 'next/image';
 
 // Bank connector icons available in /public/assets/connector-icons/
@@ -11,6 +13,7 @@ const bankIcons = [
 
 const BankLogosCarousel = () => {
   // Duplicate the array for seamless infinite scroll
+  // Using 2 copies: animation moves 50% (one full copy), then loops seamlessly
   const duplicatedIcons = [...bankIcons, ...bankIcons];
 
   return (
@@ -31,16 +34,34 @@ const BankLogosCarousel = () => {
       </div>
 
       {/* Carousel Container */}
-      <div className="relative group">
+      <div className="relative group space-y-6 md:space-y-8">
         {/* Gradient Overlays for fade effect */}
         <div className="absolute left-0 top-0 bottom-0 w-20 md:w-32 bg-gradient-to-r from-muted/20 to-transparent z-10 pointer-events-none" />
         <div className="absolute right-0 top-0 bottom-0 w-20 md:w-32 bg-gradient-to-l from-muted/20 to-transparent z-10 pointer-events-none" />
 
-        {/* Single Row - scrolling left */}
+        {/* First Row - scrolling left */}
         <div className="flex items-center gap-10 md:gap-14 animate-scroll-left group-hover:[animation-play-state:paused]">
           {duplicatedIcons.map((icon, index) => (
             <div
-              key={`logo-${icon}-${index}`}
+              key={`logo-left-${icon}-${index}`}
+              className="flex-shrink-0 flex items-center justify-center hover:scale-110 transition-transform duration-300 opacity-70 hover:opacity-100"
+            >
+              <Image
+                src={`/assets/connector-icons/${icon}.svg`}
+                alt={`Banco ${icon}`}
+                width={96}
+                height={96}
+                className="w-20 h-20 md:w-24 md:h-24 object-contain"
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* Second Row - scrolling right (opposite direction) */}
+        <div className="flex items-center gap-10 md:gap-14 animate-scroll-right group-hover:[animation-play-state:paused]">
+          {duplicatedIcons.map((icon, index) => (
+            <div
+              key={`logo-right-${icon}-${index}`}
               className="flex-shrink-0 flex items-center justify-center hover:scale-110 transition-transform duration-300 opacity-70 hover:opacity-100"
             >
               <Image

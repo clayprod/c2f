@@ -128,3 +128,5 @@ COMMENT ON FUNCTION decrypt_sensitive_data(TEXT) IS 'Decrypts text data encrypte
 COMMENT ON FUNCTION hash_for_search(TEXT) IS 'Creates SHA-256 hash for searchable fields without exposing plaintext';
 COMMENT ON FUNCTION hash_email_partial(TEXT) IS 'Creates partial hash for email search (first 3 chars + domain)';
 
+
+

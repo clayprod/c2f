@@ -30,7 +30,7 @@ export default function CheckEmailPage() {
         <div className="glass-card p-8">
           <div className="text-center space-y-4">
             <div className="w-20 h-20 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-              <i className="bx bx-mail-send text-5xl text-primary" />
+              <i className="bx bx-envelope text-5xl text-primary" />
             </div>
 
             <div>

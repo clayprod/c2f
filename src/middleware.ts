@@ -66,6 +66,11 @@ export async function middleware(request: NextRequest) {
     }
   );
 
+  // Permitir que o callback do OAuth seja processado sem interferência
+  if (request.nextUrl.pathname.startsWith('/auth/callback')) {
+    return response;
+  }
+
   const {
     data: { user },
   } = await supabase.auth.getUser();

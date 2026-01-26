@@ -96,3 +96,5 @@ COMMENT ON COLUMN public.encryption_keys.key_hash IS 'Hash of the key (for verif
 COMMENT ON FUNCTION get_current_key_version() IS 'Returns the current active encryption key version';
 COMMENT ON FUNCTION rotate_encryption_key() IS 'Rotates encryption key and marks old version as retired';
 
+
+

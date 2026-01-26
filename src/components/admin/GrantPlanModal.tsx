@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 
 interface UserPlanInfo {
   id: string;
@@ -40,6 +41,7 @@ export default function GrantPlanModal({
   const [customMonths, setCustomMonths] = useState<number>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const periodMonths = periodType === 'preset' ? presetMonths : customMonths;
 
@@ -74,13 +76,34 @@ export default function GrantPlanModal({
         }),
       });
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Erro ao conceder plano');
+      let data;
+      try {
+        data = await res.json();
+      } catch (jsonError) {
+        // If response is not JSON, use status text
+        throw new Error(res.statusText || 'Erro ao processar resposta do servidor');
       }
 
+      if (!res.ok) {
+        throw new Error(data.error || data.details || 'Erro ao conceder plano');
+      }
+
+      // Show success message
+      toast({
+        title: 'Plano concedido com sucesso',
+        description: data.message || `Plano ${plan.toUpperCase()} concedido por ${periodMonths} ${periodMonths === 1 ? 'mês' : 'meses'}`,
+      });
+
+      // Close modal and refresh list
+      // Call onSuccess first to refresh, then close modal
       onSuccess();
+      
+      // Small delay before closing to ensure refresh starts
+      setTimeout(() => {
+        onOpenChange(false);
+      }, 50);
     } catch (err: any) {
+      console.error('Error granting plan:', err);
       setError(err.message || 'Erro ao conceder plano');
     } finally {
       setLoading(false);

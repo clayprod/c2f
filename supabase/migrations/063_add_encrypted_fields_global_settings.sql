@@ -146,3 +146,5 @@ COMMENT ON VIEW public.global_settings_decrypted IS 'View with decrypted global 
 -- ALTER TABLE public.global_settings DROP COLUMN IF EXISTS evolution_webhook_secret;
 -- ALTER TABLE public.global_settings DROP COLUMN IF EXISTS n8n_api_key;
 
+
+

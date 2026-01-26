@@ -367,6 +367,7 @@ export async function grantPlan(
     status: subscriptionData.status,
     current_period_end: subscriptionData.current_period_end,
     is_manual: subscriptionData.is_manual,
+    stripe_subscription_id: subscriptionData.stripe_subscription_id || 'null',
   });
 
   let { error: upsertError } = await supabase
@@ -375,17 +376,27 @@ export async function grantPlan(
       onConflict: 'user_id',
     });
 
-  // If the error is about missing columns, try without the manual plan fields
+  // If the error is about missing columns or NOT NULL constraint, try without the manual plan fields
   if (upsertError && (
     upsertError.message?.includes('granted_at') ||
     upsertError.message?.includes('granted_by') ||
     upsertError.message?.includes('is_manual') ||
-    upsertError.message?.includes('schema cache')
+    upsertError.message?.includes('schema cache') ||
+    upsertError.message?.includes('stripe_subscription_id') ||
+    upsertError.message?.includes('null value') ||
+    upsertError.code === '23502' || // NOT NULL violation
+    upsertError.code === '42703'    // Undefined column
   )) {
-    console.warn('Migration 036 may not be applied. Retrying without manual plan fields...');
+    console.warn('Migration 036 may not be applied or stripe_subscription_id is NOT NULL. Retrying without manual plan fields...');
+    console.warn('Error details:', {
+      code: upsertError.code,
+      message: upsertError.message,
+      hint: upsertError.hint,
+    });
     console.warn('Please apply migration 036_add_manual_plan_fields.sql to enable full functionality');
     
     // Retry without manual plan fields (fallback for databases without migration 036)
+    // Also ensure stripe_subscription_id is provided if it's required
     subscriptionData = {
       user_id: userId,
       stripe_customer_id: stripeCustomerId,
@@ -394,8 +405,13 @@ export async function grantPlan(
       current_period_end: periodEnd.toISOString(),
     };
 
+    // If stripe_subscription_id is required (NOT NULL), use a placeholder if we don't have one
     if (stripeSubscriptionId) {
       subscriptionData.stripe_subscription_id = stripeSubscriptionId;
+    } else {
+      // Generate a placeholder ID for manual subscriptions if NOT NULL constraint exists
+      subscriptionData.stripe_subscription_id = `manual_${userId}_${Date.now()}`;
+      console.warn('Using placeholder stripe_subscription_id for manual plan');
     }
 
     const retryResult = await supabase
@@ -418,7 +434,7 @@ export async function grantPlan(
     console.error('Error message:', upsertError.message);
     console.error('Error details:', upsertError.details);
     console.error('Error hint:', upsertError.hint);
-    throw new Error(`Failed to grant plan: ${upsertError.message}`);
+    throw new Error(`Failed to grant plan: ${upsertError.message || 'Unknown database error'}`);
   }
 
   console.log(`Successfully granted ${plan} plan to user ${user.email}`);
