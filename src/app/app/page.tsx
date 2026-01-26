@@ -609,8 +609,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4 md:gap-6">
-        <div className="lg:col-span-2 glass-card p-4 md:p-6 animate-slide-in-up delay-300">
+      <div className="grid lg:grid-cols-3 gap-4 md:gap-6 overflow-hidden">
+        <div className="lg:col-span-2 glass-card p-4 md:p-6 animate-slide-in-up delay-300 overflow-hidden">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
             <div className="flex items-center gap-2">
               <h2 className="font-display font-semibold text-sm md:text-base">Fluxo de Caixa</h2>

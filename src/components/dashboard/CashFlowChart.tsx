@@ -479,7 +479,7 @@ export function CashFlowChart({ data, periodCount = 12, groupBy = 'month' }: Cas
       {/* Container do gráfico com suporte a arraste */}
       <div
         ref={containerRef}
-        className="cursor-grab select-none"
+        className="cursor-grab select-none overflow-hidden"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -492,7 +492,7 @@ export function CashFlowChart({ data, periodCount = 12, groupBy = 'month' }: Cas
           <ComposedChart
             data={chartData}
             margin={isMobile
-              ? { top: 10, right: 30, left: 10, bottom: 50 }
+              ? { top: 10, right: 15, left: 0, bottom: 50 }
               : { top: 20, right: 50, left: 40, bottom: 5 }
             }
             barGap={-40}

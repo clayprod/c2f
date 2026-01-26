@@ -84,6 +84,24 @@ export async function POST(request: NextRequest) {
           }, { status: 400 });
         }
 
+        // CRITICAL: Validate amount is provided and not zero
+        // This prevents creating transactions with incomplete information
+        if (transaction.amount_cents === undefined || transaction.amount_cents === null) {
+          return NextResponse.json({
+            success: false,
+            error: 'Valor da transação é obrigatório. Por favor, informe o valor.',
+            clarification_needed: 'amount',
+          }, { status: 400 });
+        }
+
+        if (transaction.amount_cents === 0) {
+          return NextResponse.json({
+            success: false,
+            error: 'Valor da transação não pode ser zero. Por favor, informe o valor correto.',
+            clarification_needed: 'amount',
+          }, { status: 400 });
+        }
+
         const installmentTotal = transaction.installment_total || 1;
 
         // Check if it's an installment transaction

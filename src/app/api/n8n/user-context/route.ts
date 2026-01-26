@@ -11,6 +11,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getGlobalSettings } from '@/services/admin/globalSettings';
 import { getUserByPhoneNumber, normalizePhoneNumber } from '@/services/whatsapp/verification';
 import { getUserContextForAI } from '@/services/whatsapp/transactions';
+import { createClient } from '@supabase/supabase-js';
+
+// Admin client for service role operations
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 async function validateN8nApiKey(request: NextRequest): Promise<boolean> {
   const apiKey = request.headers.get('x-n8n-api-key');
@@ -61,6 +68,29 @@ export async function GET(request: NextRequest) {
         verified: true,
         error: 'Erro ao obter contexto do usuário',
       }, { status: 500 });
+    }
+
+    // Get conversation buffer (if exists and not expired)
+    let conversationBuffer = null;
+    try {
+      const { data: buffer } = await supabaseAdmin
+        .from('whatsapp_conversation_buffer')
+        .select('*')
+        .eq('phone_number', normalizedPhone)
+        .gt('expires_at', new Date().toISOString())
+        .single();
+
+      if (buffer) {
+        conversationBuffer = {
+          pending_intent: buffer.pending_intent,
+          pending_data: buffer.pending_data,
+          clarification_field: buffer.clarification_field,
+          conversation_history: buffer.conversation_history,
+          expires_at: buffer.expires_at,
+        };
+      }
+    } catch (e) {
+      // Buffer doesn't exist or table not created yet - ignore
     }
 
     // Format context for AI
@@ -128,6 +158,8 @@ export async function GET(request: NextRequest) {
         default_account: context.accounts.find((a) => a.type !== 'credit_card')?.name || null,
         credit_cards_available: context.creditCards.map((cc) => cc.name),
       },
+      // Buffer de conversa pendente (se existir)
+      conversation_buffer: conversationBuffer,
     };
 
     return NextResponse.json(formattedContext);
