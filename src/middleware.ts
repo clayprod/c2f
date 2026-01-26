@@ -111,37 +111,6 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Se é rota protegida e há sessão, verificar se perfil está completo
-  if (isProtectedRoute && user) {
-    // Não verificar perfil incompleto na própria página de completar perfil
-    if (request.nextUrl.pathname === '/app/complete-profile') {
-      return response;
-    }
-
-    // Verificar se o usuário fez login via OAuth e tem perfil incompleto
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('city, state, monthly_income_cents')
-      .eq('id', user.id)
-      .single();
-
-    const isProfileIncomplete = !profile || 
-      !profile.city || 
-      !profile.state || 
-      !profile.monthly_income_cents;
-
-    // Verificar se é usuário OAuth (Google)
-    const identities = user.identities || [];
-    const isOAuthUser = identities.some((identity: any) => identity.provider === 'google');
-
-    // Se é usuário OAuth e perfil incompleto, redirecionar para completar perfil
-    if (isOAuthUser && isProfileIncomplete) {
-      return NextResponse.redirect(new URL('/app/complete-profile', request.url));
-    }
-
-    return response;
-  }
-
   return response;
 }
 

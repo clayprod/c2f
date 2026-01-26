@@ -33,6 +33,9 @@ function SignupPageContent() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [cep, setCep] = useState('');
   const [state, setState] = useState('');
   const [city, setCity] = useState('');
@@ -88,12 +91,18 @@ function SignupPageContent() {
     loadEstados();
   }, []);
 
-  // Carregar cidades quando o estado for selecionado
+  // Carregar cidades quando o estado for selecionado manualmente (não pelo CEP)
   useEffect(() => {
     async function loadCidades() {
       if (!state) {
         setCidades([]);
         setCity('');
+        return;
+      }
+
+      // Se o estado foi preenchido pelo CEP, não recarregar as cidades
+      // pois o lookupCep já fez isso e pode ter adicionado cidade como fallback
+      if (hasAutoFilledFromCep) {
         return;
       }
 
@@ -113,7 +122,7 @@ function SignupPageContent() {
       }
     }
     loadCidades();
-  }, [state]);
+  }, [state, hasAutoFilledFromCep]);
 
   // Função para normalizar nome de cidade (remove acentos, converte para minúsculas)
   const normalizeCityName = (name: string): string => {
@@ -274,6 +283,15 @@ function SignupPageContent() {
       return;
     }
 
+    if (password !== confirmPassword) {
+      toast({
+        variant: "destructive",
+        title: "Senhas não coincidem",
+        description: "A senha e a confirmação de senha devem ser iguais",
+      });
+      return;
+    }
+
     if (!acceptedTerms) {
       toast({
         variant: "destructive",
@@ -426,16 +444,52 @@ function SignupPageContent() {
               <label htmlFor="password" className="block text-sm font-medium mb-2">
                 Senha
               </label>
-              <input
-                type="password"
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
-                placeholder="Mínimo 8 caracteres"
-                required
-                disabled={loading}
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 pr-12 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                  placeholder="Mínimo 8 caracteres"
+                  required
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  <i className={`bx ${showPassword ? 'bx-hide' : 'bx-show'} text-xl`} />
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium mb-2">
+                Confirmar Senha
+              </label>
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  id="confirmPassword"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-4 py-3 pr-12 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                  placeholder="Digite a senha novamente"
+                  required
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  <i className={`bx ${showConfirmPassword ? 'bx-hide' : 'bx-show'} text-xl`} />
+                </button>
+              </div>
             </div>
 
             <div>
@@ -583,11 +637,21 @@ function SignupPageContent() {
                 className="text-sm text-muted-foreground leading-relaxed cursor-pointer"
               >
                 Li e concordo com os{' '}
-                <Link href="/terms-of-service" className="text-primary hover:underline font-medium">
+                <Link
+                  href="/terms-of-service"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline font-medium"
+                >
                   Termos de Uso
                 </Link>{' '}
                 e{' '}
-                <Link href="/privacy-policy" className="text-primary hover:underline font-medium">
+                <Link
+                  href="/privacy-policy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline font-medium"
+                >
                   Política de Privacidade
                 </Link>
               </label>

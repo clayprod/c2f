@@ -13,6 +13,7 @@ import { Turnstile } from '@/components/auth/Turnstile';
 function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [lockoutStatus, setLockoutStatus] = useState<{
     locked: boolean;
@@ -222,16 +223,26 @@ function LoginForm() {
           <label htmlFor="password" className="block text-sm font-medium mb-2">
             Senha
           </label>
-          <input
-            type="password"
-            id="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
-            placeholder="••••••••"
-            required
-            disabled={loading}
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              id="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-3 pr-12 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+              placeholder="••••••••"
+              required
+              disabled={loading}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              tabIndex={-1}
+            >
+              <i className={`bx ${showPassword ? 'bx-hide' : 'bx-show'} text-xl`} />
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center justify-between text-sm">
@@ -389,11 +400,21 @@ export default function LoginPage() {
 
         <p className="text-center text-xs text-muted-foreground mt-6">
           Ao entrar, você concorda com nossos{' '}
-          <Link href="/terms-of-service" className="text-primary hover:underline">
+          <Link
+            href="/terms-of-service"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline"
+          >
             Termos de Uso
           </Link>{' '}
           e{' '}
-          <Link href="/privacy-policy" className="text-primary hover:underline">
+          <Link
+            href="/privacy-policy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline"
+          >
             Política de Privacidade
           </Link>
         </p>
