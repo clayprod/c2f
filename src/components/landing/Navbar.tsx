@@ -21,7 +21,9 @@ const Navbar = () => {
   }, []);
 
   const navLinks = [
+    { label: 'IA', href: '/#ai-advisor' },
     { label: 'Recursos', href: '/#features' },
+    { label: 'Bancos', href: '/#banks' },
     { label: 'Preços', href: '/#pricing' },
     { label: 'FAQ', href: '/#faq' },
     { label: 'Blog', href: '/blog' },

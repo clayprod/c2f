@@ -30,9 +30,14 @@ const testimonials = [
 ];
 
 const Metrics = () => {
+  // SEÇÃO DE DEPOIMENTOS TEMPORARIAMENTE DESABILITADA
+  // Para reativar, descomente o bloco abaixo e remova o return null
+  return null;
+
+  /* INÍCIO DA SEÇÃO DE DEPOIMENTOS - COMENTADA
   return (
     <section id="testimonials" className="section-padding pt-10 md:pt-12 bg-muted/20 relative overflow-hidden">
-      {/* Background Effects */}
+      {/* Background Effects *}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-primary/5 rounded-full blur-[120px]" />
         <div className="absolute bottom-1/4 left-1/4 w-96 h-96 bg-secondary/5 rounded-full blur-[120px]" />
@@ -59,19 +64,19 @@ const Metrics = () => {
               className="glass-card-hover p-8 group relative flex flex-col"
               style={{ animationDelay: `${index * 0.1}s` }}
             >
-              {/* Rating Stars */}
+              {/* Rating Stars *}
               <div className="flex gap-1 mb-4">
                 {[...Array(testimonial.rating)].map((_, i) => (
                   <i key={i} className='bx bxs-star text-primary text-lg'></i>
                 ))}
               </div>
 
-              {/* Testimonial Text */}
+              {/* Testimonial Text *}
               <p className="text-muted-foreground mb-6 leading-relaxed text-sm flex-1">
                 "{testimonial.text}"
               </p>
 
-              {/* Author Info */}
+              {/* Author Info *}
               <div className="flex items-center gap-4 pt-6 border-t border-border mt-auto">
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden flex-shrink-0">
                   <Image
@@ -100,6 +105,7 @@ const Metrics = () => {
       </div>
     </section>
   );
+  FIM DA SEÇÃO DE DEPOIMENTOS */
 };
 
 export default Metrics;
