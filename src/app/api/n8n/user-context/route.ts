@@ -13,11 +13,16 @@ import { getUserByPhoneNumber, normalizePhoneNumber } from '@/services/whatsapp/
 import { getUserContextForAI } from '@/services/whatsapp/transactions';
 import { createClient } from '@supabase/supabase-js';
 
-// Admin client for service role operations
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !serviceRoleKey) {
+    return null;
+  }
+
+  return createClient(url, serviceRoleKey);
+}
 
 async function validateN8nApiKey(request: NextRequest): Promise<boolean> {
   const apiKey = request.headers.get('x-n8n-api-key');
@@ -73,6 +78,11 @@ export async function GET(request: NextRequest) {
     // Get conversation buffer (if exists and not expired)
     let conversationBuffer = null;
     try {
+      const supabaseAdmin = getSupabaseAdmin();
+      if (!supabaseAdmin) {
+        throw new Error('Supabase admin credentials not configured');
+      }
+
       const { data: buffer } = await supabaseAdmin
         .from('whatsapp_conversation_buffer')
         .select('*')
