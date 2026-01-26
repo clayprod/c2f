@@ -198,7 +198,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
     if (!userProfile) return item.minPlan === 'free';
     if (item.minPlan === 'free') return true;
     const planOrder: Record<'free' | 'pro' | 'premium', number> = { free: 0, pro: 1, premium: 2 };
-    return planOrder[userProfile.plan] >= planOrder[item.minPlan];
+    const minPlan = item.minPlan as 'free' | 'pro' | 'premium';
+    return planOrder[userProfile.plan] >= planOrder[minPlan];
   };
 
   // Show all menu items (no filtering)
