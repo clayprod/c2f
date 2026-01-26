@@ -1,87 +1,119 @@
-import type { PlanFeature, PlanFeatures } from '@/services/admin/globalSettings';
+import { createServerClient } from '@supabase/ssr';
+import { NextResponse, type NextRequest } from 'next/server';
 
-export type PlanModuleId =
-  | 'dashboard'
-  | 'transactions'
-  | 'accounts'
-  | 'credit_cards'
-  | 'categories'
-  | 'budgets'
-  | 'debts'
-  | 'receivables'
-  | 'investments'
-  | 'assets'
-  | 'goals'
-  | 'reports'
-  | 'integrations'
-  | 'ai_advisor';
+export async function middleware(request: NextRequest) {
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  });
 
-export const PLAN_MODULES: Array<{ id: PlanModuleId; label: string; route: string }> = [
-  { id: 'dashboard', label: 'Dashboard', route: '/app' },
-  { id: 'transactions', label: 'Transações', route: '/app/transactions' },
-  { id: 'accounts', label: 'Contas', route: '/app/accounts' },
-  { id: 'credit_cards', label: 'Cartões', route: '/app/credit-cards' },
-  { id: 'categories', label: 'Categorias', route: '/app/categories' },
-  { id: 'budgets', label: 'Orçamentos', route: '/app/budgets' },
-  { id: 'debts', label: 'Dívidas', route: '/app/debts' },
-  { id: 'receivables', label: 'Recebíveis', route: '/app/receivables' },
-  { id: 'investments', label: 'Investimentos', route: '/app/investments' },
-  { id: 'assets', label: 'Patrimônio', route: '/app/assets' },
-  { id: 'goals', label: 'Objetivos', route: '/app/goals' },
-  { id: 'reports', label: 'Relatórios', route: '/app/reports' },
-  { id: 'integrations', label: 'Integrações', route: '/app/integrations' },
-  { id: 'ai_advisor', label: 'AI Advisor (chat)', route: '/app/advisor' },
-];
-
-const MODULE_LABELS = PLAN_MODULES.reduce<Record<string, string>>((acc, module) => {
-  acc[module.id] = module.label;
-  return acc;
-}, {});
-
-export function formatFeatureText(featureId: string, feature: PlanFeature | undefined): string {
-  if (featureId === 'transactions') {
-    if (feature?.unlimited) return 'Transações ilimitadas';
-    if (typeof feature?.limit === 'number') {
-      return `Até ${feature.limit} transações/mês`;
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value;
+        },
+        set(name: string, value: string, options: any) {
+          const cookieOptions = {
+            ...options,
+            maxAge: options?.maxAge || 60 * 60 * 24 * 30,
+            sameSite: 'lax' as const,
+            path: '/',
+            httpOnly: false,
+          };
+          request.cookies.set({
+            name,
+            value,
+            ...cookieOptions,
+          });
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          });
+          response.cookies.set({
+            name,
+            value,
+            ...cookieOptions,
+          });
+        },
+        remove(name: string, options: any) {
+          const cookieOptions = {
+            ...options,
+            maxAge: 0,
+            path: '/',
+          };
+          request.cookies.set({
+            name,
+            value: '',
+            ...cookieOptions,
+          });
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          });
+          response.cookies.set({
+            name,
+            value: '',
+            ...cookieOptions,
+          });
+        },
+      },
     }
-    return 'Transações';
+  );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (request.nextUrl.pathname === '/' && user) {
+    return NextResponse.redirect(new URL('/app', request.url));
   }
 
-  if (featureId === 'ai_advisor') {
-    if (feature?.unlimited) return 'AI Advisor ilimitado';
-    if (typeof feature?.limit === 'number') {
-      return `AI Advisor (${feature.limit} consultas/mês)`;
+  const protectedRoutes = ['/app'];
+  const publicAppRoutes = ['/app/terms-of-service', '/app/privacy-policy'];
+
+  const isPublicAppRoute = publicAppRoutes.some((route) =>
+    request.nextUrl.pathname.startsWith(route)
+  );
+
+  const isProtectedRoute = protectedRoutes.some((route) =>
+    request.nextUrl.pathname.startsWith(route)
+  ) && !isPublicAppRoute;
+
+  if (isProtectedRoute && !user) {
+    const redirectUrl = new URL('/login', request.url);
+    redirectUrl.searchParams.set('next', request.nextUrl.pathname);
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  const isAdminRoute = request.nextUrl.pathname.startsWith('/app/admin');
+
+  if (isAdminRoute && user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile || profile.role !== 'admin') {
+      return NextResponse.redirect(new URL('/app', request.url));
     }
-    return 'AI Advisor';
   }
 
-  return MODULE_LABELS[featureId] || featureId;
+  if (isProtectedRoute && user) {
+    return response;
+  }
+
+  return response;
 }
 
-export function buildPlanFeatureList(features: PlanFeatures): Array<{ id: string; text: string; enabled: boolean }> {
-  return PLAN_MODULES.map((module) => {
-    const feature = features?.[module.id];
-    if (!feature?.enabled) return null;
-    return {
-      id: module.id,
-      text: formatFeatureText(module.id, feature),
-      enabled: true,
-    };
-  }).filter((item): item is { id: string; text: string; enabled: boolean } => Boolean(item));
-}
-
-export function resolvePlanLimit(feature: PlanFeature | undefined, fallback: number): { enabled: boolean; unlimited: boolean; limit: number } {
-  if (!feature?.enabled) {
-    return { enabled: false, unlimited: false, limit: 0 };
-  }
-
-  if (feature.unlimited) {
-    return { enabled: true, unlimited: true, limit: -1 };
-  }
-
-  if (typeof feature.limit === 'number') {
-    return { enabled: true, unlimited: false, limit: feature.limit };
-  }
-
-  return { enabled: true, unlimited: false, limit: fallback };
-}
+export const config = {
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
+};

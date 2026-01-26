@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useLogo } from '@/hooks/useLogo';
 import Image from 'next/image';
 import AdvisorDialog from './AdvisorDialog';
+import CompleteProfileForm from './CompleteProfileForm';
 import { NotificationDropdown } from './NotificationDropdown';
 import { useTheme } from '@/hooks/useTheme';
 import { useAccountContext } from '@/hooks/useAccountContext';
@@ -20,6 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 
 interface AppLayoutProps {
@@ -70,6 +72,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [showScrollUp, setShowScrollUp] = useState(false);
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [advisorOpen, setAdvisorOpen] = useState(false);
+  const [showCompleteProfile, setShowCompleteProfile] = useState(false);
   const menuListRef = useRef<HTMLUListElement>(null);
   const pathname = usePathname();
   const router = useRouter();
@@ -256,7 +259,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         const [profileResult, planResponse] = await Promise.all([
           supabase
             .from('profiles')
-            .select('full_name, email, avatar_url, role')
+            .select('full_name, email, avatar_url, role, city, state, monthly_income_cents')
             .eq('id', user.id)
             .single(),
           fetch('/api/billing/plan')
@@ -271,6 +274,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
           fetchedFeatures = (planData?.features as PlanFeatures) || null;
         }
         setPlanFeatures(fetchedFeatures);
+
+        const identities = user.identities || [];
+        const isOAuthUser = identities.some((identity: any) => identity.provider === 'google');
+        const isProfileIncomplete = !profile?.city || !profile?.state || !profile?.monthly_income_cents;
+        setShowCompleteProfile(isOAuthUser && isProfileIncomplete);
 
         if (profile) {
           setUserProfile({
@@ -654,6 +662,26 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
         <main className="flex-1 p-3 md:p-4 lg:p-6 overflow-y-auto overflow-x-hidden max-w-full min-w-0">{children}</main>
       </div>
+
+      <Dialog
+        open={showCompleteProfile}
+        onOpenChange={(open) => {
+          if (open) {
+            setShowCompleteProfile(true);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto [&>button]:hidden">
+          <CompleteProfileForm
+            useCard={false}
+            className="p-0"
+            redirectTo=""
+            redirectIfComplete={false}
+            requireAuthRedirect={false}
+            onCompleted={() => setShowCompleteProfile(false)}
+          />
+        </DialogContent>
+      </Dialog>
 
       <AdvisorDialog open={advisorOpen} onOpenChange={setAdvisorOpen} />
     </div>
