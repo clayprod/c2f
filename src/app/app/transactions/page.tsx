@@ -362,18 +362,21 @@ export default function TransactionsPage() {
           <h1 className="font-display text-2xl md:text-3xl font-bold">Transações</h1>
           <p className="text-muted-foreground">Gerencie suas receitas e despesas</p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={handleImportCSV} variant="outline">
-            <i className='bx bx-file-plus mr-2'></i>
-            Importar
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 -mb-1">
+          <Button onClick={handleImportCSV} variant="outline" className="flex-shrink-0">
+            <i className='bx bx-file-plus mr-1 sm:mr-2'></i>
+            <span className="hidden sm:inline">Importar</span>
+            <span className="sm:hidden">Importar</span>
           </Button>
-          <Button onClick={handleExportCSV} variant="outline" disabled={exporting}>
-            <i className='bx bx-save mr-2'></i>
-            Exportar CSV
+          <Button onClick={handleExportCSV} variant="outline" disabled={exporting} className="flex-shrink-0">
+            <i className='bx bx-save mr-1 sm:mr-2'></i>
+            <span className="hidden sm:inline">Exportar CSV</span>
+            <span className="sm:hidden">Exportar</span>
           </Button>
-          <Button onClick={handleNewTransaction} className="btn-primary">
-            <i className='bx bx-plus'></i>
-            Nova Transação
+          <Button onClick={handleNewTransaction} className="btn-primary flex-shrink-0">
+            <i className='bx bx-plus mr-1 sm:mr-2'></i>
+            <span className="hidden sm:inline">Nova Transação</span>
+            <span className="sm:hidden">Nova</span>
           </Button>
         </div>
       </div>

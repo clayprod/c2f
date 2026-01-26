@@ -812,7 +812,7 @@ export default function BudgetsPage() {
                 <span className="sm:hidden">Auto</span>
               </span>
             ) : (
-              <div className="w-32 md:w-40">
+              <div className="w-36 sm:w-40 md:w-44">
                 <InlineBudgetEditor
                   categoryId={category.id}
                   categoryName={category.name}

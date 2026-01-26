@@ -453,7 +453,7 @@ export function CashFlowChart({ data, periodCount = 12, groupBy = 'month' }: Cas
   };
 
   return (
-    <div className="w-full relative">
+    <div className="w-full relative overflow-hidden">
       {/* Botões de navegação */}
       <div className="absolute top-1/2 -translate-y-1/2 left-0 z-10">
         <button
@@ -635,30 +635,30 @@ export function CashFlowChart({ data, periodCount = 12, groupBy = 'month' }: Cas
           <Legend
             wrapperStyle={{ paddingTop: isMobile ? '10px' : '20px' }}
             content={() => (
-              <div className={`flex items-center justify-center flex-wrap ${isMobile ? 'gap-x-4 gap-y-2 text-xs px-2' : 'gap-x-6 gap-y-2 text-sm'}`}>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: chartIncomeColor }}></div>
-                  <span className="text-muted-foreground">Receitas Realizadas</span>
+              <div className={`flex items-center justify-center flex-wrap ${isMobile ? 'gap-x-3 gap-y-1.5 text-[10px] px-1' : 'gap-x-6 gap-y-2 text-sm'}`}>
+                <div className="flex items-center gap-1">
+                  <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: chartIncomeColor }}></div>
+                  <span className="text-muted-foreground whitespace-nowrap">{isMobile ? 'Receitas' : 'Receitas Realizadas'}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-sm opacity-40" style={{ backgroundColor: chartIncomeColor }}></div>
-                  <span className="text-muted-foreground">Receitas Projetadas</span>
+                <div className="flex items-center gap-1">
+                  <div className="w-2.5 h-2.5 rounded-sm opacity-40 flex-shrink-0" style={{ backgroundColor: chartIncomeColor }}></div>
+                  <span className="text-muted-foreground whitespace-nowrap">{isMobile ? 'Receitas Proj.' : 'Receitas Projetadas'}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: chartExpenseColor }}></div>
-                  <span className="text-muted-foreground">Despesas Realizadas</span>
+                <div className="flex items-center gap-1">
+                  <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: chartExpenseColor }}></div>
+                  <span className="text-muted-foreground whitespace-nowrap">{isMobile ? 'Despesas' : 'Despesas Realizadas'}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-sm opacity-40" style={{ backgroundColor: chartExpenseColor }}></div>
-                  <span className="text-muted-foreground">Despesas Projetadas</span>
+                <div className="flex items-center gap-1">
+                  <div className="w-2.5 h-2.5 rounded-sm opacity-40 flex-shrink-0" style={{ backgroundColor: chartExpenseColor }}></div>
+                  <span className="text-muted-foreground whitespace-nowrap">{isMobile ? 'Despesas Proj.' : 'Despesas Projetadas'}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-0.5 w-6" style={{ backgroundColor: chartBalanceColor }}></div>
-                  <span className="text-muted-foreground">Saldo Realizado</span>
+                <div className="flex items-center gap-1">
+                  <div className="h-0.5 w-4 flex-shrink-0" style={{ backgroundColor: chartBalanceColor }}></div>
+                  <span className="text-muted-foreground whitespace-nowrap">{isMobile ? 'Saldo' : 'Saldo Realizado'}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-0.5 w-6 border-t-2 border-dashed" style={{ borderColor: chartBalanceColor }}></div>
-                  <span className="text-muted-foreground">Saldo Projetado</span>
+                <div className="flex items-center gap-1">
+                  <div className="h-0.5 w-4 border-t-2 border-dashed flex-shrink-0" style={{ borderColor: chartBalanceColor }}></div>
+                  <span className="text-muted-foreground whitespace-nowrap">{isMobile ? 'Saldo Proj.' : 'Saldo Projetado'}</span>
                 </div>
               </div>
             )}

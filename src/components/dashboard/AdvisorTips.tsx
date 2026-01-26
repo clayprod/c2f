@@ -115,9 +115,9 @@ export function AdvisorTips() {
   }
 
   return (
-    <div className="glass-card p-6 animate-slide-in-right delay-300">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
+    <div className="glass-card p-4 sm:p-6 animate-slide-in-right delay-300 overflow-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+        <div className="flex items-center gap-2 flex-wrap">
           <i className="bx bx-sparkles text-2xl text-purple-600 animate-pulse-soft"></i>
           <h2 className="font-display font-semibold">Dica do Dia</h2>
           {tip.isNew && (
@@ -140,7 +140,7 @@ export function AdvisorTips() {
           />
         </div>
         <span className={cn(
-          'px-2 py-0.5 text-xs font-medium rounded-full',
+          'px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap self-start sm:self-auto',
           confidenceColors[tip.confidence]
         )}>
           {tip.confidence === 'high' ? 'Alta' : tip.confidence === 'medium' ? 'Média' : 'Baixa'} confiança
@@ -152,18 +152,18 @@ export function AdvisorTips() {
 
       {/* Insights */}
       {tip.insights && tip.insights.length > 0 && (
-        <div className="mb-4">
-          <div className="flex flex-wrap gap-2 animate-children-stagger">
+        <div className="mb-4 overflow-x-auto scrollbar-hide -mx-4 sm:-mx-6 px-4 sm:px-6">
+          <div className="flex flex-nowrap sm:flex-wrap gap-2 animate-children-stagger pb-1">
             {tip.insights.slice(0, expanded ? undefined : 3).map((insight, index) => (
               <div
                 key={index}
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-300 hover:scale-105',
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-300 hover:scale-105 flex-shrink-0',
                   severityColors[insight.severity]
                 )}
               >
                 <i className={cn('bx', severityIcons[insight.severity])}></i>
-                <span className="max-w-[200px] truncate" title={insight.message}>
+                <span className="max-w-[150px] sm:max-w-[200px] truncate" title={insight.message}>
                   {insight.message}
                 </span>
               </div>
@@ -171,7 +171,7 @@ export function AdvisorTips() {
             {!expanded && tip.insights.length > 3 && (
               <button
                 onClick={() => setExpanded(true)}
-                className="px-3 py-1.5 rounded-full text-xs font-medium bg-muted hover:bg-muted/80 transition-colors"
+                className="px-3 py-1.5 rounded-full text-xs font-medium bg-muted hover:bg-muted/80 transition-colors flex-shrink-0"
               >
                 +{tip.insights.length - 3} mais
               </button>

@@ -14,8 +14,8 @@ const BankLogosCarousel = () => {
   const duplicatedIcons = [...bankIcons, ...bankIcons];
 
   return (
-    <section id="banks" className="py-12 md:py-16 bg-muted/10 overflow-hidden">
-      <div className="container-custom mb-8">
+    <section id="banks" className="pt-6 md:pt-8 pb-12 md:pb-16 bg-muted/20 overflow-hidden">
+      <div className="container-custom mb-12 md:mb-16">
         <div className="text-center">
           <span className="badge-pill mb-4">
             <i className='bx bx-bank'></i>
@@ -33,32 +33,14 @@ const BankLogosCarousel = () => {
       {/* Carousel Container */}
       <div className="relative group">
         {/* Gradient Overlays for fade effect */}
-        <div className="absolute left-0 top-0 bottom-0 w-20 md:w-32 bg-gradient-to-r from-muted/10 to-transparent z-10 pointer-events-none" />
-        <div className="absolute right-0 top-0 bottom-0 w-20 md:w-32 bg-gradient-to-l from-muted/10 to-transparent z-10 pointer-events-none" />
+        <div className="absolute left-0 top-0 bottom-0 w-20 md:w-32 bg-gradient-to-r from-muted/20 to-transparent z-10 pointer-events-none" />
+        <div className="absolute right-0 top-0 bottom-0 w-20 md:w-32 bg-gradient-to-l from-muted/20 to-transparent z-10 pointer-events-none" />
 
-        {/* First Row - scrolling left */}
-        <div className="flex items-center gap-10 md:gap-14 mb-6 animate-scroll-left group-hover:[animation-play-state:paused]">
-          {duplicatedIcons.slice(0, Math.ceil(duplicatedIcons.length / 2)).map((icon, index) => (
+        {/* Single Row - scrolling left */}
+        <div className="flex items-center gap-10 md:gap-14 animate-scroll-left group-hover:[animation-play-state:paused]">
+          {duplicatedIcons.map((icon, index) => (
             <div
-              key={`row1-${icon}-${index}`}
-              className="flex-shrink-0 flex items-center justify-center hover:scale-110 transition-transform duration-300 opacity-70 hover:opacity-100"
-            >
-              <Image
-                src={`/assets/connector-icons/${icon}.svg`}
-                alt={`Banco ${icon}`}
-                width={96}
-                height={96}
-                className="w-20 h-20 md:w-24 md:h-24 object-contain"
-              />
-            </div>
-          ))}
-        </div>
-
-        {/* Second Row - scrolling right */}
-        <div className="flex items-center gap-10 md:gap-14 animate-scroll-right group-hover:[animation-play-state:paused]">
-          {duplicatedIcons.slice(Math.ceil(duplicatedIcons.length / 2)).map((icon, index) => (
-            <div
-              key={`row2-${icon}-${index}`}
+              key={`logo-${icon}-${index}`}
               className="flex-shrink-0 flex items-center justify-center hover:scale-110 transition-transform duration-300 opacity-70 hover:opacity-100"
             >
               <Image

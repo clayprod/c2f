@@ -131,22 +131,23 @@ export default function GoalsPage() {
   return (
     <PlanGuard minPlan="pro">
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="font-display text-2xl md:text-3xl font-bold">Objetivos</h1>
             <p className="text-muted-foreground">Crie metas e poupe com "caixinhas"</p>
           </div>
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer hover:bg-muted/80">
+          <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto scrollbar-hide pb-1 -mb-1">
+            <label className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium cursor-pointer hover:bg-muted/80 flex-shrink-0">
               <Switch
                 checked={showCompleted}
                 onCheckedChange={setShowCompleted}
               />
-              <span>Mostrar concluídos</span>
+              <span className="whitespace-nowrap">Mostrar concluídos</span>
             </label>
-            <Link href="/app/goals/new" className="btn-primary">
+            <Link href="/app/goals/new" className="btn-primary flex-shrink-0">
               <i className='bx bx-plus'></i>
-              Novo Objetivo
+              <span className="hidden sm:inline">Novo Objetivo</span>
+              <span className="sm:hidden">Novo</span>
             </Link>
           </div>
         </div>

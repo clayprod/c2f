@@ -279,9 +279,9 @@ export function InlineBudgetEditor({
   // Compact version for create mode
   if (mode === 'create') {
     return (
-      <div className="flex items-center gap-1">
-        <div className="relative flex-1">
-          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">R$</span>
+      <div className="flex items-center gap-0.5 sm:gap-1">
+        <div className="relative flex-1 min-w-0">
+          <span className="absolute left-1.5 sm:left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-[10px] sm:text-xs">R$</span>
           <input
             ref={inputRef}
             type="text"
@@ -293,7 +293,7 @@ export function InlineBudgetEditor({
             }}
             onKeyDown={handleKeyDown}
             disabled={saving}
-            className={`w-full pl-7 pr-2 py-1.5 text-sm rounded bg-muted/50 border ${
+            className={`w-full pl-6 sm:pl-7 pr-1 sm:pr-2 py-1 sm:py-1.5 text-xs sm:text-sm rounded bg-muted/50 border ${
               error ? 'border-red-500' : 'border-border'
             } focus:border-primary focus:outline-none transition-colors`}
             placeholder="0,00"
@@ -307,13 +307,13 @@ export function InlineBudgetEditor({
             parseFloat(value.replace(',', '.')) <= 0
           }
           size="sm"
-          className="h-7 w-7 p-0"
+          className="h-6 w-6 sm:h-7 sm:w-7 p-0 flex-shrink-0"
           title="Salvar (Enter)"
         >
           {saving ? (
-            <i className="bx bx-loader-alt bx-spin text-xs"></i>
+            <i className="bx bx-loader-alt bx-spin text-[10px] sm:text-xs"></i>
           ) : (
-            <i className="bx bx-check text-xs"></i>
+            <i className="bx bx-check text-[10px] sm:text-xs"></i>
           )}
         </Button>
         <Button
@@ -321,10 +321,10 @@ export function InlineBudgetEditor({
           disabled={saving || !onSaveBreakdown}
           variant="ghost"
           size="sm"
-          className="h-7 w-7 p-0"
+          className="h-6 w-6 sm:h-7 sm:w-7 p-0 flex-shrink-0"
           title="Detalhar em subs"
         >
-          <i className="bx bx-list-ul text-xs"></i>
+          <i className="bx bx-list-ul text-[10px] sm:text-xs"></i>
         </Button>
         {error && (
           <span className="absolute -bottom-4 left-0 text-[10px] text-negative whitespace-nowrap">{error}</span>

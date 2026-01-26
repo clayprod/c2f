@@ -119,9 +119,9 @@ export default function SharingSection() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="font-display font-semibold text-lg flex items-center gap-2">
+          <h2 className="font-display font-semibold text-lg flex items-center gap-2 flex-wrap">
             <i className="bx bx-share-alt text-xl text-primary"></i>
             Compartilhamento
             {sharingInfo && (
@@ -138,6 +138,7 @@ export default function SharingSection() {
           onClick={() => setShowInviteModal(true)}
           disabled={sharingInfo ? !sharingInfo.canInvite : false}
           title={sharingInfo && !sharingInfo.canInvite ? `Limite de ${sharingInfo.limit} pessoas atingido` : undefined}
+          className="self-start sm:self-auto flex-shrink-0"
         >
           <i className="bx bx-user-plus mr-2"></i>
           Convidar
