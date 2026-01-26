@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 
@@ -17,6 +17,14 @@ const chatMessages = [
 const AIShowcase = () => {
   const [visibleMessages, setVisibleMessages] = useState<number>(0);
   const [isTyping, setIsTyping] = useState(false);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  // Scroll para o final quando novas mensagens aparecem
+  useEffect(() => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
+  }, [visibleMessages, isTyping]);
 
   // Animação do chat - mostra mensagens uma por uma
   useEffect(() => {
@@ -91,7 +99,7 @@ const AIShowcase = () => {
               </div>
 
               {/* Chat Messages */}
-              <div className="space-y-3 min-h-[280px] max-h-[280px] overflow-hidden">
+              <div ref={messagesContainerRef} className="space-y-3 min-h-[320px] max-h-[320px] overflow-y-auto scrollbar-hide">
                 <AnimatePresence mode="popLayout">
                   {chatMessages.slice(0, visibleMessages).map((msg, index) => (
                     <motion.div
@@ -131,7 +139,7 @@ const AIShowcase = () => {
                     </div>
                   </motion.div>
                 )}
-              </div>
+                </div>
 
               {/* Chat Input (decorative) */}
               <div className="mt-4 pt-4 border-t border-border">
@@ -191,7 +199,7 @@ const AIShowcase = () => {
         {/* Features Text */}
         <div className="glass-card p-6 md:p-8 max-w-4xl mx-auto text-center">
           <h3 className="font-display text-xl md:text-2xl font-bold mb-4">
-            Tudo que você precisa, onde você estiver
+            Não precisa mudar sua rotina
           </h3>
           <p className="text-muted-foreground text-base md:text-lg leading-relaxed">
             Registre suas transações por <span className="text-foreground font-medium">texto ou áudio</span> diretamente pelo WhatsApp, 

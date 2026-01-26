@@ -992,7 +992,10 @@ export async function updateTransaction(
   }
 
   if (updates.categoryName !== undefined) {
-    const type = (updates.amountCents ?? txToUpdate.amount * 100) >= 0 ? 'income' : 'expense';
+    // Fix: use explicit undefined check to handle zero amounts correctly
+    const existingAmountCents = txToUpdate.amount * 100;
+    const amountToCheck = updates.amountCents !== undefined ? updates.amountCents : existingAmountCents;
+    const type = amountToCheck >= 0 ? 'income' : 'expense';
     const categoryId = await findOrCreateCategory(input.userId, updates.categoryName, type);
     if (categoryId) {
       updateData.category_id = categoryId;
@@ -1053,5 +1056,622 @@ export async function updateTransaction(
       amount: updateData.amount ?? txToUpdate.amount,
       postedAt: updateData.posted_at ?? txToUpdate.posted_at,
     },
+  };
+}
+
+// ============================================
+// NEW QUERY FUNCTIONS
+// ============================================
+
+export interface InvestmentResult {
+  id: string;
+  name: string;
+  type: string;
+  institution: string | null;
+  initialValueCents: number;
+  currentValueCents: number;
+  monthlyContributionCents: number;
+  status: string;
+}
+
+export interface InvestmentsQueryResult {
+  success: boolean;
+  data: InvestmentResult[];
+  summary: {
+    totalInvestedCents: number;
+    totalCurrentValueCents: number;
+    totalReturnsCents: number;
+    returnPercentage: number;
+  };
+  message: string;
+  error?: string;
+}
+
+/**
+ * Get user's investments
+ */
+export async function getInvestments(userId: string): Promise<InvestmentsQueryResult> {
+  const supabase = createAdminClient();
+
+  const { data: investments, error } = await supabase
+    .from('investments')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .order('current_value_cents', { ascending: false });
+
+  if (error) {
+    console.error('[WhatsApp] Error fetching investments:', error);
+    return {
+      success: false,
+      data: [],
+      summary: { totalInvestedCents: 0, totalCurrentValueCents: 0, totalReturnsCents: 0, returnPercentage: 0 },
+      message: 'Erro ao buscar investimentos',
+      error: error.message,
+    };
+  }
+
+  const investmentTypes: Record<string, string> = {
+    stocks: 'Ações',
+    bonds: 'Renda Fixa',
+    funds: 'Fundos',
+    crypto: 'Crypto',
+    real_estate: 'Imóveis',
+    other: 'Outros',
+  };
+
+  const data: InvestmentResult[] = (investments || []).map((inv) => ({
+    id: inv.id,
+    name: inv.name,
+    type: inv.type,
+    institution: inv.institution,
+    initialValueCents: inv.initial_investment_cents || 0,
+    currentValueCents: inv.current_value_cents || 0,
+    monthlyContributionCents: inv.monthly_contribution_cents || 0,
+    status: inv.status,
+  }));
+
+  const totalInvested = data.reduce((sum, inv) => sum + inv.initialValueCents, 0);
+  const totalCurrent = data.reduce((sum, inv) => sum + inv.currentValueCents, 0);
+  const totalReturns = totalCurrent - totalInvested;
+  const returnPct = totalInvested > 0 ? (totalReturns / totalInvested) * 100 : 0;
+
+  // Format message
+  let message = '📈 *Seus Investimentos*\n\n';
+
+  if (data.length === 0) {
+    message = 'Você ainda não tem investimentos cadastrados.';
+  } else {
+    data.forEach((inv, i) => {
+      const typeName = investmentTypes[inv.type] || inv.type;
+      const initial = inv.initialValueCents / 100;
+      const current = inv.currentValueCents / 100;
+      const returnVal = current - initial;
+      const returnPctItem = initial > 0 ? (returnVal / initial) * 100 : 0;
+      const returnSign = returnVal >= 0 ? '+' : '';
+
+      message += `${i + 1}. *${inv.name}* (${typeName})\n`;
+      message += `   Investido: R$ ${initial.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n`;
+      message += `   Valor atual: R$ ${current.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (${returnSign}${returnPctItem.toFixed(1)}%)\n`;
+      if (inv.monthlyContributionCents > 0) {
+        message += `   Aporte mensal: R$ ${(inv.monthlyContributionCents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n`;
+      }
+      message += '\n';
+    });
+
+    const totalReturnSign = totalReturns >= 0 ? '+' : '';
+    message += `💰 *Total investido:* R$ ${(totalInvested / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n`;
+    message += `💵 *Valor atual:* R$ ${(totalCurrent / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n`;
+    message += `📊 *Rendimento:* ${totalReturnSign}R$ ${(Math.abs(totalReturns) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (${totalReturnSign}${returnPct.toFixed(1)}%)`;
+  }
+
+  return {
+    success: true,
+    data,
+    summary: {
+      totalInvestedCents: totalInvested,
+      totalCurrentValueCents: totalCurrent,
+      totalReturnsCents: totalReturns,
+      returnPercentage: returnPct,
+    },
+    message,
+  };
+}
+
+export interface CreditCardResult {
+  id: string;
+  name: string;
+  brand: string | null;
+  creditLimitCents: number;
+  availableLimitCents: number;
+  currentBillCents: number;
+  closingDay: number;
+  dueDay: number;
+  billStatus: string;
+}
+
+export interface CreditCardsQueryResult {
+  success: boolean;
+  data: CreditCardResult[];
+  summary: {
+    totalLimitCents: number;
+    totalAvailableCents: number;
+    totalBillsCents: number;
+  };
+  message: string;
+  error?: string;
+}
+
+/**
+ * Get user's credit cards with current bills
+ */
+export async function getCreditCardsWithBills(
+  userId: string,
+  cardName?: string
+): Promise<CreditCardsQueryResult> {
+  const supabase = createAdminClient();
+
+  // Get credit card accounts
+  let query = supabase
+    .from('accounts')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('type', 'credit_card');
+
+  if (cardName) {
+    query = query.ilike('name', `%${cardName}%`);
+  }
+
+  const { data: cards, error } = await query.order('name');
+
+  if (error) {
+    console.error('[WhatsApp] Error fetching credit cards:', error);
+    return {
+      success: false,
+      data: [],
+      summary: { totalLimitCents: 0, totalAvailableCents: 0, totalBillsCents: 0 },
+      message: 'Erro ao buscar cartões',
+      error: error.message,
+    };
+  }
+
+  // Get current month bills
+  const currentMonth = new Date();
+  const referenceMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1)
+    .toISOString()
+    .split('T')[0];
+
+  const cardIds = (cards || []).map((c) => c.id);
+  const { data: bills } = await supabase
+    .from('credit_card_bills')
+    .select('account_id, total_cents, status')
+    .in('account_id', cardIds)
+    .eq('reference_month', referenceMonth);
+
+  const billsByCard: Record<string, { total: number; status: string }> = {};
+  for (const bill of bills || []) {
+    billsByCard[bill.account_id] = { total: bill.total_cents || 0, status: bill.status || 'open' };
+  }
+
+  const data: CreditCardResult[] = (cards || []).map((card) => {
+    const bill = billsByCard[card.id] || { total: 0, status: 'open' };
+    const limit = card.credit_limit || 0;
+    const available = limit - bill.total;
+
+    return {
+      id: card.id,
+      name: card.name,
+      brand: card.card_brand || null,
+      creditLimitCents: limit,
+      availableLimitCents: Math.max(0, available),
+      currentBillCents: bill.total,
+      closingDay: card.closing_day || 1,
+      dueDay: card.due_day || 10,
+      billStatus: bill.status,
+    };
+  });
+
+  const totalLimit = data.reduce((sum, c) => sum + c.creditLimitCents, 0);
+  const totalAvailable = data.reduce((sum, c) => sum + c.availableLimitCents, 0);
+  const totalBills = data.reduce((sum, c) => sum + c.currentBillCents, 0);
+
+  // Format message
+  let message = '💳 *Seus Cartões de Crédito*\n\n';
+
+  if (data.length === 0) {
+    message = cardName
+      ? `Nenhum cartão encontrado com "${cardName}".`
+      : 'Você ainda não tem cartões de crédito cadastrados.';
+  } else {
+    data.forEach((card, i) => {
+      const brandStr = card.brand ? ` (${card.brand})` : '';
+      message += `${i + 1}. *${card.name}*${brandStr}\n`;
+      message += `   Limite: R$ ${(card.creditLimitCents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n`;
+      message += `   Disponível: R$ ${(card.availableLimitCents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n`;
+      message += `   Fatura atual: R$ ${(card.currentBillCents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n`;
+      message += `   Vencimento: dia ${card.dueDay}\n\n`;
+    });
+
+    message += `📊 *Resumo:*\n`;
+    message += `Total em faturas: R$ ${(totalBills / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n`;
+    message += `Limite disponível: R$ ${(totalAvailable / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+  }
+
+  return {
+    success: true,
+    data,
+    summary: {
+      totalLimitCents: totalLimit,
+      totalAvailableCents: totalAvailable,
+      totalBillsCents: totalBills,
+    },
+    message,
+  };
+}
+
+export interface UpcomingPayment {
+  type: 'debt' | 'card_bill' | 'installment' | 'goal_contribution';
+  description: string;
+  amountCents: number;
+  dueDate: string;
+  daysUntilDue: number;
+  sourceName: string;
+}
+
+export interface UpcomingPaymentsResult {
+  success: boolean;
+  data: UpcomingPayment[];
+  summary: {
+    next7DaysCents: number;
+    next30DaysCents: number;
+    overdueCents: number;
+  };
+  message: string;
+  error?: string;
+}
+
+/**
+ * Get upcoming payments (debts, card bills, goal contributions)
+ */
+export async function getUpcomingPayments(
+  userId: string,
+  days: number = 30
+): Promise<UpcomingPaymentsResult> {
+  const supabase = createAdminClient();
+  const today = new Date();
+  const futureDate = new Date(today);
+  futureDate.setDate(futureDate.getDate() + days);
+
+  const todayStr = today.toISOString().split('T')[0];
+  const futureDateStr = futureDate.toISOString().split('T')[0];
+
+  const payments: UpcomingPayment[] = [];
+
+  // 1. Get debts with due dates
+  const { data: debts } = await supabase
+    .from('debts')
+    .select('id, name, total_amount_cents, paid_amount_cents, due_date, monthly_payment_cents, installment_day')
+    .eq('user_id', userId)
+    .in('status', ['active', 'negotiating', 'negociando'])
+    .not('due_date', 'is', null)
+    .gte('due_date', todayStr)
+    .lte('due_date', futureDateStr);
+
+  for (const debt of debts || []) {
+    const dueDate = new Date(debt.due_date);
+    const diffTime = dueDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const remaining = (debt.total_amount_cents || 0) - (debt.paid_amount_cents || 0);
+    const amount = debt.monthly_payment_cents || remaining;
+
+    payments.push({
+      type: 'debt',
+      description: `Dívida: ${debt.name}`,
+      amountCents: amount,
+      dueDate: debt.due_date,
+      daysUntilDue: diffDays,
+      sourceName: debt.name,
+    });
+  }
+
+  // 2. Get credit card bills
+  const { data: cards } = await supabase
+    .from('accounts')
+    .select('id, name, due_day')
+    .eq('user_id', userId)
+    .eq('type', 'credit_card');
+
+  for (const card of cards || []) {
+    // Calculate next due date
+    let nextDue = new Date(today.getFullYear(), today.getMonth(), card.due_day || 10);
+    if (nextDue <= today) {
+      nextDue.setMonth(nextDue.getMonth() + 1);
+    }
+
+    if (nextDue <= futureDate) {
+      // Get current bill
+      const refMonth = new Date(nextDue.getFullYear(), nextDue.getMonth(), 1).toISOString().split('T')[0];
+      const { data: bill } = await supabase
+        .from('credit_card_bills')
+        .select('total_cents')
+        .eq('account_id', card.id)
+        .eq('reference_month', refMonth)
+        .single();
+
+      if (bill && bill.total_cents > 0) {
+        const diffTime = nextDue.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        payments.push({
+          type: 'card_bill',
+          description: `Fatura ${card.name}`,
+          amountCents: bill.total_cents,
+          dueDate: nextDue.toISOString().split('T')[0],
+          daysUntilDue: diffDays,
+          sourceName: card.name,
+        });
+      }
+    }
+  }
+
+  // 3. Get goals with contribution day
+  const { data: goals } = await supabase
+    .from('goals')
+    .select('id, name, monthly_contribution_cents, contribution_day')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .eq('include_in_budget', true)
+    .gt('monthly_contribution_cents', 0);
+
+  for (const goal of goals || []) {
+    const contribDay = goal.contribution_day || 1;
+    let nextContrib = new Date(today.getFullYear(), today.getMonth(), contribDay);
+    if (nextContrib <= today) {
+      nextContrib.setMonth(nextContrib.getMonth() + 1);
+    }
+
+    if (nextContrib <= futureDate) {
+      const diffTime = nextContrib.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      payments.push({
+        type: 'goal_contribution',
+        description: `Aporte: ${goal.name}`,
+        amountCents: goal.monthly_contribution_cents,
+        dueDate: nextContrib.toISOString().split('T')[0],
+        daysUntilDue: diffDays,
+        sourceName: goal.name,
+      });
+    }
+  }
+
+  // Sort by due date
+  payments.sort((a, b) => a.daysUntilDue - b.daysUntilDue);
+
+  // Calculate summaries
+  const next7Days = payments.filter((p) => p.daysUntilDue <= 7 && p.daysUntilDue >= 0);
+  const next30Days = payments.filter((p) => p.daysUntilDue <= 30 && p.daysUntilDue >= 0);
+  const overdue = payments.filter((p) => p.daysUntilDue < 0);
+
+  const sum7 = next7Days.reduce((sum, p) => sum + p.amountCents, 0);
+  const sum30 = next30Days.reduce((sum, p) => sum + p.amountCents, 0);
+  const sumOverdue = overdue.reduce((sum, p) => sum + p.amountCents, 0);
+
+  // Format message
+  let message = '📅 *Próximos Vencimentos*\n\n';
+
+  if (payments.length === 0) {
+    message = `Nenhum vencimento nos próximos ${days} dias. 🎉`;
+  } else {
+    const thisWeek = payments.filter((p) => p.daysUntilDue <= 7 && p.daysUntilDue >= 0);
+    const later = payments.filter((p) => p.daysUntilDue > 7);
+
+    if (thisWeek.length > 0) {
+      message += '*Esta semana:*\n';
+      for (const p of thisWeek) {
+        const emoji = p.daysUntilDue <= 1 ? '🔴' : '🟡';
+        const dayText = p.daysUntilDue === 0 ? 'Hoje' : p.daysUntilDue === 1 ? 'Amanhã' : `Em ${p.daysUntilDue} dias`;
+        message += `${emoji} ${dayText} - ${p.description}: R$ ${(p.amountCents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n`;
+      }
+      message += '\n';
+    }
+
+    if (later.length > 0) {
+      message += '*Próximos 30 dias:*\n';
+      for (const p of later.slice(0, 5)) {
+        const date = new Date(p.dueDate);
+        const dateStr = `dia ${date.getDate()}/${date.getMonth() + 1}`;
+        message += `• ${p.description} (${dateStr}): R$ ${(p.amountCents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n`;
+      }
+      if (later.length > 5) {
+        message += `... e mais ${later.length - 5} vencimentos\n`;
+      }
+      message += '\n';
+    }
+
+    message += `💰 *Total 7 dias:* R$ ${(sum7 / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n`;
+    message += `💰 *Total 30 dias:* R$ ${(sum30 / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+  }
+
+  return {
+    success: true,
+    data: payments,
+    summary: {
+      next7DaysCents: sum7,
+      next30DaysCents: sum30,
+      overdueCents: sumOverdue,
+    },
+    message,
+  };
+}
+
+export interface BudgetStatusItem {
+  categoryId: string;
+  categoryName: string;
+  plannedCents: number;
+  spentCents: number;
+  remainingCents: number;
+  percentUsed: number;
+  status: 'ok' | 'warning' | 'exceeded';
+  isAutoGenerated: boolean;
+}
+
+export interface BudgetStatusResult {
+  success: boolean;
+  data: BudgetStatusItem[];
+  summary: {
+    totalPlannedCents: number;
+    totalSpentCents: number;
+    exceededCount: number;
+    warningCount: number;
+    okCount: number;
+  };
+  message: string;
+  error?: string;
+}
+
+/**
+ * Get budget status with alerts
+ */
+export async function getBudgetStatus(
+  userId: string,
+  month?: string
+): Promise<BudgetStatusResult> {
+  const supabase = createAdminClient();
+
+  const targetMonth = month || new Date().toISOString().slice(0, 7);
+  const [year, monthNum] = targetMonth.split('-').map(Number);
+  const startDate = `${targetMonth}-01`;
+  const endDate = new Date(year, monthNum, 0).toISOString().split('T')[0];
+
+  // Get budgets
+  const { data: budgets, error } = await supabase
+    .from('budgets')
+    .select(`
+      id,
+      amount_planned_cents,
+      is_auto_generated,
+      categories (
+        id,
+        name,
+        type
+      )
+    `)
+    .eq('user_id', userId)
+    .eq('year', year)
+    .eq('month', monthNum);
+
+  if (error) {
+    console.error('[WhatsApp] Error fetching budgets:', error);
+    return {
+      success: false,
+      data: [],
+      summary: { totalPlannedCents: 0, totalSpentCents: 0, exceededCount: 0, warningCount: 0, okCount: 0 },
+      message: 'Erro ao buscar orçamentos',
+      error: error.message,
+    };
+  }
+
+  // Get transactions for the month (expenses only)
+  const { data: transactions } = await supabase
+    .from('transactions')
+    .select('category_id, amount')
+    .eq('user_id', userId)
+    .gte('posted_at', startDate)
+    .lte('posted_at', endDate)
+    .lt('amount', 0);
+
+  // Sum by category
+  const spentByCategory: Record<string, number> = {};
+  for (const tx of transactions || []) {
+    if (tx.category_id) {
+      spentByCategory[tx.category_id] = (spentByCategory[tx.category_id] || 0) + Math.abs(tx.amount * 100);
+    }
+  }
+
+  const data: BudgetStatusItem[] = (budgets || [])
+    .filter((b: any) => b.categories?.name)
+    .map((b: any) => {
+      const cat = b.categories;
+      const planned = b.amount_planned_cents || 0;
+      const spent = spentByCategory[cat.id] || 0;
+      const remaining = planned - spent;
+      const percent = planned > 0 ? (spent / planned) * 100 : 0;
+
+      let status: 'ok' | 'warning' | 'exceeded' = 'ok';
+      if (percent > 100) status = 'exceeded';
+      else if (percent >= 80) status = 'warning';
+
+      return {
+        categoryId: cat.id,
+        categoryName: cat.name,
+        plannedCents: planned,
+        spentCents: spent,
+        remainingCents: remaining,
+        percentUsed: percent,
+        status,
+        isAutoGenerated: b.is_auto_generated || false,
+      };
+    })
+    .sort((a, b) => b.percentUsed - a.percentUsed);
+
+  const exceeded = data.filter((b) => b.status === 'exceeded');
+  const warning = data.filter((b) => b.status === 'warning');
+  const ok = data.filter((b) => b.status === 'ok');
+
+  const totalPlanned = data.reduce((sum, b) => sum + b.plannedCents, 0);
+  const totalSpent = data.reduce((sum, b) => sum + b.spentCents, 0);
+
+  // Format message
+  const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  let message = `📊 *Status dos Orçamentos - ${monthNames[monthNum - 1]}*\n\n`;
+
+  if (data.length === 0) {
+    message = 'Você ainda não tem orçamentos cadastrados para este mês.';
+  } else {
+    if (exceeded.length > 0) {
+      message += `🔴 *Estourados (${exceeded.length}):*\n`;
+      for (const b of exceeded) {
+        message += `• ${b.categoryName}: R$ ${(b.spentCents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/R$ ${(b.plannedCents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (${Math.round(b.percentUsed)}%)\n`;
+      }
+      message += '\n';
+    }
+
+    if (warning.length > 0) {
+      message += `🟡 *Atenção (${warning.length}):*\n`;
+      for (const b of warning) {
+        message += `• ${b.categoryName}: R$ ${(b.spentCents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/R$ ${(b.plannedCents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (${Math.round(b.percentUsed)}%)\n`;
+      }
+      message += '\n';
+    }
+
+    if (ok.length > 0) {
+      message += `🟢 *OK (${ok.length}):*\n`;
+      for (const b of ok.slice(0, 5)) {
+        message += `• ${b.categoryName}: R$ ${(b.spentCents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/R$ ${(b.plannedCents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (${Math.round(b.percentUsed)}%)\n`;
+      }
+      if (ok.length > 5) {
+        message += `... e mais ${ok.length - 5} categorias\n`;
+      }
+      message += '\n';
+    }
+
+    const exceededTotal = exceeded.reduce((sum, b) => sum + (b.spentCents - b.plannedCents), 0);
+    if (exceededTotal > 0) {
+      message += `💡 *Dica:* Você estourou R$ ${(exceededTotal / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} em categorias. Considere ajustar o orçamento ou reduzir gastos.`;
+    }
+  }
+
+  return {
+    success: true,
+    data,
+    summary: {
+      totalPlannedCents: totalPlanned,
+      totalSpentCents: totalSpent,
+      exceededCount: exceeded.length,
+      warningCount: warning.length,
+      okCount: ok.length,
+    },
+    message,
   };
 }

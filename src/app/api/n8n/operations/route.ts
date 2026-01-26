@@ -28,6 +28,10 @@ import {
   formatTransactionsList,
   deleteTransaction,
   updateTransaction,
+  getInvestments,
+  getCreditCardsWithBills,
+  getUpcomingPayments,
+  getBudgetStatus,
 } from '@/services/whatsapp/transactions';
 import {
   suggestFromHistory,
@@ -1087,6 +1091,62 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      // ==================== NEW QUERY OPERATIONS ====================
+      case 'query_investments': {
+        const result = await getInvestments(user.userId);
+
+        await logWhatsAppMessage(user.userId, normalizedPhone, 'incoming', 'text', {
+          contentSummary: `Consulta: investimentos (${result.data.length})`,
+          actionType: 'query_balance',
+          status: result.success ? 'processed' : 'failed',
+          errorMessage: result.error,
+        });
+
+        return NextResponse.json(result);
+      }
+
+      case 'query_credit_cards': {
+        const cardName = body.data?.card_name;
+        const result = await getCreditCardsWithBills(user.userId, cardName);
+
+        await logWhatsAppMessage(user.userId, normalizedPhone, 'incoming', 'text', {
+          contentSummary: `Consulta: cartões (${result.data.length})`,
+          actionType: 'query_balance',
+          status: result.success ? 'processed' : 'failed',
+          errorMessage: result.error,
+        });
+
+        return NextResponse.json(result);
+      }
+
+      case 'query_upcoming_payments': {
+        const days = body.data?.days || 30;
+        const result = await getUpcomingPayments(user.userId, days);
+
+        await logWhatsAppMessage(user.userId, normalizedPhone, 'incoming', 'text', {
+          contentSummary: `Consulta: vencimentos (${result.data.length})`,
+          actionType: 'query_balance',
+          status: result.success ? 'processed' : 'failed',
+          errorMessage: result.error,
+        });
+
+        return NextResponse.json(result);
+      }
+
+      case 'query_budget_status': {
+        const month = body.data?.month;
+        const result = await getBudgetStatus(user.userId, month);
+
+        await logWhatsAppMessage(user.userId, normalizedPhone, 'incoming', 'text', {
+          contentSummary: `Consulta: status orçamentos (${result.summary.exceededCount} estourados)`,
+          actionType: 'query_balance',
+          status: result.success ? 'processed' : 'failed',
+          errorMessage: result.error,
+        });
+
+        return NextResponse.json(result);
+      }
+
       // ==================== EXTENDED CONTEXT ====================
       case 'get_context': {
         const context = await getUserContextForAI(user.userId);
@@ -1142,6 +1202,7 @@ export async function POST(request: NextRequest) {
             'query_budgets', 'update_budget',
             'query_goals', 'create_goal', 'contribute_goal',
             'query_debts', 'create_debt', 'pay_debt',
+            'query_investments', 'query_credit_cards', 'query_upcoming_payments', 'query_budget_status',
             'generate_report',
             'get_context',
           ],
