@@ -298,11 +298,11 @@ export async function checkBudgetEmptyNotifications(
 
   const budgetedCategoryIds = new Set(
     (budgets || [])
-      .filter((b) => (b.amount_planned || 0) > 0)
-      .map((b) => b.category_id)
+      .filter((b: any) => (b.amount_planned || 0) > 0)
+      .map((b: any) => b.category_id)
   );
 
-  const emptyCategories = categories.filter((c) => !budgetedCategoryIds.has(c.id));
+  const emptyCategories = categories.filter((c: any) => !budgetedCategoryIds.has(c.id));
 
   if (emptyCategories.length === 0) return 0;
 
@@ -317,7 +317,7 @@ export async function checkBudgetEmptyNotifications(
 
   if (!shouldSend) return 0;
 
-  const categoryNames = emptyCategories.map((c) => c.name).join(', ');
+  const categoryNames = emptyCategories.map((c: any) => c.name).join(', ');
   const count = emptyCategories.length;
 
   const notificationId = await createNotification(userId, {
@@ -514,7 +514,7 @@ export async function checkDailySpendingNotifications(
 
   // Filter to only expense categories
   const expenseBudgets = budgets.filter(
-    (budget) => (budget.categories as any)?.type === 'expense'
+    (budget: any) => (budget.categories as any)?.type === 'expense'
   );
 
   if (expenseBudgets.length === 0) return 0;

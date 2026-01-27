@@ -136,13 +136,13 @@ export async function getSegmentedUsers(
     .select('user_id, plan_id');
 
   const userPlanMap = new Map<string, string>();
-  (subscriptions || []).forEach((sub) => {
+  (subscriptions || []).forEach((sub: { user_id: string; plan_id: string }) => {
     userPlanMap.set(sub.user_id, sub.plan_id);
   });
 
   // Filter users based on all criteria
   const filteredUsers = profiles
-    .filter((profile) => {
+    .filter((profile: any) => {
       // City filter
       if (segment.cities && segment.cities.length > 0) {
         if (!profile.city || !segment.cities.includes(profile.city)) {
@@ -190,7 +190,7 @@ export async function getSegmentedUsers(
 
       return true;
     })
-    .map((profile) => profile.id);
+    .map((profile: any) => profile.id);
 
   return filteredUsers;
 }
