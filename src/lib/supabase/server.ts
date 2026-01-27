@@ -13,34 +13,28 @@ export async function createClient() {
         getAll() {
           return cookieStore.getAll();
         },
-        set(name: string, value: string, options: any) {
+        setAll(cookiesToSet: { name: string; value: string; options: any }[]) {
           try {
-            const cookieOptions = {
-              ...options,
-              maxAge: options?.maxAge || 60 * 60 * 24 * 30, // 30 dias por padrão
-              sameSite: 'lax' as const,
-              path: '/',
-              secure: process.env.NODE_ENV === 'production',
-              httpOnly: false, // Supabase precisa acessar dados no client-side
-            };
-            cookieStore.set(name, value, cookieOptions);
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, {
+                ...options,
+                sameSite: 'lax',
+                path: '/',
+                secure: process.env.NODE_ENV === 'production',
+                httpOnly: false, // Supabase precisa acessar dados no client-side
+              });
+            });
           } catch (error) {
-            // The `set` method was called from a Server Component.
+            // The `setAll` method was called from a Server Component.
             // This can be ignored if you have middleware refreshing
             // user sessions.
-          }
-        },
-        remove(name: string, options: any) {
-          try {
-            cookieStore.set(name, '', { ...options, maxAge: 0 });
-          } catch (error) {
-            // The `remove` method was called from a Server Component.
           }
         },
       },
     }
   );
 }
+
 
 /**
  * Create Supabase client from NextRequest (for Route Handlers)

@@ -21,11 +21,13 @@ export function PremiumUpgradeTooltip({
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
     const [isVisible, setIsVisible] = useState(false);
     const [isInteracting, setIsInteracting] = useState(false);
+    const [isFrozen, setIsFrozen] = useState(false);
     const [mounted, setMounted] = useState(false);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const showTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const lastMouseY = useRef<number>(0);
 
     useEffect(() => {
         setMounted(true);
@@ -43,46 +45,54 @@ export function PremiumUpgradeTooltip({
     const handleMouseEnter = (e: React.MouseEvent) => {
         const x = e.clientX;
         const y = e.clientY;
+        lastMouseY.current = y;
 
-        // Clear any pending hide
         if (hideTimeoutRef.current) {
             clearTimeout(hideTimeoutRef.current);
             hideTimeoutRef.current = null;
         }
 
-        // Set appear delay (1 second)
         if (!isVisible && !showTimeoutRef.current) {
             showTimeoutRef.current = setTimeout(() => {
                 setMousePos({ x, y });
                 setIsVisible(true);
                 showTimeoutRef.current = null;
+                // Don't freeze immediately on appear
+                setIsFrozen(false);
             }, 1000);
         }
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
-        if (followMouse && !isInteracting) {
-            if (isVisible) {
-                setMousePos({ x: e.clientX, y: e.clientY });
-            } else {
-                // Update the position while waiting to show
-                setMousePos({ x: e.clientX, y: e.clientY });
+        if (!followMouse) return;
+
+        // If the mouse starts moving UP (towards the tooltip), FREEZE it
+        // This solves the "chasing the tooltip" problem
+        if (isVisible && !isInteracting) {
+            if (e.clientY < lastMouseY.current - 5) {
+                setIsFrozen(true);
             }
+        }
+
+        lastMouseY.current = e.clientY;
+
+        if (!isFrozen && !isInteracting) {
+            setMousePos({ x: e.clientX, y: e.clientY });
         }
     };
 
     const handleMouseLeave = () => {
-        // Clear appear timer if we leave before it shows
         if (showTimeoutRef.current) {
             clearTimeout(showTimeoutRef.current);
             showTimeoutRef.current = null;
         }
 
-        // Increased hide timeout (2 seconds after moving mouse away)
+        // 2 second delay as requested
         if (isVisible) {
             hideTimeoutRef.current = setTimeout(() => {
                 if (!isInteracting) {
                     setIsVisible(false);
+                    setIsFrozen(false);
                 }
                 hideTimeoutRef.current = null;
             }, 2000);
@@ -102,6 +112,7 @@ export function PremiumUpgradeTooltip({
             }}
             onMouseEnter={() => {
                 setIsInteracting(true);
+                setIsFrozen(true);
                 if (hideTimeoutRef.current) {
                     clearTimeout(hideTimeoutRef.current);
                     hideTimeoutRef.current = null;
@@ -109,15 +120,15 @@ export function PremiumUpgradeTooltip({
             }}
             onMouseLeave={() => {
                 setIsInteracting(false);
-                // Also apply the 2s delay when leaving the tooltip content itself
                 hideTimeoutRef.current = setTimeout(() => {
                     setIsVisible(false);
+                    setIsFrozen(false);
                     hideTimeoutRef.current = null;
                 }, 2000);
             }}
         >
-            {/* Hitbox bridge */}
-            <div className="absolute top-[80%] left-[-20%] w-[140%] h-[60px]" />
+            {/* Hitbox bridge - wider and higher to catch the mouse */}
+            <div className="absolute top-[90%] left-[-20%] w-[140%] h-[40px]" />
 
             <div className="rounded-xl border-2 border-primary/40 bg-card p-4 shadow-[0_25px_60px_rgba(0,0,0,0.6)] backdrop-blur-xl w-[260px] flex flex-col gap-3 relative ring-1 ring-black/20">
                 <div className="flex items-center gap-3">

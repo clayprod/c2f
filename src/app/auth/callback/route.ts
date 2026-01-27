@@ -1,20 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
   const error = searchParams.get('error');
   const errorDescription = searchParams.get('error_description');
   const next = searchParams.get('next') || '/app';
 
   // Log para debugging
-  console.log('Auth callback:', {
+  console.log('Auth callback initiated:', {
     url: request.url,
     code: code ? 'present' : 'missing',
-    next,
-    origin
+    next
   });
+
+  // Determinar a base de redirecionamento de forma robusta
+  const requestUrl = new URL(request.url);
+  const origin = requestUrl.origin;
 
   // Se houver erro direto do OAuth, redirecionar para login com mensagem
   if (error) {
@@ -29,42 +33,51 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     try {
-      const supabase = await createClient();
+      const cookieStore = cookies();
+
+      // Criar a resposta de redirecionamento primeiro
+      const targetPath = (next === '/' || !next) ? '/app' : next;
+      const redirectUrl = new URL(targetPath, origin);
+      const response = NextResponse.redirect(redirectUrl);
+
+      // Criar o cliente Supabase vinculado a essa resposta para garantir que os cookies sejam definidos nela
+      const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          cookies: {
+            get(name: string) {
+              return cookieStore.get(name)?.value;
+            },
+            set(name: string, value: string, options: CookieOptions) {
+              // Definir no cookieStore para o contexto atual
+              cookieStore.set({ name, value, ...options });
+              // Definir na resposta para o redirecionamento
+              response.cookies.set({ name, value, ...options });
+            },
+            remove(name: string, options: CookieOptions) {
+              cookieStore.delete({ name, ...options });
+              response.cookies.delete({ name, ...options });
+            },
+          },
+        }
+      );
+
       const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
-      if (exchangeError) throw exchangeError;
-
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-
-      if (user) {
-        // Redirecionamento inteligente:
-        // Se estamos no domínio de produção ou em ambiente de produção, forçamos o domínio real.
-        // Caso contrário (localhost), usamos a origem da requisição.
-        let redirectBase: string;
-
-        if (process.env.NODE_ENV === 'production' || origin.includes('c2finance.com.br')) {
-          redirectBase = 'https://c2finance.com.br';
-        } else {
-          redirectBase = origin.replace('0.0.0.0', 'localhost');
-        }
-
-        // Forçar /app se por algum motivo 'next' veio vazio ou como home
-        const targetPath = (next === '/' || !next) ? '/app' : next;
-        const redirectUrl = new URL(targetPath, redirectBase).toString();
-
-        console.log('Redirecting to:', redirectUrl);
-        return NextResponse.redirect(redirectUrl);
+      if (exchangeError) {
+        console.error('Exchange error:', exchangeError);
+        throw exchangeError;
       }
+
+      console.log('Auth successful, redirecting to:', redirectUrl.toString());
+      return response;
     } catch (error: any) {
-      console.error('Auth callback error:', error);
+      console.error('Auth callback exception:', error);
     }
   }
 
   // Fallback de erro
-  const errorBase = (process.env.NODE_ENV === 'production' || origin.includes('c2finance.com.br'))
-    ? 'https://c2finance.com.br'
-    : origin.replace('0.0.0.0', 'localhost');
-
-  return NextResponse.redirect(new URL('/auth/auth-code-error', errorBase).toString());
+  return NextResponse.redirect(new URL('/auth/auth-code-error', origin));
 }
+
