@@ -65,7 +65,7 @@ export function PremiumUpgradeTooltip({
             if (isVisible) {
                 setMousePos({ x: e.clientX, y: e.clientY });
             } else {
-                // Update the position so whenever the 1s timer hits, it shows at the LATEST mouse position
+                // Update the position while waiting to show
                 setMousePos({ x: e.clientX, y: e.clientY });
             }
         }
@@ -78,13 +78,15 @@ export function PremiumUpgradeTooltip({
             showTimeoutRef.current = null;
         }
 
-        // Grace period to reach the tooltip
-        hideTimeoutRef.current = setTimeout(() => {
-            if (!isInteracting) {
-                setIsVisible(false);
-            }
-            hideTimeoutRef.current = null;
-        }, 150);
+        // Increased hide timeout (2 seconds after moving mouse away)
+        if (isVisible) {
+            hideTimeoutRef.current = setTimeout(() => {
+                if (!isInteracting) {
+                    setIsVisible(false);
+                }
+                hideTimeoutRef.current = null;
+            }, 2000);
+        }
     };
 
     const tooltipContent = (
@@ -107,7 +109,11 @@ export function PremiumUpgradeTooltip({
             }}
             onMouseLeave={() => {
                 setIsInteracting(false);
-                setIsVisible(false);
+                // Also apply the 2s delay when leaving the tooltip content itself
+                hideTimeoutRef.current = setTimeout(() => {
+                    setIsVisible(false);
+                    hideTimeoutRef.current = null;
+                }, 2000);
             }}
         >
             {/* Hitbox bridge */}
