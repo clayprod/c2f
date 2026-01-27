@@ -207,3 +207,4 @@ Como você está usando Next.js com SSR, o Supabase usa o **PKCE flow**, que req
 - [Setup SMTP - EMAIL_SMTP_SETUP.md](./EMAIL_SMTP_SETUP.md)
 - [Diagnóstico Completo - DIAGNOSTICO_EMAILS.md](./DIAGNOSTICO_EMAILS.md)
 
+

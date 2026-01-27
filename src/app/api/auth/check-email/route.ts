@@ -14,13 +14,11 @@ export async function POST(request: NextRequest) {
 
         const admin = createAdminClient();
 
-        // Check if user exists in profiles table
-        // Using email.toLowerCase() because we should store/compare emails case-insensitively
-        const { data, error } = await admin
-            .from('profiles')
-            .select('id')
-            .ilike('email', email)
-            .maybeSingle();
+        // Check if user exists in profiles table using case-insensitive comparison
+        // Use RPC function that handles LOWER() comparison properly
+        const { data, error } = await admin.rpc('check_email_exists', {
+            email_param: email
+        });
 
         if (error) {
             console.error('Erro ao verificar email no banco:', error);

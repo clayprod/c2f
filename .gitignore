@@ -63,3 +63,9 @@ desktop.ini
 .mcp.json
 .mcp.json.backup
 .mcp_original_cursor_gemini.json
+.mcp.json.backup
+
+.cursor/
+.claude/
+.gemini/
+.troubeshooting/

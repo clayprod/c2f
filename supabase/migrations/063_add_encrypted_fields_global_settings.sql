@@ -150,3 +150,4 @@ COMMENT ON VIEW public.global_settings_decrypted IS 'View with decrypted global 
 
 
 
+

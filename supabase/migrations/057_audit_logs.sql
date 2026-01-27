@@ -218,3 +218,4 @@ COMMENT ON FUNCTION public.audit_trigger_function IS 'Trigger function for autom
 
 
 
+
