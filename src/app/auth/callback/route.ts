@@ -18,7 +18,12 @@ export async function GET(request: NextRequest) {
 
   // Determinar a base de redirecionamento de forma robusta
   const requestUrl = new URL(request.url);
-  const origin = requestUrl.origin;
+  let origin = requestUrl.origin;
+
+  // Se o origin for o endereço interno 0.0.0.0, tentamos usar NEXT_PUBLIC_APP_URL ou localhost
+  if (origin.includes('0.0.0.0')) {
+    origin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || origin.replace('0.0.0.0', 'localhost');
+  }
 
   // Se houver erro direto do OAuth, redirecionar para login com mensagem
   if (error) {
