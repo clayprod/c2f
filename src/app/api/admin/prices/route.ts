@@ -61,10 +61,20 @@ export async function POST(request: NextRequest) {
     const stripe = getStripeClient();
 
     // Create new price
+    // IMPORTANTE: Para subscriptions, o price DEVE ser recorrente
     const newPrice = await stripe.prices.create({
       product: product_id,
       unit_amount: typeof unit_amount === 'number' ? unit_amount : parseInt(unit_amount),
       currency: currency.toLowerCase(),
+      recurring: {
+        interval: 'month', // Assinatura mensal
+      },
+    });
+    
+    console.log('[Admin Prices] Created new recurring price (POST):', {
+      id: newPrice.id,
+      unit_amount: newPrice.unit_amount,
+      recurring: newPrice.recurring,
     });
 
     clearPricingCache();
@@ -142,10 +152,20 @@ export async function PUT(request: NextRequest) {
     const stripe = getStripeClient();
 
     // Stripe doesn't allow editing prices, so we create a new one
+    // IMPORTANTE: Para subscriptions, o price DEVE ser recorrente
     const newPrice = await stripe.prices.create({
       product: product_id,
       unit_amount: typeof unit_amount === 'number' ? unit_amount : parseInt(unit_amount),
       currency: currency.toLowerCase(),
+      recurring: {
+        interval: 'month', // Assinatura mensal
+      },
+    });
+    
+    console.log('[Admin Prices] Created new recurring price:', {
+      id: newPrice.id,
+      unit_amount: newPrice.unit_amount,
+      recurring: newPrice.recurring,
     });
 
     // Update global settings if this is a plan price

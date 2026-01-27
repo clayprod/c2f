@@ -116,9 +116,20 @@ async function fetchPricingData(): Promise<PlanData[]> {
       if (proPriceId) {
         try {
           const configuredPrice = await stripe.prices.retrieve(proPriceId);
-          if (configuredPrice.active && configuredPrice.unit_amount) {
+          console.log('[Pricing API] Pro price details:', {
+            id: configuredPrice.id,
+            type: configuredPrice.type,
+            recurring: configuredPrice.recurring,
+            active: configuredPrice.active,
+            unit_amount: configuredPrice.unit_amount,
+          });
+          
+          // Verificar se é recorrente (necessário para subscriptions)
+          if (configuredPrice.active && configuredPrice.unit_amount && configuredPrice.recurring) {
             proPrice = configuredPrice.unit_amount;
             proStripePriceId = configuredPrice.id;
+          } else if (!configuredPrice.recurring) {
+            console.warn('[Pricing API] Configured Pro price is not recurring, will search for recurring price');
           }
         } catch (error: any) {
           console.warn('[Pricing API] Configured Pro price ID not found or inactive:', proPriceId, error?.message);
@@ -144,14 +155,18 @@ async function fetchPricingData(): Promise<PlanData[]> {
               limit: 100,
             });
             
-            // Pegar o price ativo mais recente (ordenado por created desc)
-            const activePrices = prices.data
-              .filter(p => p.active && p.unit_amount)
+            // Pegar o price ativo mais recente que seja RECORRENTE (ordenado por created desc)
+            // IMPORTANTE: Apenas prices recorrentes podem ser usados em subscriptions
+            const activeRecurringPrices = prices.data
+              .filter(p => p.active && p.unit_amount && p.recurring) // Apenas prices recorrentes
               .sort((a, b) => (b.created || 0) - (a.created || 0));
             
-            if (activePrices.length > 0) {
-              proPrice = activePrices[0].unit_amount;
-              proStripePriceId = activePrices[0].id;
+            if (activeRecurringPrices.length > 0) {
+              proPrice = activeRecurringPrices[0].unit_amount;
+              proStripePriceId = activeRecurringPrices[0].id;
+              console.log('[Pricing API] Using recurring Pro price:', activeRecurringPrices[0].id);
+            } else {
+              console.warn('[Pricing API] No active recurring prices found for Pro product');
             }
           }
         } catch (error: any) {
@@ -211,9 +226,20 @@ async function fetchPricingData(): Promise<PlanData[]> {
       if (premiumPriceId) {
         try {
           const configuredPrice = await stripe.prices.retrieve(premiumPriceId);
-          if (configuredPrice.active && configuredPrice.unit_amount) {
+          console.log('[Pricing API] Premium price details:', {
+            id: configuredPrice.id,
+            type: configuredPrice.type,
+            recurring: configuredPrice.recurring,
+            active: configuredPrice.active,
+            unit_amount: configuredPrice.unit_amount,
+          });
+          
+          // Verificar se é recorrente (necessário para subscriptions)
+          if (configuredPrice.active && configuredPrice.unit_amount && configuredPrice.recurring) {
             premiumPrice = configuredPrice.unit_amount;
             premiumStripePriceId = configuredPrice.id;
+          } else if (!configuredPrice.recurring) {
+            console.warn('[Pricing API] Configured Premium price is not recurring, will search for recurring price');
           }
         } catch (error: any) {
           console.warn('[Pricing API] Configured Premium price ID not found or inactive:', premiumPriceId, error?.message);
@@ -238,14 +264,18 @@ async function fetchPricingData(): Promise<PlanData[]> {
               limit: 100,
             });
             
-            // Pegar o price ativo mais recente (ordenado por created desc)
-            const activePrices = prices.data
-              .filter(p => p.active && p.unit_amount)
+            // Pegar o price ativo mais recente que seja RECORRENTE (ordenado por created desc)
+            // IMPORTANTE: Apenas prices recorrentes podem ser usados em subscriptions
+            const activeRecurringPrices = prices.data
+              .filter(p => p.active && p.unit_amount && p.recurring) // Apenas prices recorrentes
               .sort((a, b) => (b.created || 0) - (a.created || 0));
             
-            if (activePrices.length > 0) {
-              premiumPrice = activePrices[0].unit_amount;
-              premiumStripePriceId = activePrices[0].id;
+            if (activeRecurringPrices.length > 0) {
+              premiumPrice = activeRecurringPrices[0].unit_amount;
+              premiumStripePriceId = activeRecurringPrices[0].id;
+              console.log('[Pricing API] Using recurring Premium price:', activeRecurringPrices[0].id);
+            } else {
+              console.warn('[Pricing API] No active recurring prices found for Premium product');
             }
           }
         } catch (error: any) {

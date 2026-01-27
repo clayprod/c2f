@@ -95,6 +95,26 @@ export async function createCheckoutSession(
   console.log('[Stripe] Customer ID:', customerId);
 
   console.log('[Stripe] Creating checkout session...');
+  console.log('[Stripe] Price ID to use:', priceId);
+  
+  // Verificar se o price é recorrente antes de criar a sessão
+  try {
+    const price = await stripe.prices.retrieve(priceId);
+    console.log('[Stripe] Price details:', {
+      id: price.id,
+      type: price.type,
+      recurring: price.recurring,
+      active: price.active,
+    });
+    
+    if (!price.recurring) {
+      throw new Error(`Price ${priceId} não é recorrente. Para criar uma assinatura, o price deve ter recurring configurado.`);
+    }
+  } catch (error: any) {
+    console.error('[Stripe] Error validating price:', error);
+    throw new Error(`Erro ao validar price: ${error.message}`);
+  }
+  
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     mode: 'subscription',

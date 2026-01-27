@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { createPortal } from 'react-dom';
+import { useUpgradeModal } from '@/hooks/useUpgradeModal';
 
 interface PremiumUpgradeTooltipProps {
     children: React.ReactNode;
@@ -37,6 +37,8 @@ export function PremiumUpgradeTooltip({
             if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
         };
     }, []);
+
+    const { openUpgradeModal } = useUpgradeModal();
 
     if (!isLocked) {
         return <>{children}</>;
@@ -145,17 +147,17 @@ export function PremiumUpgradeTooltip({
                 <p className="text-xs text-muted-foreground leading-relaxed">
                     Este recurso está disponível apenas para usuários do plano <strong className="text-primary">{planLabel}</strong>.
                 </p>
-                <Link
-                    href="/app/settings?tab=profile"
+                <button
                     className="w-full inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-lg active:scale-95 text-center"
                     onClick={(e) => {
                         e.stopPropagation();
                         setIsVisible(false);
                         setIsInteracting(false);
+                        openUpgradeModal();
                     }}
                 >
                     Assinar Plano {planLabel}
-                </Link>
+                </button>
             </div>
 
             <div className="absolute top-[calc(100%-12px)] left-1/2 -translate-x-1/2 w-4 h-4 bg-card border-r-2 border-b-2 border-primary/40 rotate-45 z-[-1] ring-1 ring-black/10" />

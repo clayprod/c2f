@@ -8,6 +8,7 @@ import { useLogo } from '@/hooks/useLogo';
 import Image from 'next/image';
 import AdvisorDialog from './AdvisorDialog';
 import CompleteProfileForm from './CompleteProfileForm';
+import { UpgradeModal } from './UpgradeModal';
 import { NotificationDropdown } from './NotificationDropdown';
 import { useTheme } from '@/hooks/useTheme';
 import { useAccountContext } from '@/hooks/useAccountContext';
@@ -699,6 +700,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </Dialog>
 
       <AdvisorDialog open={advisorOpen} onOpenChange={setAdvisorOpen} />
+      <UpgradeModal />
     </div>
   );
 }

@@ -38,7 +38,7 @@ const BankLogosCarousel = () => {
           alt={`Banco ${icon}`}
           width={80}
           height={80}
-          className={`w-16 h-16 md:w-20 md:h-20 object-contain transition-all duration-300 ${!isColored ? 'brightness-0 invert' : ''
+          className={`w-16 h-16 md:w-20 md:h-20 object-contain transition-all duration-300 ${!isColored ? 'brightness-0 dark:invert' : ''
             }`}
         />
       </div>
