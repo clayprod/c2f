@@ -275,10 +275,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
         }
         setPlanFeatures(fetchedFeatures);
 
-        const identities = user.identities || [];
-        const isOAuthUser = identities.some((identity: any) => identity.provider === 'google');
         const isProfileIncomplete = !profile?.city || !profile?.state || !profile?.monthly_income_cents;
-        setShowCompleteProfile(isOAuthUser && isProfileIncomplete);
+        setShowCompleteProfile(!!isProfileIncomplete);
 
         if (profile) {
           setUserProfile({

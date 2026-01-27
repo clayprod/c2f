@@ -26,7 +26,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const next = searchParams?.get('next') || '/app';
   const { toast } = useToast();
-  
+
   // Check for OAuth errors
   const oauthError = searchParams?.get('error');
   const oauthErrorDescription = searchParams?.get('error_description');
@@ -183,20 +183,17 @@ function LoginForm() {
   const handleGoogleLogin = async () => {
     try {
       const supabase = createClient();
-      
+
       // Use NEXT_PUBLIC_APP_URL if available, otherwise fallback to window.location.origin
       let origin = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-      
-      // Em produção, garantir que usa o dominio correto
-      if (process.env.NODE_ENV === 'production') {
-        origin = 'https://c2finance.com.br';
-      } else if (origin.includes('0.0.0.0')) {
-        // Em desenvolvimento, substituir 0.0.0.0 por localhost
+
+      // Em desenvolvimento, substituir 0.0.0.0 por localhost
+      if (origin.includes('0.0.0.0')) {
         origin = origin.replace('0.0.0.0', 'localhost');
       }
-      
+
       const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(next)}`;
-      
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -328,9 +325,9 @@ function LoginForm() {
           </div>
         )}
 
-        <button 
-          type="submit" 
-          className="btn-primary w-full" 
+        <button
+          type="submit"
+          className="btn-primary w-full"
           disabled={loading || (lockoutStatus?.requiresCaptcha && !turnstileToken)}
         >
           {loading ? 'Entrando...' : 'Entrar'}
@@ -401,7 +398,7 @@ function LoginFormFallback() {
 
 export default function LoginPage() {
   const logo = useLogo();
-  
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">

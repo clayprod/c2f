@@ -46,6 +46,8 @@ export default function CompleteProfileForm({
   const [birthDate, setBirthDate] = useState<Date | undefined>(undefined);
   const [gender, setGender] = useState('');
   const [monthlyIncome, setMonthlyIncome] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingCep, setLoadingCep] = useState(false);
   const [estados, setEstados] = useState<Estado[]>([]);
@@ -60,23 +62,31 @@ export default function CompleteProfileForm({
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
 
-      if (!user) {
+      if (user) {
+        setEmail(user.email || '');
+        setFullName(user.user_metadata?.full_name || user.user_metadata?.name || '');
+
         if (requireAuthRedirect) {
-          router.push('/login');
+          // If we need to check if profile is already complete
         }
+      } else if (requireAuthRedirect) {
+        router.push('/login');
         return;
       }
 
-      if (!redirectIfComplete) return;
-
       const { data: profile } = await supabase
         .from('profiles')
-        .select('city, state, monthly_income_cents')
-        .eq('id', user.id)
+        .select('full_name, email, city, state, monthly_income_cents')
+        .eq('id', user?.id)
         .single();
 
-      if (profile && profile.city && profile.state && profile.monthly_income_cents) {
-        router.push(redirectTo);
+      if (profile) {
+        if (profile.full_name) setFullName(profile.full_name);
+        if (profile.email) setEmail(profile.email);
+
+        if (redirectIfComplete && profile.city && profile.state && profile.monthly_income_cents) {
+          router.push(redirectTo);
+        }
       }
     };
 
@@ -132,7 +142,7 @@ export default function CompleteProfileForm({
   useEffect(() => {
     if (pendingCityFromCep && cidades.length > 0 && hasAutoFilledFromCep && !city) {
       // Verifica se a cidade pendente existe na lista de cidades (com comparação normalizada)
-      const cidadeExiste = cidades.some(c => 
+      const cidadeExiste = cidades.some(c =>
         normalizeCityName(c.nome) === normalizeCityName(pendingCityFromCep) ||
         c.nome === pendingCityFromCep
       );
@@ -198,7 +208,7 @@ export default function CompleteProfileForm({
           setHasAutoFilledFromCep(true);
           setState(dados.state);
           setCidades(cidadesFinal);
-          
+
           // Preenche a cidade imediatamente após definir as cidades
           // Usa um pequeno delay para garantir que o React atualize o estado do Select
           if (cidadeParaPreencher) {
@@ -209,7 +219,7 @@ export default function CompleteProfileForm({
               setPendingCityFromCep('');
             }, 150);
           }
-          
+
           return { ok: true, state: dados.state, city: cidadeParaPreencher };
         }
 
@@ -318,6 +328,7 @@ export default function CompleteProfileForm({
       const { error: updateError } = await supabase
         .from('profiles')
         .update({
+          full_name: fullName,
           city: resolvedCity,
           state: resolvedState,
           cep: cep || null,
@@ -372,6 +383,38 @@ export default function CompleteProfileForm({
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="fullName" className="block text-sm font-medium mb-2">
+              Nome Completo <span className="text-destructive">*</span>
+            </label>
+            <input
+              type="text"
+              id="fullName"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+              placeholder="Seu nome"
+              required
+              disabled={loading}
+            />
+          </div>
+          <div>
+            <label htmlFor="email_form" className="block text-sm font-medium mb-2">
+              Email
+            </label>
+            <input
+              type="email"
+              id="email_form"
+              value={email}
+              className="w-full px-4 py-3 rounded-xl bg-muted/10 border border-border text-muted-foreground cursor-not-allowed"
+              placeholder="seu@email.com"
+              disabled
+            />
+            <p className="text-[10px] text-muted-foreground mt-1">O email não pode ser alterado aqui.</p>
+          </div>
+        </div>
+
         <div>
           <label htmlFor="cep" className="block text-sm font-medium mb-2">
             CEP (opcional)
@@ -402,13 +445,13 @@ export default function CompleteProfileForm({
           <label htmlFor="state" className="block text-sm font-medium mb-2">
             Estado <span className="text-destructive">*</span>
           </label>
-          <Select 
-            value={state} 
+          <Select
+            value={state}
             onValueChange={(value) => {
               setHasAutoFilledFromCep(false);
               setState(value);
-            }} 
-            disabled={loading || loadingCep} 
+            }}
+            disabled={loading || loadingCep}
             required
           >
             <SelectTrigger className="w-full px-4 py-3 h-auto rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors">
