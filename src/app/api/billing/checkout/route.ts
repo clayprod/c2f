@@ -3,11 +3,81 @@ import { getUserId } from '@/lib/auth';
 import { createCheckoutSession } from '@/services/stripe/subscription';
 import { PLAN_PRICE_IDS } from '@/services/stripe/client';
 import { createErrorResponse } from '@/lib/errors';
+import { getGlobalSettings } from '@/services/admin/globalSettings';
+import { getStripeClient } from '@/services/stripe/client';
 import { z } from 'zod';
 
 const checkoutSchema = z.object({
   plan: z.enum(['pro', 'premium']),
 });
+
+/**
+ * Busca o price_id ativo mais recente do Stripe para um plano
+ */
+async function getActivePriceId(plan: 'pro' | 'premium'): Promise<string | null> {
+  try {
+    const stripe = getStripeClient();
+    const settings = await getGlobalSettings();
+    
+    const configuredPriceId = plan === 'pro' 
+      ? settings.stripe_price_id_pro 
+      : settings.stripe_price_id_business;
+    
+    // Primeiro, tentar usar o price_id das configurações diretamente
+    if (configuredPriceId) {
+      try {
+        const configuredPrice = await stripe.prices.retrieve(configuredPriceId);
+        if (configuredPrice.active) {
+          return configuredPrice.id;
+        }
+      } catch (error) {
+        console.warn(`[Billing] Configured ${plan} price ID not found or inactive:`, configuredPriceId);
+      }
+    }
+    
+    // Se não encontrou o price configurado ou não está ativo, buscar o price ativo mais recente do produto
+    const products = await stripe.products.list({ limit: 100 });
+    let targetProduct;
+    
+    if (plan === 'pro') {
+      targetProduct = products.data.find(p => 
+        p.name.toLowerCase().includes('pro') && 
+        !p.name.toLowerCase().includes('premium') &&
+        !p.name.toLowerCase().includes('business')
+      );
+    } else {
+      targetProduct = products.data.find(p => 
+        p.name.toLowerCase().includes('premium') || 
+        p.name.toLowerCase().includes('business')
+      );
+    }
+    
+    if (targetProduct) {
+      // Buscar prices ativos do produto
+      const prices = await stripe.prices.list({
+        product: targetProduct.id,
+        active: true,
+        limit: 100,
+      });
+      
+      // Pegar o price ativo mais recente (ordenado por created desc)
+      const activePrices = prices.data
+        .filter(p => p.active && p.unit_amount)
+        .sort((a, b) => (b.created || 0) - (a.created || 0));
+      
+      if (activePrices.length > 0) {
+        return activePrices[0].id;
+      }
+    }
+    
+    // Fallback final: usar variáveis de ambiente
+    return plan === 'pro' ? PLAN_PRICE_IDS.PRO : PLAN_PRICE_IDS.PREMIUM;
+  } catch (error) {
+    console.error(`[Billing] Error fetching active price for ${plan}:`, error);
+    // Fallback para variáveis de ambiente
+    return plan === 'pro' ? PLAN_PRICE_IDS.PRO : PLAN_PRICE_IDS.PREMIUM;
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,12 +94,11 @@ export async function POST(request: NextRequest) {
     const validated = checkoutSchema.parse(body);
     console.log('[Billing] Plan requested:', validated.plan);
 
-    const priceId = validated.plan === 'pro' ? PLAN_PRICE_IDS.PRO : PLAN_PRICE_IDS.PREMIUM;
+    const priceId = await getActivePriceId(validated.plan);
     console.log('[Billing] Price ID:', priceId || 'NOT CONFIGURED');
-    console.log('[Billing] PLAN_PRICE_IDS:', JSON.stringify(PLAN_PRICE_IDS));
 
     if (!priceId) {
-      console.error(`[Billing] Price ID not configured for plan: ${validated.plan}. Set STRIPE_PRICE_ID_${validated.plan.toUpperCase()} in environment variables.`);
+      console.error(`[Billing] Price ID not configured for plan: ${validated.plan}`);
       return NextResponse.json({
         error: `Plano ${validated.plan} ainda não está configurado. Entre em contato com o suporte.`
       }, { status: 500 });

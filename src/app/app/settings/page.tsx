@@ -73,9 +73,15 @@ interface UserPlan {
   current_period_end?: string;
 }
 
+interface PlanPrice {
+  id: string;
+  priceFormatted: string;
+}
+
 function SettingsPageContent() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [plan, setPlan] = useState<UserPlan | null>(null);
+  const [planPrices, setPlanPrices] = useState<Record<string, PlanPrice>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -123,8 +129,34 @@ function SettingsPageContent() {
   useEffect(() => {
     fetchProfile();
     fetchPlan();
+    fetchPlanPrices();
     loadEstados();
   }, []);
+
+  const fetchPlanPrices = () => {
+    fetch('/api/public/pricing')
+      .then((res) => {
+        if (res.ok) {
+          return res.json();
+        }
+        throw new Error('Failed to fetch pricing');
+      })
+      .then((data) => {
+        const prices: Record<string, PlanPrice> = {};
+        (data.plans || []).forEach((p: PlanPrice & { id: string }) => {
+          prices[p.id] = { id: p.id, priceFormatted: p.priceFormatted };
+        });
+        setPlanPrices(prices);
+      })
+      .catch((error) => {
+        console.error('Error fetching plan prices:', error);
+        // Fallback para valores padrão
+        setPlanPrices({
+          pro: { id: 'pro', priceFormatted: 'R$29' },
+          premium: { id: 'premium', priceFormatted: 'R$79' },
+        });
+      });
+  };
 
   // Carregar estados ao montar o componente
   const loadEstados = async () => {
@@ -1153,7 +1185,7 @@ function SettingsPageContent() {
                   {plan?.plan === 'pro' && <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full uppercase">Atual</span>}
                 </h3>
                 <div className="flex items-baseline gap-1 mt-2">
-                  <span className="text-3xl font-bold">R$29</span>
+                  <span className="text-3xl font-bold">{planPrices.pro?.priceFormatted || 'R$29'}</span>
                   <span className="text-muted-foreground">/mês</span>
                 </div>
                 <p className="text-sm text-muted-foreground mt-2">O poder da IA para suas finanças</p>
@@ -1197,7 +1229,7 @@ function SettingsPageContent() {
                   {plan?.plan === 'premium' && <span className="text-xs bg-amber-500/20 text-amber-500 px-2 py-0.5 rounded-full uppercase">Atual</span>}
                 </h3>
                 <div className="flex items-baseline gap-1 mt-2">
-                  <span className="text-3xl font-bold font-display">R$79</span>
+                  <span className="text-3xl font-bold font-display">{planPrices.premium?.priceFormatted || 'R$79'}</span>
                   <span className="text-muted-foreground">/mês</span>
                 </div>
                 <p className="text-sm text-muted-foreground mt-2">Análise avançada e IA ilimitada</p>

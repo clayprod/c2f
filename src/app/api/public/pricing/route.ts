@@ -44,7 +44,11 @@ function formatPrice(cents: number | null): string {
  * Fetch pricing data from Stripe and global settings
  */
 async function fetchPricingData(): Promise<PlanData[]> {
-  const settings = await getGlobalSettings();
+  // Forçar refresh das configurações globais para pegar os price_ids mais recentes
+  const settings = await getGlobalSettings(true); // forceRefresh = true
+  console.log('[Pricing API] Global settings - stripe_price_id_pro:', settings.stripe_price_id_pro);
+  console.log('[Pricing API] Global settings - stripe_price_id_business:', settings.stripe_price_id_business);
+  
   const allFeatures = await getAllPlanFeatures();
   const displayConfig = await getPlanDisplayConfig();
 
@@ -98,28 +102,72 @@ async function fetchPricingData(): Promise<PlanData[]> {
     features: freeFeatures.length ? freeFeatures : fallbackFeatureSets.free,
   });
 
-  // Pro Plan
+  // Pro Plan - Buscar price ativo mais recente do Stripe
   const proPriceId = settings.stripe_price_id_pro;
   let proPrice: number | null = null;
   let proStripePriceId: string | null = null;
 
-  if (proPriceId) {
-    try {
+  try {
+    // Verificar se Stripe está configurado
+    if (process.env.STRIPE_SECRET_KEY) {
       const stripe = getStripeClient();
-      const price = await stripe.prices.retrieve(proPriceId);
       
-      if (price.active && price.unit_amount) {
-        proPrice = price.unit_amount;
-        proStripePriceId = price.id;
+      // Primeiro, tentar usar o price_id das configurações diretamente
+      if (proPriceId) {
+        try {
+          const configuredPrice = await stripe.prices.retrieve(proPriceId);
+          if (configuredPrice.active && configuredPrice.unit_amount) {
+            proPrice = configuredPrice.unit_amount;
+            proStripePriceId = configuredPrice.id;
+          }
+        } catch (error: any) {
+          console.warn('[Pricing API] Configured Pro price ID not found or inactive:', proPriceId, error?.message);
+        }
       }
-    } catch (error) {
-      console.error('[Pricing API] Error fetching Pro price from Stripe:', error);
-      // Fallback to default if Stripe fails
-      proPrice = 2900; // R$29 default
+      
+      // Se não encontrou o price configurado ou não está ativo, buscar o price ativo mais recente do produto
+      if (!proPrice) {
+        try {
+          // Buscar produtos que contenham "pro" no nome (case insensitive)
+          const products = await stripe.products.list({ limit: 100 });
+          const proProduct = products.data.find(p => 
+            p.name.toLowerCase().includes('pro') && 
+            !p.name.toLowerCase().includes('premium') &&
+            !p.name.toLowerCase().includes('business')
+          );
+          
+          if (proProduct) {
+            // Buscar prices ativos do produto Pro
+            const prices = await stripe.prices.list({
+              product: proProduct.id,
+              active: true,
+              limit: 100,
+            });
+            
+            // Pegar o price ativo mais recente (ordenado por created desc)
+            const activePrices = prices.data
+              .filter(p => p.active && p.unit_amount)
+              .sort((a, b) => (b.created || 0) - (a.created || 0));
+            
+            if (activePrices.length > 0) {
+              proPrice = activePrices[0].unit_amount;
+              proStripePriceId = activePrices[0].id;
+            }
+          }
+        } catch (error: any) {
+          console.warn('[Pricing API] Error searching for Pro product:', error?.message);
+        }
+      }
+    } else {
+      console.warn('[Pricing API] STRIPE_SECRET_KEY not configured');
     }
-  } else {
-    // Fallback if not configured
-    proPrice = 2900;
+  } catch (error: any) {
+    console.error('[Pricing API] Error fetching Pro price from Stripe:', error?.message || error);
+  }
+  
+  // Fallback final se tudo falhar
+  if (!proPrice) {
+    proPrice = 2900; // R$29 default
   }
 
   const proConfig = displayConfig.pro || {};
@@ -149,28 +197,71 @@ async function fetchPricingData(): Promise<PlanData[]> {
     features: proFeatures.length ? proFeatures : fallbackFeatureSets.pro,
   });
 
-  // Premium Plan
+  // Premium Plan - Buscar price ativo mais recente do Stripe
   const premiumPriceId = settings.stripe_price_id_business;
   let premiumPrice: number | null = null;
   let premiumStripePriceId: string | null = null;
 
-  if (premiumPriceId) {
-    try {
+  try {
+    // Verificar se Stripe está configurado
+    if (process.env.STRIPE_SECRET_KEY) {
       const stripe = getStripeClient();
-      const price = await stripe.prices.retrieve(premiumPriceId);
       
-      if (price.active && price.unit_amount) {
-        premiumPrice = price.unit_amount;
-        premiumStripePriceId = price.id;
+      // Primeiro, tentar usar o price_id das configurações diretamente
+      if (premiumPriceId) {
+        try {
+          const configuredPrice = await stripe.prices.retrieve(premiumPriceId);
+          if (configuredPrice.active && configuredPrice.unit_amount) {
+            premiumPrice = configuredPrice.unit_amount;
+            premiumStripePriceId = configuredPrice.id;
+          }
+        } catch (error: any) {
+          console.warn('[Pricing API] Configured Premium price ID not found or inactive:', premiumPriceId, error?.message);
+        }
       }
-    } catch (error) {
-      console.error('[Pricing API] Error fetching Premium price from Stripe:', error);
-      // Fallback to default if Stripe fails
-      premiumPrice = 7900; // R$79 default
+      
+      // Se não encontrou o price configurado ou não está ativo, buscar o price ativo mais recente do produto
+      if (!premiumPrice) {
+        try {
+          // Buscar produtos que contenham "premium" ou "business" no nome (case insensitive)
+          const products = await stripe.products.list({ limit: 100 });
+          const premiumProduct = products.data.find(p => 
+            p.name.toLowerCase().includes('premium') || 
+            p.name.toLowerCase().includes('business')
+          );
+          
+          if (premiumProduct) {
+            // Buscar prices ativos do produto Premium/Business
+            const prices = await stripe.prices.list({
+              product: premiumProduct.id,
+              active: true,
+              limit: 100,
+            });
+            
+            // Pegar o price ativo mais recente (ordenado por created desc)
+            const activePrices = prices.data
+              .filter(p => p.active && p.unit_amount)
+              .sort((a, b) => (b.created || 0) - (a.created || 0));
+            
+            if (activePrices.length > 0) {
+              premiumPrice = activePrices[0].unit_amount;
+              premiumStripePriceId = activePrices[0].id;
+            }
+          }
+        } catch (error: any) {
+          console.warn('[Pricing API] Error searching for Premium product:', error?.message);
+        }
+      }
+    } else {
+      console.warn('[Pricing API] STRIPE_SECRET_KEY not configured');
     }
-  } else {
-    // Fallback if not configured
-    premiumPrice = 7900;
+  } catch (error: any) {
+    console.error('[Pricing API] Error fetching Premium price from Stripe:', error?.message || error);
+  }
+  
+  // Fallback final se tudo falhar
+  if (!premiumPrice) {
+    premiumPrice = 7900; // R$79 default
   }
 
   const premiumConfig = displayConfig.premium || {};
@@ -208,16 +299,33 @@ export async function GET(request: NextRequest) {
     // Check cache
     const now = Date.now();
     const forceRefresh = request.nextUrl.searchParams.get('refresh') === 'true';
+    const skipCache = request.nextUrl.searchParams.get('skipCache') === 'true';
 
-    const cachedPricing = getPricingCache(now);
-    if (!forceRefresh && cachedPricing) {
-      return NextResponse.json({
-        plans: cachedPricing,
-        cached: true,
-      });
+    // Se skipCache, sempre buscar dados frescos (útil após atualizar preços no admin)
+    if (!skipCache) {
+      const cachedPricing = getPricingCache(now);
+      if (!forceRefresh && cachedPricing) {
+        console.log('[Pricing API] Returning cached pricing data');
+        return NextResponse.json({
+          plans: cachedPricing,
+          cached: true,
+        });
+      }
+    } else {
+      console.log('[Pricing API] Skipping cache, fetching fresh data');
     }
 
     const plans = await fetchPricingData();
+
+    // Log para debug detalhado
+    console.log('[Pricing API] Fetched plans:', plans.map(p => ({ 
+      id: p.id, 
+      price: p.price, 
+      priceFormatted: p.priceFormatted,
+      stripePriceId: p.stripePriceId 
+    })));
+    console.log('[Pricing API] Pro plan price:', plans.find(p => p.id === 'pro')?.price, 'cents =', plans.find(p => p.id === 'pro')?.priceFormatted);
+    console.log('[Pricing API] Premium plan price:', plans.find(p => p.id === 'premium')?.price, 'cents =', plans.find(p => p.id === 'premium')?.priceFormatted);
 
     // Update cache
     setPricingCache(plans, now);
@@ -227,9 +335,21 @@ export async function GET(request: NextRequest) {
       cached: false,
     });
   } catch (error: any) {
-    console.error('[Pricing API] Error:', error);
+    console.error('[Pricing API] Error:', error?.message || error);
+    
+    // Tentar retornar dados do cache mesmo se houver erro
+    const cachedPricing = getPricingCache(Date.now());
+    if (cachedPricing) {
+      console.log('[Pricing API] Returning cached data due to error');
+      return NextResponse.json({
+        plans: cachedPricing,
+        cached: true,
+        error: 'Using cached data due to error',
+      });
+    }
     
     // Return fallback data if everything fails
+    console.log('[Pricing API] Returning fallback data');
     return NextResponse.json({
       plans: [
         {

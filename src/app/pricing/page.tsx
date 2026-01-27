@@ -32,16 +32,24 @@ async function getPricingData(): Promise<Plan[]> {
       || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
       || 'http://localhost:3000';
 
-    const res = await fetch(`${baseUrl}/api/public/pricing`, {
-      next: { revalidate: 300 }, // Revalidate every 5 minutes
+    const res = await fetch(`${baseUrl}/api/public/pricing?refresh=true`, {
+      next: { revalidate: 0 }, // Sempre buscar dados frescos
+      cache: 'no-store', // Não usar cache do Next.js
     });
 
     if (!res.ok) {
+      console.error('[Pricing Page] API returned error:', res.status, res.statusText);
       throw new Error(`Failed to fetch pricing: ${res.status}`);
     }
 
     const data = await res.json();
-    return data.plans || [];
+    console.log('[Pricing Page] Received plans:', data.plans?.map((p: Plan) => ({ id: p.id, priceFormatted: p.priceFormatted })));
+    
+    if (data.plans && data.plans.length > 0) {
+      return data.plans;
+    }
+    
+    throw new Error('No plans returned from API');
   } catch (error) {
     console.error('[Pricing Page] Error fetching pricing data:', error);
     // Return fallback data

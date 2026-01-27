@@ -96,11 +96,18 @@ export default function PriceManagement() {
 
       toast({
         title: 'Sucesso',
-        description: 'Preço atualizado com sucesso',
+        description: 'Preço atualizado com sucesso. Os preços serão atualizados na página de pricing em alguns segundos.',
       });
 
       // Refresh prices
       await fetchPrices();
+      
+      // Limpar cache do pricing na API pública (opcional, mas ajuda)
+      try {
+        await fetch('/api/public/pricing?skipCache=true', { method: 'GET' });
+      } catch (error) {
+        console.warn('Failed to clear pricing cache:', error);
+      }
     } catch (error: any) {
       console.error('Error updating price:', error);
       toast({

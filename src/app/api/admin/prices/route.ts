@@ -3,7 +3,7 @@ import { requireAdmin } from '@/lib/auth';
 import { createErrorResponse } from '@/lib/errors';
 import { clearPricingCache } from '@/services/pricing/cache';
 import { getStripeClient } from '@/services/stripe/client';
-import { updateGlobalSettings } from '@/services/admin/globalSettings';
+import { updateGlobalSettings, clearSettingsCache } from '@/services/admin/globalSettings';
 
 export async function GET(request: NextRequest) {
   try {
@@ -151,11 +151,15 @@ export async function PUT(request: NextRequest) {
     // Update global settings if this is a plan price
     if (plan_type === 'pro') {
       await updateGlobalSettings({ stripe_price_id_pro: newPrice.id });
+      console.log('[Admin Prices] Updated stripe_price_id_pro to:', newPrice.id);
     } else if (plan_type === 'premium' || plan_type === 'business') {
       await updateGlobalSettings({ stripe_price_id_business: newPrice.id });
+      console.log('[Admin Prices] Updated stripe_price_id_business to:', newPrice.id);
     }
 
-    clearPricingCache();
+    // Limpar ambos os caches para garantir que os novos preços sejam buscados
+    clearSettingsCache(); // Limpa cache de globalSettings
+    clearPricingCache(); // Limpa cache de pricing
 
     return NextResponse.json({
       new_price: {
