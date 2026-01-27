@@ -61,15 +61,20 @@ export async function GET(request: NextRequest) {
         let redirectUrl: string;
         if (isLocalEnv) {
           // Em desenvolvimento, usar origin (que pode ser localhost)
-          redirectUrl = `${origin.replace('0.0.0.0', 'localhost')}${next}`;
-        } else if (forwardedHost) {
-          // Em produção, usar o host do forwarded header
-          redirectUrl = `https://${forwardedHost}${next}`;
+          const devOrigin = origin.includes('0.0.0.0') ? origin.replace('0.0.0.0', 'localhost') : origin;
+          redirectUrl = `${devOrigin}${next}`;
         } else {
-          // Fallback para origin em produção
-          redirectUrl = `${origin}${next}`;
+          // Em produção, sempre usar o domínio correto
+          redirectUrl = `https://c2finance.com.br${next}`;
         }
 
+        console.log('Environment check:', { 
+          isLocalEnv, 
+          origin, 
+          forwardedHost, 
+          next, 
+          redirectUrl 
+        });
         console.log('Redirecting to:', redirectUrl);
         // Usar NextResponse.redirect com URL absoluta
         return NextResponse.redirect(redirectUrl);
@@ -80,7 +85,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Retornar para página de erro se algo der errado
-  console.log('Redirecting to error page');
+  console.log('No code or error occurred, redirecting to error page. Origin:', origin);
   return NextResponse.redirect(new URL(`${origin}/auth/auth-code-error`));
 }
 
