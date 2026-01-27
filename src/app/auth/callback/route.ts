@@ -55,23 +55,19 @@ export async function GET(request: NextRequest) {
         console.log('Auth successful for user:', user.id);
         
         // Redirecionar para o destino especificado (ou /app por padrão)
-        const forwardedHost = request.headers.get('x-forwarded-host');
-        const isLocalEnv = process.env.NODE_ENV === 'development';
-
         let redirectUrl: string;
-        if (isLocalEnv) {
-          // Em desenvolvimento, usar origin (que pode ser localhost)
+        
+        // Em produção, forçar o domínio correto
+        if (process.env.NODE_ENV === 'production' || origin.includes('c2finance.com.br')) {
+          redirectUrl = `https://c2finance.com.br${next}`;
+        } else {
+          // Em desenvolvimento, tratar localhost
           const devOrigin = origin.includes('0.0.0.0') ? origin.replace('0.0.0.0', 'localhost') : origin;
           redirectUrl = `${devOrigin}${next}`;
-        } else {
-          // Em produção, sempre usar o domínio correto
-          redirectUrl = `https://c2finance.com.br${next}`;
         }
 
         console.log('Environment check:', { 
-          isLocalEnv, 
           origin, 
-          forwardedHost, 
           next, 
           redirectUrl 
         });
