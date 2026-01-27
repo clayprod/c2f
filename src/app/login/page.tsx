@@ -11,7 +11,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Turnstile } from '@/components/auth/Turnstile';
 
 function LoginForm() {
-  const [email, setEmail] = useState('');
+  const searchParams = useSearchParams();
+  const emailFromQuery = searchParams?.get('email') || '';
+  const [email, setEmail] = useState(emailFromQuery);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -23,7 +25,6 @@ function LoginForm() {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [passwordResetSent, setPasswordResetSent] = useState(false);
   const router = useRouter();
-  const searchParams = useSearchParams();
   const next = searchParams?.get('next') || '/app';
   const { toast } = useToast();
 
@@ -184,14 +185,8 @@ function LoginForm() {
     try {
       const supabase = createClient();
 
-      // Use NEXT_PUBLIC_APP_URL if available, otherwise fallback to window.location.origin
-      let origin = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-
-      // Em desenvolvimento, substituir 0.0.0.0 por localhost
-      if (origin.includes('0.0.0.0')) {
-        origin = origin.replace('0.0.0.0', 'localhost');
-      }
-
+      // Use a origem atual mas garanta que não haja barra sobrando no final
+      const origin = window.location.origin.replace(/\/$/, '');
       const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(next)}`;
 
       const { error } = await supabase.auth.signInWithOAuth({

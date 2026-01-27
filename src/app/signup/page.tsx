@@ -53,6 +53,8 @@ function SignupPageContent() {
   const [pendingCityFromCep, setPendingCityFromCep] = useState<string>('');
   const inviteToken = searchParams?.get('invite');
   const logo = useLogo();
+  const [emailExists, setEmailExists] = useState(false);
+  const [checkingEmail, setCheckingEmail] = useState(false);
   const isPasswordMismatch =
     password.length > 0 && confirmPassword.length > 0 && password !== confirmPassword;
 
@@ -103,6 +105,37 @@ function SignupPageContent() {
     loadEstados();
   }, []);
 
+  // Verificar se o email já existe
+  useEffect(() => {
+    const checkEmail = async () => {
+      if (!email || email.length < 5 || !email.includes('@')) {
+        setEmailExists(false);
+        return;
+      }
+
+      setCheckingEmail(true);
+      try {
+        const response = await fetch('/api/auth/check-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setEmailExists(data.exists);
+        }
+      } catch (error) {
+        console.error('Erro ao verificar email:', error);
+      } finally {
+        setCheckingEmail(false);
+      }
+    };
+
+    const timeoutId = setTimeout(checkEmail, 500);
+    return () => clearTimeout(timeoutId);
+  }, [email]);
+
   // Carregar cidades quando o estado for selecionado manualmente (não pelo CEP)
   useEffect(() => {
     async function loadCidades() {
@@ -142,7 +175,7 @@ function SignupPageContent() {
   useEffect(() => {
     if (pendingCityFromCep && cidades.length > 0 && hasAutoFilledFromCep && !city) {
       // Verifica se a cidade pendente existe na lista de cidades (com comparação normalizada)
-      const cidadeExiste = cidades.some(c => 
+      const cidadeExiste = cidades.some(c =>
         normalizeCityName(c.nome) === normalizeCityName(pendingCityFromCep) ||
         c.nome === pendingCityFromCep
       );
@@ -214,7 +247,7 @@ function SignupPageContent() {
           setHasAutoFilledFromCep(true);
           setState(dados.state);
           setCidades(cidadesFinal);
-          
+
           // Preenche a cidade imediatamente após definir as cidades
           // Usa um pequeno delay para garantir que o React atualize o estado do Select
           if (cidadeParaPreencher) {
@@ -225,7 +258,7 @@ function SignupPageContent() {
               setPendingCityFromCep('');
             }, 150);
           }
-          
+
           return { ok: true, state: dados.state, city: cidadeParaPreencher };
         } else {
           // CEP não encontrado ou inválido
@@ -344,7 +377,7 @@ function SignupPageContent() {
       const supabase = createClient();
       // Convert monthly income to cents
       const monthlyIncomeCents = parseCurrencyToCents(monthlyIncome);
-      
+
       let origin = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
       if (origin.includes('0.0.0.0')) {
         origin = origin.replace('0.0.0.0', 'localhost');
@@ -486,11 +519,33 @@ function SignupPageContent() {
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                className={`w-full px-4 py-3 rounded-xl bg-muted/50 border transition-colors ${emailExists
+                  ? 'border-primary shadow-[0_0_0_1px_rgba(var(--primary),0.2)] focus:border-primary focus:ring-primary'
+                  : 'border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary'
+                  }`}
                 placeholder="seu@email.com"
                 required
                 disabled={loading}
               />
+              {emailExists && (
+                <div className="mt-2 p-3 rounded-xl bg-primary/5 border border-primary/10 flex items-center justify-between animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <i className='bx bx-user-check text-primary text-lg'></i>
+                    </div>
+                    <p className="text-sm text-foreground/80 font-medium">
+                      Usuário já cadastrado
+                    </p>
+                  </div>
+                  <Link
+                    href={`/login?email=${encodeURIComponent(email)}`}
+                    className="text-sm font-bold text-primary hover:text-primary/80 transition-colors flex items-center gap-1 group"
+                  >
+                    Entrar agora
+                    <i className='bx bx-right-arrow-alt group-hover:translate-x-0.5 transition-transform'></i>
+                  </Link>
+                </div>
+              )}
             </div>
 
             <div>
@@ -769,7 +824,7 @@ function SignupPageContent() {
             <button
               type="submit"
               className="btn-primary w-full"
-              disabled={loading || !acceptedTerms || isPasswordMismatch || !isPasswordValid}
+              disabled={loading || !acceptedTerms || isPasswordMismatch || !isPasswordValid || emailExists}
             >
               <i className='bx bx-rocket'></i>
               {loading ? 'Criando conta...' : 'Criar conta grátis'}
@@ -782,8 +837,8 @@ function SignupPageContent() {
               href={
                 inviteToken
                   ? `/login?invite=${encodeURIComponent(inviteToken)}&next=${encodeURIComponent(
-                      `/app/sharing/accept?token=${inviteToken}`
-                    )}`
+                    `/app/sharing/accept?token=${inviteToken}`
+                  )}`
                   : '/login'
               }
               className="text-primary hover:underline font-medium"

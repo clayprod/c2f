@@ -54,23 +54,20 @@ export async function GET(request: NextRequest) {
       if (user) {
         console.log('Auth successful for user:', user.id);
 
-        // Redirecionar para o destino especificado (ou /app por padrão)
-        // Em produção, forçar o domínio correto para evitar problemas
-        let redirectUrl: string;
-        
-        if (process.env.NODE_ENV === 'production' || origin.includes('c2finance.com.br')) {
-          redirectUrl = `https://c2finance.com.br${next}`;
-        } else {
-          // Em desenvolvimento, tratar localhost/0.0.0.0
-          let redirectBase = origin;
-          if (redirectBase.includes('0.0.0.0')) {
-            redirectBase = redirectBase.replace('0.0.0.0', 'localhost');
-          }
-          redirectUrl = new URL(next, redirectBase).toString();
+        // Forçar /app se por algum motivo 'next' veio vazio ou como home
+        const targetPath = (next === '/' || !next) ? '/app' : next;
+
+        // Usar a origem da requisição, mas tratar casos de localhost/0.0.0.0
+        let redirectBase = origin;
+        if (redirectBase.includes('0.0.0.0')) {
+          redirectBase = redirectBase.replace('0.0.0.0', 'localhost');
         }
 
+        // Criar a URL absoluta de redirecionamento baseada na origem atual
+        const redirectUrl = new URL(targetPath, redirectBase).toString();
+
         console.log('Redirecting to:', redirectUrl);
-        return NextResponse.redirect(new URL(redirectUrl));
+        return NextResponse.redirect(redirectUrl);
       }
     } catch (error: any) {
       console.error('Auth callback error:', error);
@@ -79,9 +76,6 @@ export async function GET(request: NextRequest) {
 
   // Retornar para página de erro se algo der errado
   console.log('No code or error occurred, redirecting to error page. Origin:', origin);
-  const errorUrl = process.env.NODE_ENV === 'production' 
-    ? 'https://c2finance.com.br/auth/auth-code-error'
-    : `${origin}/auth/auth-code-error`;
-  return NextResponse.redirect(new URL(errorUrl));
+  const errorBase = origin.includes('0.0.0.0') ? origin.replace('0.0.0.0', 'localhost') : origin;
+  return NextResponse.redirect(new URL('/auth/auth-code-error', errorBase).toString());
 }
-

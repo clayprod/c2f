@@ -22,7 +22,8 @@ export async function middleware(request: NextRequest) {
             maxAge: options?.maxAge || 60 * 60 * 24 * 30, // 30 dias por padrão
             sameSite: 'lax' as const,
             path: '/',
-            httpOnly: false, // Supabase precisa acessar cookies no client-side
+            secure: process.env.NODE_ENV === 'production',
+            httpOnly: false, // Supabase precisa acessar alguns dados no client-side
           };
           request.cookies.set({
             name,
@@ -102,7 +103,7 @@ export async function middleware(request: NextRequest) {
 
   // Verificar rota admin
   const isAdminRoute = request.nextUrl.pathname.startsWith('/app/admin');
-  
+
   if (isAdminRoute && user) {
     // Check if user is admin
     const { data: profile } = await supabase

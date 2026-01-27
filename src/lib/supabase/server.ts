@@ -20,13 +20,21 @@ export async function createClient() {
               maxAge: options?.maxAge || 60 * 60 * 24 * 30, // 30 dias por padrão
               sameSite: 'lax' as const,
               path: '/',
-              httpOnly: false, // Supabase precisa acessar cookies no client-side
+              secure: process.env.NODE_ENV === 'production',
+              httpOnly: false, // Supabase precisa acessar dados no client-side
             };
             cookieStore.set(name, value, cookieOptions);
           } catch (error) {
             // The `set` method was called from a Server Component.
             // This can be ignored if you have middleware refreshing
             // user sessions.
+          }
+        },
+        remove(name: string, options: any) {
+          try {
+            cookieStore.set(name, '', { ...options, maxAge: 0 });
+          } catch (error) {
+            // The `remove` method was called from a Server Component.
           }
         },
       },
@@ -59,7 +67,8 @@ export function createClientFromRequest(request: NextRequest) {
             maxAge: options?.maxAge || 60 * 60 * 24 * 30, // 30 dias por padrão
             sameSite: 'lax' as const,
             path: '/',
-            httpOnly: false, // Supabase precisa acessar cookies no client-side
+            secure: process.env.NODE_ENV === 'production',
+            httpOnly: false, // Supabase precisa acessar dados no client-side
           };
           request.cookies.set({
             name,
@@ -105,7 +114,3 @@ export function createClientFromRequest(request: NextRequest) {
 
   return { supabase, response };
 }
-
-
-
-
