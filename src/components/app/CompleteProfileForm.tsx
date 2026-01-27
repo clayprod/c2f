@@ -415,109 +415,110 @@ export default function CompleteProfileForm({
           </div>
         </div>
 
-        <div>
-          <label htmlFor="cep" className="block text-sm font-medium mb-2">
-            CEP (opcional)
-          </label>
-          <input
-            type="text"
-            id="cep"
-            value={cep}
-            onChange={(e) => {
-              const value = e.target.value.replace(/\D/g, '');
-              if (value.length <= 8) {
-                setCep(value);
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label htmlFor="cep" className="block text-sm font-medium mb-2">
+              CEP (opcional)
+            </label>
+            <input
+              type="text"
+              id="cep"
+              value={cep}
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, '');
+                if (value.length <= 8) {
+                  setCep(value);
+                  setHasAutoFilledFromCep(false);
+                }
+              }}
+              onBlur={handleCepBlur}
+              className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors text-sm"
+              placeholder="00000-000"
+              disabled={loading || loadingCep}
+              maxLength={8}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="state" className="block text-sm font-medium mb-2">
+              Estado <span className="text-destructive">*</span>
+            </label>
+            <Select
+              value={state}
+              onValueChange={(value) => {
                 setHasAutoFilledFromCep(false);
-              }
-            }}
-            onBlur={handleCepBlur}
-            className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
-            placeholder="00000-000"
-            disabled={loading || loadingCep}
-            maxLength={8}
-          />
-          {loadingCep && (
-            <p className="text-xs text-muted-foreground mt-1">Buscando endereco...</p>
-          )}
+                setState(value);
+              }}
+              disabled={loading || loadingCep}
+              required
+            >
+              <SelectTrigger className="w-full px-4 py-3 h-auto rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors text-sm">
+                <SelectValue placeholder="Estado" />
+              </SelectTrigger>
+              <SelectContent>
+                {estados.map((estado) => (
+                  <SelectItem key={estado.sigla} value={estado.sigla}>
+                    {estado.sigla}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <label htmlFor="city" className="block text-sm font-medium mb-2">
+              Cidade <span className="text-destructive">*</span>
+            </label>
+            <Select
+              value={city}
+              onValueChange={setCity}
+              disabled={loading || loadingCep || !state}
+              required
+            >
+              <SelectTrigger className="w-full px-4 py-3 h-auto rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors text-sm">
+                <SelectValue placeholder={state ? 'Cidade' : '...'} />
+              </SelectTrigger>
+              <SelectContent>
+                {cidades.map((cidade) => (
+                  <SelectItem key={cidade.codigo_ibge} value={cidade.nome}>
+                    {cidade.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        <div>
-          <label htmlFor="state" className="block text-sm font-medium mb-2">
-            Estado <span className="text-destructive">*</span>
-          </label>
-          <Select
-            value={state}
-            onValueChange={(value) => {
-              setHasAutoFilledFromCep(false);
-              setState(value);
-            }}
-            disabled={loading || loadingCep}
-            required
-          >
-            <SelectTrigger className="w-full px-4 py-3 h-auto rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors">
-              <SelectValue placeholder="Selecione o estado" />
-            </SelectTrigger>
-            <SelectContent>
-              {estados.map((estado) => (
-                <SelectItem key={estado.sigla} value={estado.sigla}>
-                  {estado.nome} ({estado.sigla})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">Data de Nascimento</label>
+            <DatePicker
+              date={birthDate}
+              setDate={setBirthDate}
+              placeholder="Sua data"
+              disabled={loading}
+            />
+          </div>
 
-        <div>
-          <label htmlFor="city" className="block text-sm font-medium mb-2">
-            Cidade <span className="text-destructive">*</span>
-          </label>
-          <Select
-            value={city}
-            onValueChange={setCity}
-            disabled={loading || loadingCep || !state}
-            required
-          >
-            <SelectTrigger className="w-full px-4 py-3 h-auto rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors">
-              <SelectValue placeholder={state ? 'Selecione a cidade' : 'Selecione o estado primeiro'} />
-            </SelectTrigger>
-            <SelectContent>
-              {cidades.map((cidade) => (
-                <SelectItem key={cidade.codigo_ibge} value={cidade.nome}>
-                  {cidade.nome}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-2">Data de Nascimento</label>
-          <DatePicker
-            date={birthDate}
-            setDate={setBirthDate}
-            placeholder="Selecione sua data de nascimento"
-            disabled={loading}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-2">Genero</label>
-          <Select
-            value={gender}
-            onValueChange={setGender}
-            disabled={loading}
-          >
-            <SelectTrigger className="w-full px-4 py-3 h-auto rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors">
-              <SelectValue placeholder="Selecione o genero" />
-            </SelectTrigger>
-            <SelectContent>
-              {GENDER_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div>
+            <label className="block text-sm font-medium mb-2">Gênero</label>
+            <Select
+              value={gender}
+              onValueChange={setGender}
+              disabled={loading}
+            >
+              <SelectTrigger className="w-full px-4 py-3 h-auto rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors text-sm">
+                <SelectValue placeholder="Selecione" />
+              </SelectTrigger>
+              <SelectContent>
+                {GENDER_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div>

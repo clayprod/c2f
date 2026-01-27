@@ -15,6 +15,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import type { PlanFeatures } from '@/services/admin/globalSettings';
 import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
 import { formatCurrencyValue } from '@/lib/utils';
+import { PremiumUpgradeTooltip } from '@/components/ui/PremiumUpgradeTooltip';
 
 interface DashboardData {
   totalBalance: number;
@@ -110,62 +111,40 @@ function LockedFeatureWrapper({
     return <>{children}</>;
   }
 
-  const planLabel = minPlan === 'pro' ? 'Pro' : minPlan === 'premium' ? 'Premium' : 'Free';
+  const planLabel = minPlan === 'pro' ? 'Pro' : 'Premium';
 
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="relative cursor-not-allowed locked-feature-wrapper">
-            <style dangerouslySetInnerHTML={{__html: `
-              .locked-feature-wrapper > div:first-child {
-                opacity: 0.3 !important;
-                filter: blur(4px) !important;
-              }
-              .locked-feature-wrapper h2,
-              .locked-feature-wrapper .font-display,
-              .locked-feature-wrapper h2 *,
-              .locked-feature-wrapper .font-display * {
-                opacity: 1 !important;
-                filter: blur(0) !important;
-                position: relative !important;
-                z-index: 30 !important;
-              }
-            `}} />
-            <div className="pointer-events-none" style={{ opacity: 0.3, filter: 'blur(4px)' }}>
-              {children}
-            </div>
-            {/* Cadeado centralizado - fica na frente */}
-            <div className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none">
-              <div className="flex flex-col items-center gap-2">
-                <i className="bx bx-lock text-4xl text-muted-foreground drop-shadow-lg"></i>
-              </div>
+    <PremiumUpgradeTooltip planLabel={planLabel} isLocked={true} followMouse={true}>
+      <div className="relative w-full min-w-0 overflow-hidden">
+        <style dangerouslySetInnerHTML={{
+          __html: `
+          .locked-feature-wrapper > div:first-child {
+            opacity: 0.3 !important;
+            filter: blur(4px) !important;
+          }
+          .locked-feature-wrapper h2,
+          .locked-feature-wrapper .font-display,
+          .locked-feature-wrapper h2 *,
+          .locked-feature-wrapper .font-display * {
+            opacity: 1 !important;
+            filter: blur(0) !important;
+            position: relative !important;
+            z-index: 30 !important;
+          }
+        `}} />
+        <div className="locked-feature-wrapper w-full min-w-0 overflow-hidden">
+          <div className="pointer-events-none w-full min-w-0" style={{ opacity: 0.3, filter: 'blur(4px)' }}>
+            {children}
+          </div>
+          {/* Cadeado centralizado - fica na frente */}
+          <div className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none">
+            <div className="flex flex-col items-center gap-2">
+              <i className="bx bx-lock text-4xl text-muted-foreground drop-shadow-lg"></i>
             </div>
           </div>
-        </TooltipTrigger>
-        <TooltipContent 
-          side="top" 
-          sideOffset={8}
-          align={featureId === 'ai_advisor' ? 'start' : 'center'}
-          collisionPadding={32}
-          avoidCollisions={true}
-          className="p-3 max-w-[280px] w-auto z-50"
-        >
-          <div className="flex flex-col gap-2">
-            <p className="text-sm font-medium text-foreground whitespace-nowrap">Assine o plano {planLabel} para liberar</p>
-            <Link
-              href="/pricing"
-              onClick={(e) => {
-                e.stopPropagation();
-              }}
-              className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
-            >
-              Ver planos
-            </Link>
-          </div>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+        </div>
+      </div>
+    </PremiumUpgradeTooltip>
   );
 }
 
@@ -484,7 +463,7 @@ export default function DashboardPage() {
       }
 
       const existing = groupedData.get(groupKey);
-      
+
       if (existing) {
         // Somar valores
         existing.income += item.income;
@@ -504,7 +483,7 @@ export default function DashboardPage() {
           month: groupKey,
           monthLabel: groupLabel,
           // Para trimestre/ano atual
-          isCurrentMonth: groupBy === 'quarter' 
+          isCurrentMonth: groupBy === 'quarter'
             ? (item.year === currentYear && item.quarter === currentQuarter)
             : (item.year === currentYear),
           isProjected: groupBy === 'quarter'
@@ -712,9 +691,9 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4 md:gap-6 overflow-hidden">
-        <div className="lg:col-span-2 glass-card p-4 md:p-6 animate-slide-in-up delay-300 overflow-hidden">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 w-full min-w-0">
+        <div className="lg:col-span-2 glass-card p-4 md:p-6 animate-slide-in-up delay-300 w-full min-w-0 overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3 min-w-0">
             <div className="flex items-center gap-2">
               <h2 className="font-display font-semibold text-sm md:text-base">Fluxo de Caixa</h2>
               <InfoIcon
@@ -743,11 +722,10 @@ export default function DashboardPage() {
                     variant={groupBy === option.value ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setGroupBy(option.value)}
-                    className={`flex-shrink-0 text-xs md:text-sm px-2 md:px-3 ${
-                      groupBy === option.value
-                        ? 'bg-muted text-foreground hover:bg-muted/80 hover:text-foreground'
-                        : 'bg-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground border-border'
-                    }`}
+                    className={`flex-shrink-0 text-xs md:text-sm px-2 md:px-3 ${groupBy === option.value
+                      ? 'bg-muted text-foreground hover:bg-muted/80 hover:text-foreground'
+                      : 'bg-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground border-border'
+                      }`}
                   >
                     {option.label}
                   </Button>
@@ -762,11 +740,10 @@ export default function DashboardPage() {
                     variant={selectedPeriod === option.periods ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setSelectedPeriod(option.periods)}
-                    className={`flex-shrink-0 text-xs md:text-sm px-2 md:px-3 ${
-                      selectedPeriod === option.periods
-                        ? 'bg-muted text-foreground hover:bg-muted/80 hover:text-foreground'
-                        : 'bg-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground border-border'
-                    }`}
+                    className={`flex-shrink-0 text-xs md:text-sm px-2 md:px-3 ${selectedPeriod === option.periods
+                      ? 'bg-muted text-foreground hover:bg-muted/80 hover:text-foreground'
+                      : 'bg-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground border-border'
+                      }`}
                   >
                     {option.label}
                   </Button>

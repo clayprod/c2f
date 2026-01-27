@@ -112,3 +112,4 @@ COMMENT ON FUNCTION log_admin_data_access IS 'Log when admin accesses encrypted 
 
 
 
+

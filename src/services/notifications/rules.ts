@@ -22,9 +22,10 @@ export interface NotificationRule {
  */
 export async function checkDebtDueNotifications(
   userId: string,
-  rules: NotificationRule[]
+  rules: NotificationRule[],
+  options?: { supabase?: any }
 ): Promise<number> {
-  const supabase = await createClient();
+  const supabase = options?.supabase ?? await createClient();
   const rule = rules.find((r) => r.rule_type === 'debt_due' && r.enabled);
 
   if (!rule) return 0;
@@ -59,7 +60,8 @@ export async function checkDebtDueNotifications(
       userId,
       'debt_due',
       debt.id,
-      rule.frequency_hours
+      rule.frequency_hours,
+      { supabase }
     );
 
     if (shouldSend) {
@@ -74,10 +76,10 @@ export async function checkDebtDueNotifications(
           entity_id: debt.id,
           rule_type: 'debt_due',
         },
-      });
+      }, { supabase });
 
       if (notificationId) {
-        await updateNotificationSentLog(userId, 'debt_due', debt.id, 'debts');
+        await updateNotificationSentLog(userId, 'debt_due', debt.id, 'debts', { supabase });
         count++;
       }
     }
@@ -91,9 +93,10 @@ export async function checkDebtDueNotifications(
  */
 export async function checkReceivableDueNotifications(
   userId: string,
-  rules: NotificationRule[]
+  rules: NotificationRule[],
+  options?: { supabase?: any }
 ): Promise<number> {
-  const supabase = await createClient();
+  const supabase = options?.supabase ?? await createClient();
   const rule = rules.find((r) => r.rule_type === 'receivable_due' && r.enabled);
 
   if (!rule) return 0;
@@ -128,7 +131,8 @@ export async function checkReceivableDueNotifications(
       userId,
       'receivable_due',
       receivable.id,
-      rule.frequency_hours
+      rule.frequency_hours,
+      { supabase }
     );
 
     if (shouldSend) {
@@ -143,14 +147,15 @@ export async function checkReceivableDueNotifications(
           entity_id: receivable.id,
           rule_type: 'receivable_due',
         },
-      });
+      }, { supabase });
 
       if (notificationId) {
         await updateNotificationSentLog(
           userId,
           'receivable_due',
           receivable.id,
-          'receivables'
+          'receivables',
+          { supabase }
         );
         count++;
       }
@@ -165,9 +170,10 @@ export async function checkReceivableDueNotifications(
  */
 export async function checkBudgetLimitNotifications(
   userId: string,
-  rules: NotificationRule[]
+  rules: NotificationRule[],
+  options?: { supabase?: any }
 ): Promise<number> {
-  const supabase = await createClient();
+  const supabase = options?.supabase ?? await createClient();
   const rule = rules.find((r) => r.rule_type === 'budget_limit' && r.enabled);
 
   if (!rule) return 0;
@@ -213,7 +219,8 @@ export async function checkBudgetLimitNotifications(
         userId,
         'budget_limit',
         budget.id,
-        rule.frequency_hours
+        rule.frequency_hours,
+        { supabase }
       );
 
       if (shouldSend) {
@@ -231,10 +238,10 @@ export async function checkBudgetLimitNotifications(
             entity_id: budget.id,
             rule_type: 'budget_limit',
           },
-        });
+        }, { supabase });
 
         if (notificationId) {
-          await updateNotificationSentLog(userId, 'budget_limit', budget.id, 'budgets');
+          await updateNotificationSentLog(userId, 'budget_limit', budget.id, 'budgets', { supabase });
           count++;
         }
       }
@@ -249,9 +256,10 @@ export async function checkBudgetLimitNotifications(
  */
 export async function checkBudgetEmptyNotifications(
   userId: string,
-  rules: NotificationRule[]
+  rules: NotificationRule[],
+  options?: { supabase?: any }
 ): Promise<number> {
-  const supabase = await createClient();
+  const supabase = options?.supabase ?? await createClient();
   const rule = rules.find((r) => r.rule_type === 'budget_empty' && r.enabled);
 
   if (!rule) return 0;
@@ -303,7 +311,8 @@ export async function checkBudgetEmptyNotifications(
     userId,
     'budget_empty',
     null,
-    rule.frequency_hours
+    rule.frequency_hours,
+    { supabase }
   );
 
   if (!shouldSend) return 0;
@@ -320,10 +329,10 @@ export async function checkBudgetEmptyNotifications(
       entity_type: 'budgets',
       rule_type: 'budget_empty',
     },
-  });
+  }, { supabase });
 
   if (notificationId) {
-    await updateNotificationSentLog(userId, 'budget_empty', null, 'budgets');
+    await updateNotificationSentLog(userId, 'budget_empty', null, 'budgets', { supabase });
     return 1;
   }
 
@@ -333,8 +342,11 @@ export async function checkBudgetEmptyNotifications(
 /**
  * Get notification rules for a user (global + user-specific)
  */
-export async function getUserNotificationRules(userId: string): Promise<NotificationRule[]> {
-  const supabase = await createClient();
+export async function getUserNotificationRules(
+  userId: string,
+  options?: { supabase?: any }
+): Promise<NotificationRule[]> {
+  const supabase = options?.supabase ?? await createClient();
 
   const { data, error } = await supabase
     .from('notification_rules')
@@ -370,9 +382,10 @@ export async function getUserNotificationRules(userId: string): Promise<Notifica
  */
 export async function checkBalanceDivergenceNotifications(
   userId: string,
-  rules: NotificationRule[]
+  rules: NotificationRule[],
+  options?: { supabase?: any }
 ): Promise<number> {
-  const supabase = await createClient();
+  const supabase = options?.supabase ?? await createClient();
   const rule = rules.find((r) => r.rule_type === 'balance_divergence' && r.enabled);
 
   if (!rule) return 0;
@@ -425,7 +438,8 @@ export async function checkBalanceDivergenceNotifications(
         userId,
         'balance_divergence',
         link.id,
-        rule.frequency_hours
+        rule.frequency_hours,
+        { supabase }
       );
 
       if (shouldSend) {
@@ -444,10 +458,10 @@ export async function checkBalanceDivergenceNotifications(
             pluggy_balance_cents: pluggyBalanceCents,
             internal_balance_cents: internalBalanceCents,
           },
-        });
+        }, { supabase });
 
         if (notificationId) {
-          await updateNotificationSentLog(userId, 'balance_divergence', link.id, 'account_links');
+          await updateNotificationSentLog(userId, 'balance_divergence', link.id, 'account_links', { supabase });
           count++;
         }
       }
@@ -462,9 +476,10 @@ export async function checkBalanceDivergenceNotifications(
  */
 export async function checkDailySpendingNotifications(
   userId: string,
-  rules: NotificationRule[]
+  rules: NotificationRule[],
+  options?: { supabase?: any }
 ): Promise<number> {
-  const supabase = await createClient();
+  const supabase = options?.supabase ?? await createClient();
   const rule = rules.find((r) => r.rule_type === 'daily_spending_exceeded' && r.enabled);
 
   if (!rule) return 0;
@@ -520,7 +535,7 @@ export async function checkDailySpendingNotifications(
   firstDayOfMonth.setHours(0, 0, 0, 0);
   const lastDayOfMonth = new Date(currentYear, currentMonth, 0);
   const daysInMonth = lastDayOfMonth.getDate();
-  
+
   // Days elapsed: from first day to today (inclusive)
   // Use current day of month (1-31)
   const currentDay = today.getDate();
@@ -540,7 +555,8 @@ export async function checkDailySpendingNotifications(
       userId,
       'daily_spending_exceeded',
       null,
-      rule.frequency_hours
+      rule.frequency_hours,
+      { supabase }
     );
 
     if (shouldSend) {
@@ -559,10 +575,10 @@ export async function checkDailySpendingNotifications(
           total_spent_cents: totalActualCents,
           total_budget_cents: totalPlannedCents,
         },
-      });
+      }, { supabase });
 
       if (notificationId) {
-        await updateNotificationSentLog(userId, 'daily_spending_exceeded', null, 'budgets');
+        await updateNotificationSentLog(userId, 'daily_spending_exceeded', null, 'budgets', { supabase });
         return 1;
       }
     }
@@ -577,9 +593,10 @@ export async function checkDailySpendingNotifications(
  */
 export async function checkExpensesAboveBudgetNotifications(
   userId: string,
-  rules: NotificationRule[]
+  rules: NotificationRule[],
+  options?: { supabase?: any }
 ): Promise<number> {
-  const supabase = await createClient();
+  const supabase = options?.supabase ?? await createClient();
   const rule = rules.find((r) => r.rule_type === 'expenses_above_budget' && r.enabled);
 
   if (!rule) return 0;
@@ -620,7 +637,7 @@ export async function checkExpensesAboveBudgetNotifications(
 
   for (const budget of budgets) {
     const category = budget.categories as any;
-    
+
     // Only check expense categories
     if (category?.type !== 'expense') continue;
 
@@ -636,7 +653,8 @@ export async function checkExpensesAboveBudgetNotifications(
         userId,
         'expenses_above_budget',
         budget.id,
-        rule.frequency_hours
+        rule.frequency_hours,
+        { supabase }
       );
 
       if (shouldSend) {
@@ -661,10 +679,10 @@ export async function checkExpensesAboveBudgetNotifications(
             excess_cents: excessCents,
             excess_percentage: excessPercentage,
           },
-        });
+        }, { supabase });
 
         if (notificationId) {
-          await updateNotificationSentLog(userId, 'expenses_above_budget', budget.id, 'budgets');
+          await updateNotificationSentLog(userId, 'expenses_above_budget', budget.id, 'budgets', { supabase });
           count++;
         }
       }
@@ -677,7 +695,10 @@ export async function checkExpensesAboveBudgetNotifications(
 /**
  * Run all notification checks for a user
  */
-export async function checkAllNotifications(userId: string): Promise<{
+export async function checkAllNotifications(
+  userId: string,
+  options?: { supabase?: any }
+): Promise<{
   debt_due: number;
   receivable_due: number;
   budget_limit: number;
@@ -687,7 +708,8 @@ export async function checkAllNotifications(userId: string): Promise<{
   expenses_above_budget: number;
   total: number;
 }> {
-  const rules = await getUserNotificationRules(userId);
+  const supabase = options?.supabase;
+  const rules = await getUserNotificationRules(userId, { supabase });
 
   const [
     debt_due,
@@ -698,13 +720,13 @@ export async function checkAllNotifications(userId: string): Promise<{
     daily_spending_exceeded,
     expenses_above_budget,
   ] = await Promise.all([
-    checkDebtDueNotifications(userId, rules),
-    checkReceivableDueNotifications(userId, rules),
-    checkBudgetLimitNotifications(userId, rules),
-    checkBudgetEmptyNotifications(userId, rules),
-    checkBalanceDivergenceNotifications(userId, rules),
-    checkDailySpendingNotifications(userId, rules),
-    checkExpensesAboveBudgetNotifications(userId, rules),
+    checkDebtDueNotifications(userId, rules, { supabase }),
+    checkReceivableDueNotifications(userId, rules, { supabase }),
+    checkBudgetLimitNotifications(userId, rules, { supabase }),
+    checkBudgetEmptyNotifications(userId, rules, { supabase }),
+    checkBalanceDivergenceNotifications(userId, rules, { supabase }),
+    checkDailySpendingNotifications(userId, rules, { supabase }),
+    checkExpensesAboveBudgetNotifications(userId, rules, { supabase }),
   ]);
 
   return {

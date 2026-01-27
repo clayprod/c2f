@@ -132,18 +132,18 @@ export default function GlobalSettings() {
     try {
       // Clear cache first to ensure fresh data
       await fetch('/api/admin/settings/clear-cache', { method: 'POST' });
-      
+
       const res = await fetch('/api/admin/settings');
       if (!res.ok) throw new Error('Failed to fetch settings');
       const data = await res.json();
-      
+
       console.log('[GlobalSettings] Fetched data:', {
         hasSupportEmail: !!data.support_email,
         hasSupportWhatsapp: !!data.support_whatsapp,
         supportEmail: data.support_email,
         supportWhatsapp: data.support_whatsapp,
       });
-      
+
       setSettings({
         ...data,
         tips_enabled: data.tips_enabled !== false, // Default to true
@@ -201,7 +201,7 @@ export default function GlobalSettings() {
         supportEmail: settings.support_email,
         supportWhatsapp: settings.support_whatsapp,
       });
-      
+
       const res = await fetch('/api/admin/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -218,7 +218,7 @@ export default function GlobalSettings() {
         title: 'Sucesso',
         description: 'Configurações salvas com sucesso',
       });
-      
+
       // Reload settings to reflect saved data
       await fetchSettings();
     } catch (error) {
@@ -257,7 +257,7 @@ export default function GlobalSettings() {
                 type="email"
                 value={settings.support_email || ''}
                 onChange={(e) => setSettings({ ...settings, support_email: e.target.value })}
-                placeholder="suporte@exemplo.com"
+                placeholder="contato@c2finance.com.br"
               />
               <p className="text-xs text-muted-foreground mt-1">
                 Email exibido na central de ajuda para contato

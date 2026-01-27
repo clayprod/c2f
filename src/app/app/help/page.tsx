@@ -24,7 +24,7 @@ export default function HelpPage() {
   // Agrupar resultados de busca por categoria
   const searchResultsByCategory = useMemo(() => {
     if (!isSearching) return {};
-    
+
     const grouped: Record<string, HelpArticle[]> = {};
     searchResults.forEach(article => {
       if (!grouped[article.category]) {
@@ -45,7 +45,7 @@ export default function HelpPage() {
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\n\n/g, '</p><p>')
       .replace(/\n/g, '<br/>');
-    
+
     return `<p>${formatted}</p>`;
   };
 
@@ -70,22 +70,21 @@ export default function HelpPage() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Sidebar de Navegação */}
         <aside className="lg:col-span-1">
-          <div className="glass-card p-4 sticky top-24">
-            <h2 className="font-semibold mb-4 flex items-center gap-2">
+          <div className="glass-card p-4 sticky top-24 max-h-[calc(100vh-120px)] flex flex-col">
+            <h2 className="font-semibold mb-4 flex items-center gap-2 flex-shrink-0">
               <i className="bx bx-menu text-primary"></i>
               Categorias
             </h2>
-            <nav className="space-y-2">
+            <nav className="space-y-2 overflow-y-auto pr-2 custom-scrollbar">
               <button
                 onClick={() => {
                   setSearchResults([]);
                   setSelectedCategory(null);
                 }}
-                className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex items-center gap-2 ${
-                  !hasSearchQuery
+                className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex items-center gap-2 ${!hasSearchQuery
                     ? 'bg-primary/10 text-primary font-medium'
                     : 'text-muted-foreground hover:bg-muted/50'
-                }`}
+                  }`}
               >
                 <i className="bx bx-home text-lg"></i>
                 Todas as categorias
@@ -97,11 +96,10 @@ export default function HelpPage() {
                     setSelectedCategory(category.id);
                     setSearchResults(getArticlesByCategory(category.id));
                   }}
-                  className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex items-center gap-2 ${
-                    selectedCategory === category.id
+                  className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex items-center gap-2 ${selectedCategory === category.id
                       ? 'bg-primary/10 text-primary font-medium'
                       : 'text-muted-foreground hover:bg-muted/50'
-                  }`}
+                    }`}
                 >
                   <i className={`bx ${category.icon} text-lg`}></i>
                   {category.name}

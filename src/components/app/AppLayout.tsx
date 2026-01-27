@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { PremiumUpgradeTooltip } from '@/components/ui/PremiumUpgradeTooltip';
 
 
 interface AppLayoutProps {
@@ -152,13 +153,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
           case '/app/transactions':
             return 'transactions';
           case '/app/accounts':
-            // Not present in permissions JSON; tie to transactions visibility.
             return 'transactions';
           case '/app/credit-cards':
-            // Not present in permissions JSON; tie to transactions visibility.
             return 'transactions';
           case '/app/categories':
-            // Not present in permissions JSON; tie to transactions visibility.
             return 'transactions';
           case '/app/budgets':
             return 'budgets';
@@ -167,7 +165,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
           case '/app/debts':
             return 'debts';
           case '/app/receivables':
-            // Not present in permissions JSON; tie to transactions visibility.
             return 'transactions';
           case '/app/investments':
             return 'investments';
@@ -183,22 +180,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
       })();
 
       if (!resource) return true;
-      // For object-shaped permissions, check "view" explicitly.
       return hasPermission(resource, 'view');
     }
 
-    if (planFeatures) {
-      const featureId = moduleByRoute[item.path];
-      if (featureId) {
-        const enabled = planFeatures[featureId]?.enabled;
-        if (enabled !== undefined) return enabled;
-      }
-    }
+    // Na conta própria, mostramos os menus fixos.
+    // Enquanto o perfil carrega, mostramos apenas o básico (free) para evitar flickers.
+    if (!userProfile && !isViewingSharedAccount) return item.minPlan === 'free';
 
-    if (!userProfile) return item.minPlan === 'free';
-    if (item.minPlan === 'free') return true;
-    if (item.minPlan === 'pro') return userProfile.plan === 'pro' || userProfile.plan === 'premium';
-    if (item.minPlan === 'premium') return userProfile.plan === 'premium';
     return true;
   });
 
@@ -381,6 +369,39 @@ export default function AppLayout({ children }: AppLayoutProps) {
             >
               {visibleMenuItems.map((item) => {
                 const isActive = pathname === item.path;
+
+                // Verificar se o item está bloqueado pelo plano
+                const isLocked = !isViewingSharedAccount && (
+                  (item.minPlan === 'pro' && userProfile?.plan === 'free') ||
+                  (item.minPlan === 'premium' && (userProfile?.plan === 'free' || userProfile?.plan === 'pro')) ||
+                  (planFeatures && moduleByRoute[item.path] && planFeatures[moduleByRoute[item.path]]?.enabled === false)
+                );
+
+                if (isLocked) {
+                  const itemPlanLabel = item.minPlan === 'premium' ? 'Premium' : 'Pro';
+                  return (
+                    <li key={item.path} className="relative group">
+                      <PremiumUpgradeTooltip planLabel={itemPlanLabel} isLocked={true}>
+                        <div
+                          className="flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground/40 cursor-not-allowed hover:bg-muted/30 transition-colors w-full text-left"
+                        >
+                          <i className={`bx ${item.icon} text-xl`}></i>
+                          <span className="font-medium">{item.label}</span>
+                          <div className="ml-auto flex items-center gap-1">
+                            <span className={`text-[8px] font-bold px-1 py-0.5 rounded uppercase ${item.minPlan === 'premium'
+                              ? 'bg-amber-500/10 text-amber-500/70 border border-amber-500/20'
+                              : 'bg-primary/10 text-primary/70 border border-primary/20'
+                              }`}>
+                              {item.minPlan === 'premium' ? 'PREMIUM' : 'PRO'}
+                            </span>
+                            <i className="bx bx-lock-alt text-xs"></i>
+                          </div>
+                        </div>
+                      </PremiumUpgradeTooltip>
+                    </li>
+                  );
+                }
+
                 return (
                   <li key={item.path}>
                     <Link
@@ -483,7 +504,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </button>
 
           <div className="flex items-center gap-2 md:gap-4 flex-1 min-w-0">
-            {userProfile && userProfile.plan !== 'free' && (
+            {userProfile && (
               <div className="p-[1px] rounded-md transition-all duration-300 group"
                 style={{
                   background: 'linear-gradient(to right, #9333ea, #3b82f6)',
@@ -663,16 +684,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
       <Dialog
         open={showCompleteProfile}
-        onOpenChange={(open) => {
-          if (open) {
-            setShowCompleteProfile(true);
-          }
-        }}
+        onOpenChange={setShowCompleteProfile}
       >
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto [&>button]:hidden">
+        <DialogContent className="max-w-2xl p-0 overflow-hidden [&>button]:hidden border-none bg-transparent shadow-none">
           <CompleteProfileForm
-            useCard={false}
-            className="p-0"
+            useCard={true}
+            className="w-full max-h-[90vh] overflow-y-auto scrollbar-thin shadow-2xl"
             redirectTo=""
             redirectIfComplete={false}
             requireAuthRedirect={false}

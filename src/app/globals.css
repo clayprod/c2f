@@ -181,6 +181,8 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: var(--font-inter), sans-serif;
+    width: 100%;
+    position: relative;
   }
 
   h1,

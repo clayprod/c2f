@@ -22,7 +22,7 @@ const CTA = () => {
               <i className='bx bx-rocket'></i>
               Começar grátis
             </Link>
-            <a href="mailto:suporte@c2finance.com" className="btn-secondary w-full sm:w-auto">
+            <a href="mailto:contato@c2finance.com.br" className="btn-secondary w-full sm:w-auto">
               <i className='bx bx-headphone'></i>
               Falar com suporte
             </a>

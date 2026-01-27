@@ -100,9 +100,10 @@ export function validateSegment(segment: NotificationSegment): {
  * Get users that match segmentation criteria
  */
 export async function getSegmentedUsers(
-  segment: NotificationSegment
+  segment: NotificationSegment,
+  options?: { supabase?: any }
 ): Promise<string[]> {
-  const supabase = await createClient();
+  const supabase = options?.supabase ?? await createClient();
 
   let query = supabase
     .from('profiles')
@@ -197,7 +198,10 @@ export async function getSegmentedUsers(
 /**
  * Estimate how many users will be targeted by a segment
  */
-export async function estimateTargetCount(segment: NotificationSegment): Promise<number> {
-  const users = await getSegmentedUsers(segment);
+export async function estimateTargetCount(
+  segment: NotificationSegment,
+  options?: { supabase?: any }
+): Promise<number> {
+  const users = await getSegmentedUsers(segment, options);
   return users.length;
 }

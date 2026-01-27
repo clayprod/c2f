@@ -28,18 +28,18 @@ async function getPricingData(): Promise<Plan[]> {
   try {
     // For server components, we can import the service directly
     // But to keep it simple and avoid circular dependencies, we'll use fetch
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL 
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL
       || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
       || 'http://localhost:3000';
-    
+
     const res = await fetch(`${baseUrl}/api/public/pricing`, {
       next: { revalidate: 300 }, // Revalidate every 5 minutes
     });
-    
+
     if (!res.ok) {
       throw new Error(`Failed to fetch pricing: ${res.status}`);
     }
-    
+
     const data = await res.json();
     return data.plans || [];
   } catch (error) {
@@ -139,20 +139,20 @@ export default async function PricingPage() {
                   </div>
                 )}
 
-              <div className="mb-6">
-                <h3 className="font-display font-semibold text-xl mb-2">{plan.name}</h3>
-                {plan.originalPriceFormatted && (
-                  <div className="text-muted-foreground text-sm mb-1">
-                    <span className="line-through">de {plan.originalPriceFormatted}</span>
-                  </div>
-                )}
-                <div className="flex items-baseline gap-1 mb-2">
+                <div className="mb-6">
+                  <h3 className="font-display font-semibold text-xl mb-2">{plan.name}</h3>
                   {plan.originalPriceFormatted && (
-                    <span className="text-muted-foreground text-sm mr-1">por</span>
+                    <div className="text-muted-foreground text-sm mb-1">
+                      <span className="line-through">de {plan.originalPriceFormatted}</span>
+                    </div>
                   )}
-                  <span className="font-display text-4xl font-bold">{plan.priceFormatted}</span>
-                  <span className="text-muted-foreground text-sm">{plan.period}</span>
-                </div>
+                  <div className="flex items-baseline gap-1 mb-2">
+                    {plan.originalPriceFormatted && (
+                      <span className="text-muted-foreground text-sm mr-1">por</span>
+                    )}
+                    <span className="font-display text-4xl font-bold">{plan.priceFormatted}</span>
+                    <span className="text-muted-foreground text-sm">{plan.period}</span>
+                  </div>
                   <p className="text-muted-foreground text-sm">{plan.description}</p>
                 </div>
 
@@ -195,7 +195,7 @@ export default async function PricingPage() {
                 <i className='bx bx-help-circle'></i>
                 Ver FAQ
               </Link>
-              <a href="mailto:suporte@c2finance.com" className="btn-secondary">
+              <a href="mailto:contato@c2finance.com.br" className="btn-secondary">
                 <i className='bx bx-support'></i>
                 Falar com suporte
               </a>

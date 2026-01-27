@@ -23,3 +23,4 @@ export function CategoryIcon({
   return <span>{iconValue}</span>;
 }
 
+

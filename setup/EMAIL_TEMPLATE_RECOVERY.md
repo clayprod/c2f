@@ -192,3 +192,4 @@ Após configurar o template:
 - **Email não chega**: Veja o guia `EMAIL_SMTP_SETUP.md`
 
 
+

@@ -10,3 +10,4 @@ COMMENT ON COLUMN public.pluggy_accounts.institution_logo IS 'URL do logo da ins
 
 
 
+

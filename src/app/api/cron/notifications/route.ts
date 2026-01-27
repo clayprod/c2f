@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { checkAllNotifications } from '@/services/notifications/rules';
 
 export const dynamic = 'force-dynamic';
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     // Get all active users (users who have logged in recently or have data)
     // We'll get users who have profiles and have created transactions, budgets, or other data
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
       await Promise.all(
         batch.map(async (user) => {
           try {
-            const result = await checkAllNotifications(user.id);
+            const result = await checkAllNotifications(user.id, { supabase });
             results.processed++;
             results.total_notifications += result.total;
           } catch (error) {

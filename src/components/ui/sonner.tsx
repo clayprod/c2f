@@ -15,14 +15,14 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           toast:
-            "group toast group-[.toaster]:bg-card/80 group-[.toaster]:backdrop-blur-xl group-[.toaster]:text-foreground group-[.toaster]:border-border/50 group-[.toaster]:rounded-xl group-[.toaster]:shadow-lg",
+            "group toast group-[.toaster]:bg-card/60 group-[.toaster]:backdrop-blur-xl group-[.toaster]:text-foreground group-[.toaster]:border-white/10 group-[.toaster]:rounded-2xl group-[.toaster]:shadow-[0_8px_32px_rgba(0,0,0,0.3)]",
           description: "group-[.toast]:text-muted-foreground",
           actionButton: "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground group-[.toast]:rounded-lg",
           cancelButton: "group-[.toast]:bg-muted/50 group-[.toast]:text-muted-foreground group-[.toast]:rounded-lg",
-          error: "group-[.toaster]:bg-destructive/90 group-[.toaster]:border-destructive/50 group-[.toaster]:text-destructive-foreground group-[.toaster]:shadow-destructive/20",
-          success: "group-[.toaster]:bg-success/90 group-[.toaster]:border-success/50 group-[.toaster]:text-success-foreground",
-          info: "group-[.toaster]:bg-info/90 group-[.toaster]:border-info/50 group-[.toaster]:text-info-foreground",
-          warning: "group-[.toaster]:bg-warning/90 group-[.toaster]:border-warning/50 group-[.toaster]:text-warning-foreground",
+          error: "group-[.toaster]:bg-destructive/10 group-[.toaster]:border-destructive/20 group-[.toaster]:text-foreground group-[.toaster]:shadow-[0_8px_32px_rgba(254,74,73,0.15)]",
+          success: "group-[.toaster]:bg-success/10 group-[.toaster]:border-success/20 group-[.toaster]:text-foreground group-[.toaster]:shadow-[0_8px_32px_rgba(31,192,210,0.15)]",
+          info: "group-[.toaster]:bg-info/10 group-[.toaster]:border-info/20 group-[.toaster]:text-foreground group-[.toaster]:shadow-[0_8px_32px_rgba(89,210,254,0.15)]",
+          warning: "group-[.toaster]:bg-warning/10 group-[.toaster]:border-warning/20 group-[.toaster]:text-foreground group-[.toaster]:shadow-[0_8px_32px_rgba(254,215,102,0.15)]",
         },
       }}
       {...props}

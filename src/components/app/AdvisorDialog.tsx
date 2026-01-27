@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { cn } from '@/lib/utils';
+import { PlanGuard } from './PlanGuard';
 import AdvisorContent from './AdvisorContent';
 
 interface AdvisorDialogProps {
@@ -48,11 +49,13 @@ export default function AdvisorDialog({ open, onOpenChange }: AdvisorDialogProps
           >
             {/* Content wrapper - pt garante espaço para o botão de fechar */}
             <div className="flex-1 flex flex-col min-h-0 px-4 pb-4 pt-16 sm:px-5 sm:pb-5 sm:pt-16 md:px-6 md:pb-6 md:pt-14 overflow-hidden scrollbar-hide">
-              <AdvisorContent inDialog={true} />
+              <PlanGuard minPlan="pro">
+                <AdvisorContent inDialog={true} />
+              </PlanGuard>
             </div>
-            
+
             {/* Close button */}
-            <DialogPrimitive.Close 
+            <DialogPrimitive.Close
               className={cn(
                 "absolute right-3 top-3 sm:right-4 sm:top-4",
                 "rounded-full w-7 h-7",

@@ -115,32 +115,34 @@ export function AdvisorTips() {
   }
 
   return (
-    <div className="glass-card p-4 sm:p-6 animate-slide-in-right delay-300 overflow-hidden">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-        <div className="flex items-center gap-2 flex-wrap">
-          <i className="bx bx-sparkles text-2xl text-purple-600 animate-pulse-soft"></i>
-          <h2 className="font-display font-semibold">Dica do Dia</h2>
+    <div className="glass-card p-4 sm:p-6 animate-slide-in-up delay-300 overflow-hidden w-full min-w-0">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4 min-w-0 w-full overflow-hidden">
+        <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
+          <i className="bx bx-sparkles text-2xl text-purple-600 animate-pulse-soft flex-shrink-0"></i>
+          <h2 className="font-display font-semibold text-sm md:text-base truncate">Dica do Dia</h2>
           {tip.isNew && (
-            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-success/10 text-success border border-success/20">
+            <span className="px-2 py-0.5 text-[10px] md:text-xs font-medium rounded-full bg-success/10 text-success border border-success/20 flex-shrink-0">
               Nova
             </span>
           )}
-          <InfoIcon
-            content={
-              <div className="space-y-2">
-                <p className="font-semibold">Sobre as Dicas:</p>
-                <ul className="space-y-1.5 text-xs list-disc list-inside">
-                  <li>Dicas são geradas diariamente com base nos seus dados financeiros.</li>
-                  <li>A IA analisa seus gastos, orçamentos, metas e dívidas.</li>
-                  <li>Insights ajudam a identificar padrões e oportunidades.</li>
-                  <li>Ações sugeridas são passos concretos que você pode tomar.</li>
-                </ul>
-              </div>
-            }
-          />
+          <div className="flex-shrink-0">
+            <InfoIcon
+              content={
+                <div className="space-y-2">
+                  <p className="font-semibold">Sobre as Dicas:</p>
+                  <ul className="space-y-1.5 text-xs list-disc list-inside">
+                    <li>Dicas são geradas diariamente com base nos seus dados financeiros.</li>
+                    <li>A IA analisa seus gastos, orçamentos, metas e dívidas.</li>
+                    <li>Insights ajudam a identificar padrões e oportunidades.</li>
+                    <li>Ações sugeridas são passos concretos que você pode tomar.</li>
+                  </ul>
+                </div>
+              }
+            />
+          </div>
         </div>
         <span className={cn(
-          'px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap self-start sm:self-auto',
+          'px-2 py-0.5 text-[10px] md:text-xs font-medium rounded-full whitespace-nowrap self-start sm:self-center flex-shrink-0',
           confidenceColors[tip.confidence]
         )}>
           {tip.confidence === 'high' ? 'Alta' : tip.confidence === 'medium' ? 'Média' : 'Baixa'} confiança
@@ -148,22 +150,22 @@ export function AdvisorTips() {
       </div>
 
       {/* Summary */}
-      <p className="text-foreground mb-4">{tip.summary}</p>
+      <p className="text-foreground mb-4 text-sm md:text-base break-words leading-relaxed">{tip.summary}</p>
 
       {/* Insights */}
       {tip.insights && tip.insights.length > 0 && (
-        <div className="mb-4 overflow-x-auto scrollbar-hide -mx-4 sm:-mx-6 px-4 sm:px-6">
-          <div className="flex flex-nowrap sm:flex-wrap gap-2 animate-children-stagger pb-1">
+        <div className="mb-4 overflow-x-auto scrollbar-hide w-full">
+          <div className="flex flex-nowrap sm:flex-wrap gap-2 animate-children-stagger pb-1 min-w-0">
             {tip.insights.slice(0, expanded ? undefined : 3).map((insight, index) => (
               <div
                 key={index}
                 className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-300 hover:scale-105 flex-shrink-0',
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] md:text-xs font-medium border transition-all duration-300 hover:scale-105 flex-shrink-0',
                   severityColors[insight.severity]
                 )}
               >
                 <i className={cn('bx', severityIcons[insight.severity])}></i>
-                <span className="max-w-[150px] sm:max-w-[200px] truncate" title={insight.message}>
+                <span className="max-w-[120px] sm:max-w-[180px] truncate" title={insight.message}>
                   {insight.message}
                 </span>
               </div>
@@ -171,7 +173,7 @@ export function AdvisorTips() {
             {!expanded && tip.insights.length > 3 && (
               <button
                 onClick={() => setExpanded(true)}
-                className="px-3 py-1.5 rounded-full text-xs font-medium bg-muted hover:bg-muted/80 transition-colors flex-shrink-0"
+                className="px-3 py-1.5 rounded-full text-[10px] md:text-xs font-medium bg-muted hover:bg-muted/80 transition-colors flex-shrink-0"
               >
                 +{tip.insights.length - 3} mais
               </button>
@@ -182,22 +184,22 @@ export function AdvisorTips() {
 
       {/* Actions */}
       {tip.actions && tip.actions.length > 0 && (
-        <div className={cn(!expanded && 'hidden')}>
+        <div className={cn(!expanded && 'hidden', "w-full min-w-0")}>
           <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
             <i className="bx bx-target-lock animate-pulse-soft"></i>
             Ações Sugeridas
           </p>
-          <div className="space-y-2 animate-children-stagger">
+          <div className="space-y-2 animate-children-stagger w-full min-w-0">
             {tip.actions.map((action, index) => (
               <div
                 key={index}
-                className="flex items-start gap-2 p-3 rounded-lg bg-card/50 border border-border hover-lift transition-all duration-300"
+                className="flex items-start gap-2 p-3 rounded-lg bg-card/50 border border-border hover-lift transition-all duration-300 w-full min-w-0 overflow-hidden"
               >
-                <i className="bx bx-right-arrow-alt text-primary mt-0.5"></i>
-                <div className="flex-1">
-                  <p className="text-sm">{action.description || action.type}</p>
+                <i className="bx bx-right-arrow-alt text-primary mt-0.5 flex-shrink-0"></i>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs md:text-sm break-words leading-snug">{action.description || action.type}</p>
                   <span className={cn(
-                    'inline-block mt-1 px-2 py-0.5 text-xs rounded-full',
+                    'inline-block mt-1 px-2 py-0.5 text-[10px] rounded-full',
                     confidenceColors[action.confidence]
                   )}>
                     {action.confidence === 'high' ? 'Recomendado' : action.confidence === 'medium' ? 'Sugerido' : 'Opcional'}

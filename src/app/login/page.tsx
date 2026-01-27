@@ -185,9 +185,13 @@ function LoginForm() {
     try {
       const supabase = createClient();
 
-      // Use a origem atual mas garanta que não haja barra sobrando no final
-      const origin = window.location.origin.replace(/\/$/, '');
-      const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(next)}`;
+      // Use a origem correta: se estivermos em produção, força o domínio oficial.
+      // Se estivermos no localhost, usa o localhost.
+      let currentOrigin = window.location.origin.replace(/\/$/, '');
+      if (!currentOrigin.includes('localhost') && !currentOrigin.includes('127.0.0.1')) {
+        currentOrigin = 'https://c2finance.com.br';
+      }
+      const redirectTo = `${currentOrigin}/auth/callback?next=${encodeURIComponent(next)}`;
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',

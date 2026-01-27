@@ -15,7 +15,7 @@ const footerLinks = {
     { label: 'Sobre', href: '/#' },
     { label: 'Blog', href: '/blog' },
     { label: 'Carreiras', href: '/#' },
-    { label: 'Contato', href: 'mailto:contato@c2finance.com' },
+    { label: 'Contato', href: 'mailto:contato@c2finance.com.br' },
   ],
   legal: [
     { label: 'Termos de Uso', href: '/terms-of-service' },
@@ -25,7 +25,7 @@ const footerLinks = {
 
 const Footer = () => {
   const logo = useLogo();
-  
+
   return (
     <footer className="border-t border-border/50 bg-card/30">
       <div className="container-custom py-12 md:py-16">
@@ -35,7 +35,7 @@ const Footer = () => {
             <Link href="/" className="flex items-center mb-4">
               <Image
                 src={logo}
-                alt="c2Finance" 
+                alt="c2Finance"
                 width={120}
                 height={40}
                 className="h-8 w-auto"

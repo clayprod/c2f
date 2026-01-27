@@ -15,9 +15,10 @@ export async function shouldSendNotification(
   userId: string,
   ruleType: string,
   entityId: string | null,
-  frequencyHours: number
+  frequencyHours: number,
+  options?: { supabase?: any }
 ): Promise<boolean> {
-  const supabase = await createClient();
+  const supabase = options?.supabase ?? await createClient();
 
   if (!entityId) {
     // For notifications without entity, check last sent time
@@ -61,9 +62,10 @@ export async function shouldSendNotification(
  */
 export async function createNotification(
   userId: string,
-  notificationData: NotificationData
+  notificationData: NotificationData,
+  options?: { supabase?: any }
 ): Promise<string | null> {
-  const supabase = await createClient();
+  const supabase = options?.supabase ?? await createClient();
 
   const { data, error } = await supabase
     .from('notifications')
@@ -93,9 +95,10 @@ export async function updateNotificationSentLog(
   userId: string,
   ruleType: string,
   entityId: string | null,
-  entityType?: string
+  entityType?: string,
+  options?: { supabase?: any }
 ): Promise<void> {
-  const supabase = await createClient();
+  const supabase = options?.supabase ?? await createClient();
 
   const logData: any = {
     user_id: userId,

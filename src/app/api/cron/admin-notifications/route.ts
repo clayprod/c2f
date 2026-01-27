@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getSegmentedUsers } from '@/services/notifications/adminSegmentation';
 import { createNotification } from '@/services/notifications/helper';
 
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     // Get scheduled notifications that are ready to send
     const now = new Date().toISOString();
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
         let userIds: string[];
 
         if (notification.admin_notification_segments) {
-          userIds = await getSegmentedUsers(notification.admin_notification_segments);
+          userIds = await getSegmentedUsers(notification.admin_notification_segments, { supabase });
         } else {
           // Get all users
           const { data: profiles } = await supabase
@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
                     admin_notification_id: notification.id,
                     source: 'admin',
                   },
-                });
+                }, { supabase });
 
                 if (notificationId) {
                   // Record recipient
