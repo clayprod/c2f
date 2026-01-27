@@ -22,15 +22,18 @@ export async function GET(request: NextRequest) {
 
         let redirectUrl: string;
         if (isLocalEnv) {
-          redirectUrl = `${origin}${next}`;
+          // Em desenvolvimento, usar origin (que pode ser localhost)
+          redirectUrl = `${origin.replace('0.0.0.0', 'localhost')}${next}`;
         } else if (forwardedHost) {
+          // Em produção, usar o host do forwarded header
           redirectUrl = `https://${forwardedHost}${next}`;
         } else {
+          // Fallback para origin em produção
           redirectUrl = `${origin}${next}`;
         }
 
         // Usar NextResponse.redirect com URL absoluta
-        return NextResponse.redirect(new URL(redirectUrl));
+        return NextResponse.redirect(redirectUrl);
       }
     }
   }

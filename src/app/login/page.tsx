@@ -170,9 +170,13 @@ function LoginForm() {
       const supabase = createClient();
       
       // Use NEXT_PUBLIC_APP_URL if available, otherwise fallback to window.location.origin
-      // Replace 0.0.0.0 with localhost to avoid OAuth redirect issues
       let origin = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-      if (origin.includes('0.0.0.0')) {
+      
+      // Em produção, garantir que usa o dominio correto
+      if (process.env.NODE_ENV === 'production') {
+        origin = 'https://c2finance.com.br';
+      } else if (origin.includes('0.0.0.0')) {
+        // Em desenvolvimento, substituir 0.0.0.0 por localhost
         origin = origin.replace('0.0.0.0', 'localhost');
       }
       
