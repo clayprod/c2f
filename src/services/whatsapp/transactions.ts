@@ -123,7 +123,7 @@ export async function findOrCreateCategory(
       user_id: userId,
       name: categoryName,
       type,
-      icon: type === 'income' ? 'bx-wallet' : 'bx-cart',
+      icon: type === 'income' ? 'bx-wallet' : 'bx-shopping-bag',
       color: type === 'income' ? '#22c55e' : '#ef4444',
       is_active: true,
     })

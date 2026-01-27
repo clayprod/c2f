@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { CategoryIcon } from '@/components/categories/CategoryIcon';
 
 interface Category {
   id: string;
@@ -145,7 +146,7 @@ export function CategoryMigrationModal({
                 className="w-10 h-10 rounded-lg flex items-center justify-center text-xl"
                 style={{ backgroundColor: (sourceCategory.color || '#3b82f6') + '20' }}
               >
-                {sourceCategory.icon || '📁'}
+                <CategoryIcon icon={sourceCategory.icon} />
               </div>
               <div>
                 <p className="font-medium">{sourceCategory.name}</p>
@@ -177,7 +178,7 @@ export function CategoryMigrationModal({
                   {availableCategories.map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       <div className="flex items-center gap-2">
-                        <span>{category.icon || '📁'}</span>
+                        <CategoryIcon icon={category.icon} />
                         <span>{category.name}</span>
                       </div>
                     </SelectItem>
@@ -194,7 +195,7 @@ export function CategoryMigrationModal({
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-lg"
                   style={{ backgroundColor: (selectedCategory.color || '#3b82f6') + '20' }}
                 >
-                  {selectedCategory.icon || '📁'}
+                  <CategoryIcon icon={selectedCategory.icon} />
                 </div>
                 <div>
                   <p className="text-sm font-medium">

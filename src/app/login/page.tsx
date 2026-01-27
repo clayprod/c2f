@@ -26,6 +26,10 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const next = searchParams?.get('next') || '/app';
   const { toast } = useToast();
+  
+  // Check for OAuth errors
+  const oauthError = searchParams?.get('error');
+  const oauthErrorDescription = searchParams?.get('error_description');
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || '';
   const inviteFromQuery = useMemo(
     () => searchParams?.get('invite') || searchParams?.get('token') || '',
@@ -39,6 +43,17 @@ function LoginForm() {
       return '';
     }
   }, [inviteFromQuery]);
+
+  // Show OAuth error toast if present
+  useEffect(() => {
+    if (oauthError) {
+      toast({
+        variant: "destructive",
+        title: "Erro na autenticação",
+        description: oauthErrorDescription || `Ocorreu um erro ao fazer login: ${oauthError}`,
+      });
+    }
+  }, [oauthError, oauthErrorDescription, toast]);
 
   // Verificar status de bloqueio quando email mudar
   useEffect(() => {

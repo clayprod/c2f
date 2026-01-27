@@ -4,18 +4,56 @@ import { createClient } from '@/lib/supabase/server';
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
+  const error = searchParams.get('error');
+  const errorDescription = searchParams.get('error_description');
   // Usar o parâmetro next da query string, ou padrão para /app
   const next = searchParams.get('next') || '/app';
 
-  if (code) {
-    const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+  // Log para debugging
+  console.log('Auth callback:', { 
+    url: request.url, 
+    code: code ? 'present' : 'missing', 
+    error, 
+    errorDescription, 
+    next,
+    origin 
+  });
 
-    if (!error) {
+  // Se houver erro direto do OAuth, redirecionar para login com mensagem
+  if (error) {
+    console.error('OAuth error:', error, errorDescription);
+    const loginUrl = new URL('/login', origin);
+    loginUrl.searchParams.set('error', error);
+    if (errorDescription) {
+      loginUrl.searchParams.set('error_description', errorDescription);
+    }
+    if (next !== '/app') {
+      loginUrl.searchParams.set('next', next);
+    }
+    return NextResponse.redirect(loginUrl);
+  }
+
+  if (code) {
+    try {
+      const supabase = await createClient();
+      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+
+      if (exchangeError) {
+        console.error('Exchange code error:', exchangeError);
+        throw exchangeError;
+      }
+
       // Verificar se a sessão foi estabelecida corretamente
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) {
+        console.error('Get user error:', userError);
+        throw userError;
+      }
       
       if (user) {
+        console.log('Auth successful for user:', user.id);
+        
         // Redirecionar para o destino especificado (ou /app por padrão)
         const forwardedHost = request.headers.get('x-forwarded-host');
         const isLocalEnv = process.env.NODE_ENV === 'development';
@@ -32,13 +70,17 @@ export async function GET(request: NextRequest) {
           redirectUrl = `${origin}${next}`;
         }
 
+        console.log('Redirecting to:', redirectUrl);
         // Usar NextResponse.redirect com URL absoluta
         return NextResponse.redirect(redirectUrl);
       }
+    } catch (error: any) {
+      console.error('Auth callback error:', error);
     }
   }
 
   // Retornar para página de erro se algo der errado
+  console.log('Redirecting to error page');
   return NextResponse.redirect(new URL(`${origin}/auth/auth-code-error`));
 }
 

@@ -16,6 +16,7 @@ import { useAccountContext } from '@/hooks/useAccountContext';
 import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
 import { Switch } from '@/components/ui/switch';
 import { CategoryMigrationModal } from '@/components/categories/CategoryMigrationModal';
+import { CategoryIcon } from '@/components/categories/CategoryIcon';
 
 interface Category {
   id: string;
@@ -869,7 +870,7 @@ function CategoryCard({
           className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center text-lg sm:text-xl flex-shrink-0 transition-transform group-hover:scale-110"
           style={{ backgroundColor: (category.color || '#3b82f6') + '20' }}
         >
-          {category.icon || '📁'}
+          <CategoryIcon icon={category.icon} />
         </div>
         <div className="flex-1 min-w-0 overflow-hidden">
           <div className="flex items-start gap-1.5 sm:gap-2">

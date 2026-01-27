@@ -895,7 +895,7 @@ export default function BudgetsPage() {
         {/* Compact Filters + Summary Row */}
         <div className="glass-card p-2.5 md:p-3 w-full max-w-full overflow-hidden">
           <div className="flex flex-col gap-3 w-full max-w-full min-w-0">
-            {/* Search - sempre na primeira linha */}
+            {/* Search - sempre na primeira linha, sozinha */}
             <div className="relative w-full">
               <i className='bx bx-search absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-sm'></i>
               <input
