@@ -60,4 +60,4 @@ A aplicação é totalmente containerizada. O `Dockerfile` utiliza uma abordagem
 
 ## Arquitetura
 
-A aplicação utiliza o **App Router** do Next.js para uma arquitetura moderna no frontend e backend. A segurança é um pilar fundamental, com o banco de dados Supabase protegido por **Row Level Security (RLS)**, garantindo que os usuários só possam acessar seus próprios dados. A containerização com Docker assegura um ambiente consistente e replicável tanto para desenvolvimento quanto para produção.
+A aplicação utiliza o **App Router** do Next.js para uma arquitetura moderna no frontend e backend. A segurança é um pilar fundamental, com o banco de dados Supabase protegido por **Row Level Security (RLS)**, garantindo que os usuários só possam acessar seus próprios dados. A containerização com Docker assegura um ambiente consistente e replicável tanto para desenvolvimento quanto para produção.empty change
