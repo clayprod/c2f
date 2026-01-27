@@ -86,3 +86,4 @@ COMMENT ON VIEW public.transactions_decrypted IS 'View with decrypted transactio
 
 
 
+

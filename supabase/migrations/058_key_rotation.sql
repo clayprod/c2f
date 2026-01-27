@@ -98,3 +98,4 @@ COMMENT ON FUNCTION rotate_encryption_key() IS 'Rotates encryption key and marks
 
 
 
+

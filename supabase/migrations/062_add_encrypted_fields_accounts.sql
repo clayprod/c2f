@@ -174,3 +174,4 @@ COMMENT ON COLUMN public.pluggy_transactions.description_encrypted IS 'Encrypted
 
 
 
+

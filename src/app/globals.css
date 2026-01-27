@@ -576,6 +576,11 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  /* Reduzir fontes em 5% apenas no conteúdo principal (não nos menus) */
+  .app-content-scaled {
+    font-size: 95%;
+  }
 }
 
 /* Blog Content Styles - Ensure proper colors in both themes */

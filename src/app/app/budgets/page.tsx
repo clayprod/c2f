@@ -841,16 +841,16 @@ export default function BudgetsPage() {
 
   return (
     <PlanGuard minPlan="pro">
-      <div className="space-y-3 md:space-y-4 max-w-full overflow-x-hidden">
+      <div className="space-y-3 md:space-y-4 w-full overflow-x-hidden">
         {/* Compact Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 max-w-full">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full min-w-0 overflow-hidden">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <div className="min-w-0">
-              <h1 className="font-display text-lg md:text-xl lg:text-2xl font-bold">Orçamentos</h1>
-              <p className="text-muted-foreground text-xs md:text-sm">Limites e acompanhamento</p>
+              <h1 className="font-display text-lg md:text-xl lg:text-2xl font-bold truncate">Orçamentos</h1>
+              <p className="text-muted-foreground text-xs md:text-sm truncate">Limites e acompanhamento</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
+          <div className="flex items-center gap-2 flex-wrap flex-shrink-0 min-w-0">
             <MonthYearPicker
               value={selectedMonth}
               onChange={setSelectedMonth}
@@ -893,64 +893,67 @@ export default function BudgetsPage() {
         </div>
 
         {/* Compact Filters + Summary Row */}
-        <div className="glass-card p-2.5 md:p-3 max-w-full overflow-x-hidden">
-          <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 max-w-full">
-            {/* Search */}
-            <div className="relative flex-1 min-w-0 md:max-w-xs">
+        <div className="glass-card p-2.5 md:p-3 w-full max-w-full overflow-hidden">
+          <div className="flex flex-col gap-3 w-full max-w-full min-w-0">
+            {/* Search - sempre na primeira linha */}
+            <div className="relative w-full">
               <i className='bx bx-search absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-sm'></i>
               <input
                 type="text"
                 placeholder="Buscar..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full max-w-full pl-8 pr-3 py-1.5 text-sm rounded-md bg-muted/50 border border-border focus:border-primary focus:outline-none"
+                className="w-full min-w-0 max-w-full pl-8 pr-3 py-1.5 text-sm rounded-md bg-muted/50 border border-border focus:border-primary focus:outline-none"
               />
             </div>
             
-            {/* Filter pills - compact */}
-            <div className="flex gap-1.5 overflow-x-auto scrollbar-hide flex-shrink-0 max-w-full">
-              {[
-                { key: 'all', label: 'Todas' },
-                { key: 'general', label: 'Gerais' },
-                { key: 'credit_card', label: '💳' },
-                { key: 'investment', label: '📊' },
-                { key: 'goal', label: '🎯' },
-                { key: 'debt', label: '📋' },
-              ].map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setFilterSource(key as typeof filterSource)}
-                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors flex-shrink-0 whitespace-nowrap ${
-                    filterSource === key
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted/50 hover:bg-muted'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {/* Divider */}
-            <div className="hidden md:block w-px h-6 bg-border flex-shrink-0" />
-
-            {/* Summary inline - compact */}
-            <div className="flex items-center gap-2 md:gap-3 lg:gap-4 text-[10px] sm:text-xs md:text-sm overflow-x-auto scrollbar-hide flex-shrink-0">
-              <div className="flex items-center gap-1 flex-shrink-0">
-                <i className='bx bx-trending-up text-positive text-xs md:text-sm'></i>
-                <span className="text-muted-foreground hidden sm:inline">Receitas:</span>
-                <span className="font-semibold text-positive whitespace-nowrap">{formatCurrencyReais(incomeActual)}</span>
-                <span className="text-muted-foreground whitespace-nowrap hidden md:inline">/ {formatCurrencyReais(incomePlanned)}</span>
+            {/* Filters and Summary - sempre na segunda linha */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full min-w-0">
+              {/* Filter pills - compact */}
+              <div className="flex gap-1.5 overflow-x-auto scrollbar-hide shrink-0">
+                {[
+                  { key: 'all', label: 'Todas' },
+                  { key: 'general', label: 'Gerais' },
+                  { key: 'credit_card', label: '💳' },
+                  { key: 'investment', label: '📊' },
+                  { key: 'goal', label: '🎯' },
+                  { key: 'debt', label: '📋' },
+                ].map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setFilterSource(key as typeof filterSource)}
+                    className={`px-2.5 py-1 rounded text-xs font-medium transition-colors shrink-0 whitespace-nowrap ${
+                      filterSource === key
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted/50 hover:bg-muted'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
-              <div className="flex items-center gap-1 flex-shrink-0">
-                <i className='bx bx-trending-down text-negative text-xs md:text-sm'></i>
-                <span className="text-muted-foreground hidden sm:inline">Despesas:</span>
-                <span className="font-semibold text-negative whitespace-nowrap">{formatCurrencyReais(expenseActual)}</span>
-                <span className="text-muted-foreground whitespace-nowrap hidden md:inline">/ {formatCurrencyReais(expensePlanned)}</span>
-              </div>
-              <div className={`flex items-center gap-1 font-semibold flex-shrink-0 ${(expensePlanned - expenseActual) >= 0 ? 'text-positive' : 'text-negative'}`}>
-                <span className="text-muted-foreground hidden sm:inline">Livre:</span>
-                <span className="whitespace-nowrap">{formatCurrencyReais(expensePlanned - expenseActual)}</span>
+
+              {/* Divider - apenas em desktop */}
+              <div className="hidden sm:block w-px h-6 bg-border shrink-0" />
+
+              {/* Summary - quebra em linhas no mobile, horizontal no desktop */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 md:gap-4 w-full min-w-0 overflow-x-auto scrollbar-hide">
+                <div className="flex items-center gap-1 shrink-0 text-xs sm:text-xs md:text-sm">
+                  <i className='bx bx-trending-up text-positive text-xs sm:text-sm'></i>
+                  <span className="text-muted-foreground">Receitas:</span>
+                  <span className="font-semibold text-positive whitespace-nowrap">{formatCurrencyReais(incomeActual)}</span>
+                  <span className="text-muted-foreground whitespace-nowrap hidden sm:inline">/ {formatCurrencyReais(incomePlanned)}</span>
+                </div>
+                <div className="flex items-center gap-1 shrink-0 text-xs sm:text-xs md:text-sm">
+                  <i className='bx bx-trending-down text-negative text-xs sm:text-sm'></i>
+                  <span className="text-muted-foreground">Despesas:</span>
+                  <span className="font-semibold text-negative whitespace-nowrap">{formatCurrencyReais(expenseActual)}</span>
+                  <span className="text-muted-foreground whitespace-nowrap hidden sm:inline">/ {formatCurrencyReais(expensePlanned)}</span>
+                </div>
+                <div className={`flex items-center gap-1 font-semibold shrink-0 text-xs sm:text-xs md:text-sm ${(expensePlanned - expenseActual) >= 0 ? 'text-positive' : 'text-negative'}`}>
+                  <span className="text-muted-foreground">Livre:</span>
+                  <span className="whitespace-nowrap">{formatCurrencyReais(expensePlanned - expenseActual)}</span>
+                </div>
               </div>
             </div>
           </div>

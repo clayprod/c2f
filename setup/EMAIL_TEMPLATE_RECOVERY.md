@@ -191,3 +191,4 @@ Após configurar o template:
 - **Redireciona para lugar errado**: Verifique o parâmetro `next=/reset-password`
 - **Email não chega**: Veja o guia `EMAIL_SMTP_SETUP.md`
 
+

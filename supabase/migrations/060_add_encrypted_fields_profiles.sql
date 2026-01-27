@@ -120,3 +120,4 @@ COMMENT ON VIEW public.profiles_decrypted IS 'View with decrypted profile data f
 
 
 
+
