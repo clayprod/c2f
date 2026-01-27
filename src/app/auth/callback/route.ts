@@ -10,13 +10,13 @@ export async function GET(request: NextRequest) {
   const next = searchParams.get('next') || '/app';
 
   // Log para debugging
-  console.log('Auth callback:', { 
-    url: request.url, 
-    code: code ? 'present' : 'missing', 
-    error, 
-    errorDescription, 
+  console.log('Auth callback:', {
+    url: request.url,
+    code: code ? 'present' : 'missing',
+    error,
+    errorDescription,
     next,
-    origin 
+    origin
   });
 
   // Se houver erro direto do OAuth, redirecionar para login com mensagem
@@ -45,35 +45,32 @@ export async function GET(request: NextRequest) {
 
       // Verificar se a sessão foi estabelecida corretamente
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
+
       if (userError) {
         console.error('Get user error:', userError);
         throw userError;
       }
-      
+
       if (user) {
         console.log('Auth successful for user:', user.id);
-        
+
         // Redirecionar para o destino especificado (ou /app por padrão)
+        // Em produção, forçar o domínio correto para evitar problemas
         let redirectUrl: string;
         
-        // Em produção, forçar o domínio correto
         if (process.env.NODE_ENV === 'production' || origin.includes('c2finance.com.br')) {
           redirectUrl = `https://c2finance.com.br${next}`;
         } else {
-          // Em desenvolvimento, tratar localhost
-          const devOrigin = origin.includes('0.0.0.0') ? origin.replace('0.0.0.0', 'localhost') : origin;
-          redirectUrl = `${devOrigin}${next}`;
+          // Em desenvolvimento, tratar localhost/0.0.0.0
+          let redirectBase = origin;
+          if (redirectBase.includes('0.0.0.0')) {
+            redirectBase = redirectBase.replace('0.0.0.0', 'localhost');
+          }
+          redirectUrl = new URL(next, redirectBase).toString();
         }
 
-        console.log('Environment check:', { 
-          origin, 
-          next, 
-          redirectUrl 
-        });
         console.log('Redirecting to:', redirectUrl);
-        // Usar NextResponse.redirect com URL absoluta
-        return NextResponse.redirect(redirectUrl);
+        return NextResponse.redirect(new URL(redirectUrl));
       }
     } catch (error: any) {
       console.error('Auth callback error:', error);
@@ -82,6 +79,9 @@ export async function GET(request: NextRequest) {
 
   // Retornar para página de erro se algo der errado
   console.log('No code or error occurred, redirecting to error page. Origin:', origin);
-  return NextResponse.redirect(new URL(`${origin}/auth/auth-code-error`));
+  const errorUrl = process.env.NODE_ENV === 'production' 
+    ? 'https://c2finance.com.br/auth/auth-code-error'
+    : `${origin}/auth/auth-code-error`;
+  return NextResponse.redirect(new URL(errorUrl));
 }
 
