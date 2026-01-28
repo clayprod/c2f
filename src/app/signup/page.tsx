@@ -407,7 +407,7 @@ function SignupPageContent() {
           title: 'Verifique seu email',
           description: 'Enviamos um link de confirmação para ativar sua conta.',
         });
-        router.push('/auth/check-email');
+        router.push(`/auth/check-email?email=${encodeURIComponent(email)}`);
         router.refresh();
         return;
       }

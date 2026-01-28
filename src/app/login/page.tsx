@@ -170,10 +170,31 @@ function LoginForm() {
       }
       router.refresh();
     } catch (error: any) {
+      // Traduzir mensagens de erro comuns do Supabase
+      let errorMessage = "Credenciais inválidas. Verifique seu email e senha.";
+      
+      if (error.message) {
+        const errorMsg = error.message.toLowerCase();
+        if (errorMsg.includes('invalid login credentials') || errorMsg.includes('email not confirmed')) {
+          errorMessage = "Credenciais inválidas. Verifique seu email e senha.";
+        } else if (errorMsg.includes('email not confirmed')) {
+          errorMessage = "Email não confirmado. Verifique sua caixa de entrada.";
+        } else if (errorMsg.includes('too many requests')) {
+          errorMessage = "Muitas tentativas. Aguarde alguns instantes antes de tentar novamente.";
+        } else if (errorMsg.includes('user not found')) {
+          errorMessage = "Usuário não encontrado. Verifique seu email.";
+        } else if (errorMsg.includes('incorrect password')) {
+          errorMessage = "Senha incorreta. Verifique sua senha ou use 'Esqueceu a senha?'.";
+        } else {
+          // Para outros erros, usar mensagem genérica em português
+          errorMessage = "Não foi possível fazer login. Tente novamente.";
+        }
+      }
+
       toast({
         variant: "destructive",
         title: "Falha na autenticação",
-        description: error.message || "Credenciais inválidas. Verifique seu email e senha.",
+        description: errorMessage,
       });
       setTurnstileToken(null); // Reset captcha token on error
     } finally {

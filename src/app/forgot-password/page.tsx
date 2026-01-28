@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useLogo } from '@/hooks/useLogo';
@@ -10,9 +10,27 @@ import { useToast } from '@/hooks/use-toast';
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const { toast } = useToast();
   const logo = useLogo();
+
+  // Cooldown timer
+  useEffect(() => {
+    if (cooldownSeconds <= 0) return;
+
+    const timer = setInterval(() => {
+      setCooldownSeconds((prev) => {
+        if (prev <= 1) {
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [cooldownSeconds]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,6 +45,7 @@ export default function ForgotPasswordPage() {
       if (error) throw error;
 
       setEmailSent(true);
+      setCooldownSeconds(60); // Iniciar cooldown após envio inicial
       toast({
         title: "Email enviado!",
         description: "Verifique sua caixa de entrada para redefinir sua senha.",
@@ -39,6 +58,48 @@ export default function ForgotPasswordPage() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendPasswordReset = async () => {
+    if (!email) {
+      toast({
+        variant: 'destructive',
+        title: 'Email não encontrado',
+        description: 'Por favor, digite seu email novamente.',
+      });
+      return;
+    }
+
+    setResendLoading(true);
+    try {
+      const response = await fetch('/api/auth/resend-password-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao reenviar email');
+      }
+
+      toast({
+        title: 'Email reenviado!',
+        description: 'Verifique sua caixa de entrada e spam.',
+      });
+
+      // Iniciar cooldown de 60 segundos
+      setCooldownSeconds(60);
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao reenviar email',
+        description: error.message || 'Não foi possível reenviar o email. Tente novamente.',
+      });
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -84,7 +145,17 @@ export default function ForgotPasswordPage() {
               </div>
               <div className="pt-4 space-y-3">
                 <button
-                  onClick={() => setEmailSent(false)}
+                  onClick={handleResendPasswordReset}
+                  className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border hover:bg-muted transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={resendLoading || cooldownSeconds > 0}
+                >
+                  {resendLoading ? 'Enviando...' : cooldownSeconds > 0 ? `Aguarde ${cooldownSeconds}s` : 'Enviar novamente'}
+                </button>
+                <button
+                  onClick={() => {
+                    setEmailSent(false);
+                    setCooldownSeconds(0);
+                  }}
                   className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border hover:bg-muted transition-colors text-sm"
                 >
                   Enviar para outro email
