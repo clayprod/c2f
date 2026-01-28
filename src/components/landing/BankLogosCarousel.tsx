@@ -38,8 +38,11 @@ const BankLogosCarousel = () => {
           alt={`Banco ${icon}`}
           width={80}
           height={80}
-          className={`w-16 h-16 md:w-20 md:h-20 object-contain transition-all duration-300 ${!isColored ? 'brightness-0 dark:invert' : ''
-            }`}
+          className={`w-16 h-16 md:w-20 md:h-20 object-contain transition-all duration-300 ${!isColored ? '' : ''}`}
+          style={!isColored ? { 
+            filter: 'brightness(0) saturate(100%) invert(70%) sepia(100%) saturate(2000%) hue-rotate(160deg) brightness(1.3) contrast(1.4) drop-shadow(0 0 2px rgba(0, 255, 255, 0.2)) drop-shadow(0 0 4px rgba(0, 255, 255, 0.15))',
+            WebkitFilter: 'brightness(0) saturate(100%) invert(70%) sepia(100%) saturate(2000%) hue-rotate(160deg) brightness(1.3) contrast(1.4) drop-shadow(0 0 2px rgba(0, 255, 255, 0.2)) drop-shadow(0 0 4px rgba(0, 255, 255, 0.15))'
+          } : undefined}
         />
       </div>
     );

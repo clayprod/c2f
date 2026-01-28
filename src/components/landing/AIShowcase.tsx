@@ -79,11 +79,11 @@ const AIShowcase = () => {
         </div>
 
         {/* Main Content - Chat + Phone + Features */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center mb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-center mb-12 max-w-5xl mx-auto">
           
           {/* Left: Chat Simulation */}
-          <div className="order-2 lg:order-1">
-            <div className="glass-card p-4 md:p-6 max-w-md mx-auto lg:mx-0">
+          <div className="order-2 lg:order-1 flex justify-center lg:justify-end">
+            <div className="glass-card p-4 md:p-6 max-w-md w-full">
               {/* Chat Header */}
               <div className="flex items-center gap-3 mb-4 pb-4 border-b border-border">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-r from-secondary to-primary flex items-center justify-center">
@@ -156,7 +156,7 @@ const AIShowcase = () => {
           </div>
 
           {/* Right: Smartphone with WhatsApp */}
-          <div className="order-1 lg:order-2 flex justify-center">
+          <div className="order-1 lg:order-2 flex justify-center lg:justify-start">
             <div className="relative">
               {/* Phone Frame */}
               <div className="relative w-[280px] md:w-[320px] bg-zinc-900 rounded-[45px] p-3 shadow-2xl">
