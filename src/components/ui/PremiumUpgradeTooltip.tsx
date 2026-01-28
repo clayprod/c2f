@@ -89,7 +89,7 @@ export function PremiumUpgradeTooltip({
             showTimeoutRef.current = null;
         }
 
-        // 2 second delay as requested
+        // Delay reduzido para ocultar mais rápido após mouse sair
         if (isVisible) {
             hideTimeoutRef.current = setTimeout(() => {
                 if (!isInteracting) {
@@ -97,7 +97,7 @@ export function PremiumUpgradeTooltip({
                     setIsFrozen(false);
                 }
                 hideTimeoutRef.current = null;
-            }, 2000);
+            }, 800);
         }
     };
 
@@ -126,7 +126,7 @@ export function PremiumUpgradeTooltip({
                     setIsVisible(false);
                     setIsFrozen(false);
                     hideTimeoutRef.current = null;
-                }, 2000);
+                }, 800);
             }}
         >
             {/* Hitbox bridge - wider and higher to catch the mouse */}

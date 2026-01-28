@@ -235,15 +235,7 @@ export function CompleteProfileDialog({ open, onComplete }: CompleteProfileDialo
       return;
     }
 
-    const monthlyIncomeCents = parseCurrencyToCents(monthlyIncome);
-    if (!monthlyIncome || monthlyIncomeCents <= 0) {
-      toast({
-        variant: "destructive",
-        title: "Renda mensal obrigatoria",
-        description: "Por favor, informe sua renda media mensal",
-      });
-      return;
-    }
+    const monthlyIncomeCents = monthlyIncome ? parseCurrencyToCents(monthlyIncome) : null;
 
     setLoading(true);
 
@@ -263,7 +255,7 @@ export function CompleteProfileDialog({ open, onComplete }: CompleteProfileDialo
           cep: cep || null,
           birth_date: birthDate ? birthDate.toISOString().split('T')[0] : null,
           gender: gender || null,
-          monthly_income_cents: monthlyIncomeCents,
+          monthly_income_cents: monthlyIncomeCents || null,
         })
         .eq('id', user.id);
 
@@ -410,7 +402,7 @@ export function CompleteProfileDialog({ open, onComplete }: CompleteProfileDialo
 
           <div>
             <label htmlFor="monthlyIncome" className="block text-sm font-medium mb-2">
-              Renda Media Mensal <span className="text-destructive">*</span>
+              Renda Media Mensal (opcional)
             </label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none select-none">
@@ -432,12 +424,11 @@ export function CompleteProfileDialog({ open, onComplete }: CompleteProfileDialo
                 }}
                 className="w-full pl-12 pr-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
                 placeholder="0,00"
-                required
                 disabled={loading}
               />
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Com base nisso, criaremos automaticamente um objetivo de Reserva de Emergencia
+              Se informado, criaremos automaticamente um objetivo de Reserva de Emergencia
             </p>
           </div>
 

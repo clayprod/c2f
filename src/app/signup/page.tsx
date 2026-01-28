@@ -348,15 +348,7 @@ function SignupPageContent() {
       return;
     }
 
-    const monthlyIncomeCents = parseCurrencyToCents(monthlyIncome);
-    if (!monthlyIncome || monthlyIncomeCents <= 0) {
-      toast({
-        variant: "destructive",
-        title: "Renda mensal obrigatória",
-        description: "Por favor, informe sua renda média mensal",
-      });
-      return;
-    }
+    const monthlyIncomeCents = monthlyIncome ? parseCurrencyToCents(monthlyIncome) : null;
 
     if (isPasswordMismatch) {
       return;
@@ -395,7 +387,7 @@ function SignupPageContent() {
             cep: cep || null,
             birth_date: birthDate ? birthDate.toISOString().split('T')[0] : null,
             gender: gender || null,
-            monthly_income_cents: monthlyIncomeCents,
+            monthly_income_cents: monthlyIncomeCents || null,
           },
         },
       });
@@ -438,20 +430,22 @@ function SignupPageContent() {
       // Wait for profile to be created by trigger
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Update profile with monthly income if user was created
+      // Update profile with monthly income if user was created and income was provided
       if (signUpData.user) {
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ monthly_income_cents: monthlyIncomeCents })
-          .eq('id', signUpData.user.id);
+        if (monthlyIncomeCents) {
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ monthly_income_cents: monthlyIncomeCents })
+            .eq('id', signUpData.user.id);
 
-        if (updateError) {
-          console.error('Error updating monthly income:', updateError);
-          // Don't throw, continue with signup
-        } else {
-          // Call setup_new_user to create emergency fund goal
-          await supabase.rpc('setup_new_user', { p_user_id: signUpData.user.id });
+          if (updateError) {
+            console.error('Error updating monthly income:', updateError);
+            // Don't throw, continue with signup
+          }
         }
+        
+        // Call setup_new_user to create emergency fund goal (only if income is set)
+        await supabase.rpc('setup_new_user', { p_user_id: signUpData.user.id });
       }
 
       router.push('/app');
@@ -754,7 +748,7 @@ function SignupPageContent() {
 
             <div>
               <label htmlFor="monthlyIncome" className="block text-sm font-medium mb-2">
-                Renda Média Mensal <span className="text-destructive">*</span>
+                Renda Média Mensal (opcional)
               </label>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none select-none">
@@ -779,12 +773,11 @@ function SignupPageContent() {
                   }}
                   className="w-full pl-12 pr-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
                   placeholder="0,00"
-                  required
                   disabled={loading}
                 />
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Com base nisso, criaremos automaticamente um objetivo de Reserva de Emergência
+                Se informado, criaremos automaticamente um objetivo de Reserva de Emergência
               </p>
             </div>
 

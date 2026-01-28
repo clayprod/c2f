@@ -830,7 +830,7 @@ function SettingsPageContent() {
                       />
                     </div>
                     <p className="text-[10px] md:text-xs text-muted-foreground mt-1">
-                      Com base nisso, atualizaremos automaticamente o objetivo de Reserva de Emergência (6x a renda mensal)
+                      Se informado, atualizaremos automaticamente o objetivo de Reserva de Emergência (6x a renda mensal)
                     </p>
                   </div>
 

@@ -31,14 +31,13 @@ export function ProfileCompletionCheck() {
         // Verificar se perfil esta incompleto
         const { data: profile } = await supabase
           .from('profiles')
-          .select('city, state, monthly_income_cents')
+          .select('city, state')
           .eq('id', user.id)
           .single();
 
         const isProfileIncomplete = !profile ||
           !profile.city ||
-          !profile.state ||
-          !profile.monthly_income_cents;
+          !profile.state;
 
         if (isProfileIncomplete) {
           setShowDialog(true);

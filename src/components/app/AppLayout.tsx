@@ -264,7 +264,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         }
         setPlanFeatures(fetchedFeatures);
 
-        const isProfileIncomplete = !profile?.city || !profile?.state || !profile?.monthly_income_cents;
+        const isProfileIncomplete = !profile?.city || !profile?.state;
         setShowCompleteProfile(!!isProfileIncomplete);
 
         if (profile) {
