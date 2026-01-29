@@ -4,6 +4,12 @@ import { createClient } from '@/lib/supabase/server';
 import { parseCSV } from '@/services/import/csvParser';
 import { createErrorResponse } from '@/lib/errors';
 import { projectionCache } from '@/services/projections/cache';
+import {
+  matchTransactions,
+  createCategories,
+  updateTransactionsWithNewCategories,
+  type CategoryToCreate,
+} from '@/services/import/categoryMatcher';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,10 +19,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { csv_content, account_id, categories, selected_ids } = body as {
+    const { csv_content, account_id, categories_to_create, selected_ids } = body as {
       csv_content: string;
       account_id?: string;
-      categories?: Record<string, string>;
+      categories_to_create?: CategoryToCreate[];
       selected_ids?: string[];
     };
 
@@ -71,7 +77,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Get or create default account
+    // Get or create default account - always use the selected account
     let defaultAccountId = account_id;
     if (!defaultAccountId) {
       const { data: accounts } = await supabase
@@ -106,20 +112,50 @@ export async function POST(request: NextRequest) {
     }
 
     // Get existing categories
-    const categoryMap = new Map<string, string>();
     const { data: existingCategories } = await supabase
       .from('categories')
       .select('id, name, type')
       .eq('user_id', userId);
 
-    if (existingCategories) {
-      for (const cat of existingCategories) {
-        categoryMap.set(`${cat.name.toLowerCase()}_${cat.type}`, cat.id);
-        categoryMap.set(cat.id, cat.id); // Also allow by ID
+    // Step 1: Match transactions with existing categories
+    const matchingResult = matchTransactions(
+      transactionsToImport.map((tx, index) => ({
+        id: tx.id || `csv-${index}`,
+        description: tx.description,
+        amount: tx.amount,
+        date: tx.date,
+        type: tx.type,
+        categoryName: tx.categoryName,
+        accountName: tx.accountName,
+      })),
+      existingCategories || [],
+      [], // We don't need accounts here, we use the selected one
+      defaultAccountId
+    );
+
+    // Step 2: Create categories that need to be created
+    let finalTransactions = matchingResult.transactions;
+    
+    if (categories_to_create && categories_to_create.length > 0) {
+      try {
+        const createdCategoriesMap = await createCategories(
+          categories_to_create,
+          userId,
+          supabase
+        );
+        
+        // Update transactions with newly created category IDs
+        finalTransactions = updateTransactionsWithNewCategories(
+          matchingResult.transactions,
+          createdCategoriesMap
+        );
+      } catch (error) {
+        console.error('Error creating categories:', error);
+        errors.push('Erro ao criar algumas categorias');
       }
     }
 
-    // Get or create fallback category
+    // Step 3: Get or create fallback category
     let fallbackCategoryId: string | undefined = undefined;
     const { data: outrosCategory } = await supabase
       .from('categories')
@@ -148,8 +184,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Process transactions
-    for (const tx of transactionsToImport) {
+    // Step 4: Process transactions
+    for (const tx of finalTransactions) {
       try {
         // Check for duplicates
         const { data: existingById } = await supabase
@@ -182,37 +218,8 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Determine category - priority: 1) provided by user, 2) from CSV, 3) fallback
-        let categoryId = categories?.[tx.id];
-        
-        if (!categoryId) {
-          const categoryKey = `${tx.categoryName.toLowerCase()}_${tx.type}`;
-          categoryId = categoryMap.get(categoryKey);
-          
-          // If category from CSV doesn't exist, create it
-          if (!categoryId && tx.categoryName && tx.categoryName.toLowerCase() !== 'outros') {
-            const { data: newCategory } = await supabase
-              .from('categories')
-              .insert({
-                user_id: userId,
-                name: tx.categoryName,
-                type: tx.type,
-                icon: tx.type === 'income' ? '💰' : '💸',
-                color: tx.type === 'income' ? '#22c55e' : '#ef4444',
-              })
-              .select()
-              .single();
-
-            if (newCategory) {
-              categoryId = newCategory.id;
-              categoryMap.set(categoryKey, newCategory.id);
-            }
-          }
-        }
-
-        if (!categoryId) {
-          categoryId = fallbackCategoryId;
-        }
+        // Use transaction's category_id or fallback
+        const categoryId = tx.category_id || fallbackCategoryId;
 
         // Insert transaction
         const { error: txError } = await supabase

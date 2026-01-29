@@ -39,7 +39,7 @@ CREATE POLICY "users_view_own_buffer" ON whatsapp_conversation_buffer
     EXISTS (
       SELECT 1 FROM profiles
       WHERE profiles.id = auth.uid()
-      AND profiles.is_admin = true
+      AND profiles.role = 'admin'
     )
   );
 
@@ -50,7 +50,7 @@ CREATE POLICY "service_role_manage_buffer" ON whatsapp_conversation_buffer
     EXISTS (
       SELECT 1 FROM profiles
       WHERE profiles.id = auth.uid()
-      AND profiles.is_admin = true
+      AND profiles.role = 'admin'
     )
   );
 

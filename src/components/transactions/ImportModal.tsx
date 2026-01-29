@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -14,7 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import ImportGuide from './ImportGuide';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrencyValue, formatDate } from '@/lib/utils';
 
 interface ImportModalProps {
   open: boolean;
@@ -35,13 +35,24 @@ interface ParsedTransaction {
   date: string;
   description: string;
   amount: number;
+  type: 'income' | 'expense';
   selected: boolean;
   category_id: string | null;
+  category_name: string | null;
+  account_id: string | null;
+  needs_category_creation: boolean;
   ai_suggested: boolean;
   ai_confidence?: 'low' | 'medium' | 'high';
   // Open Finance metadata
   link_id?: string;
   account_name?: string;
+}
+
+interface PreviewStats {
+  total: number;
+  with_category: number;
+  needs_creation: number;
+  ai_suggested: number;
 }
 
 type ImportType = 'csv' | 'ofx' | 'openfinance';
@@ -71,6 +82,13 @@ export default function ImportModal({
   const [transactions, setTransactions] = useState<ParsedTransaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectAll, setSelectAll] = useState(true);
+  const [previewStats, setPreviewStats] = useState<PreviewStats | null>(null);
+  
+  // Refs for abort control and request tracking
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef<number>(0);
+  const isMountedRef = useRef<boolean>(true);
+  
   // Open Finance states
   const [openFinanceAvailable, setOpenFinanceAvailable] = useState(false);
   const [openFinanceLoading, setOpenFinanceLoading] = useState(false);
@@ -88,6 +106,23 @@ export default function ImportModal({
     };
   }>({ status: 'idle' });
   const { toast } = useToast();
+
+  // Cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
+  // Cleanup when modal closes
+  useEffect(() => {
+    if (!open) {
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = null;
+    }
+  }, [open]);
 
   // Fetch categories and check Open Finance availability when modal opens
   useEffect(() => {
@@ -170,6 +205,11 @@ export default function ImportModal({
   };
 
   const handlePreview = async () => {
+    // Cancel any pending request
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
+    const currentRequestId = ++requestIdRef.current;
+
     // Handle Open Finance import
     if (importType === 'openfinance') {
       await fetchOpenFinanceTransactions();
@@ -192,9 +232,14 @@ export default function ImportModal({
 
       const fileContent = await file.text();
 
+      // Check if component is still mounted and request is still valid
+      if (!isMountedRef.current || currentRequestId !== requestIdRef.current) {
+        return;
+      }
+
       setProgress({ status: 'processing', message: 'Analisando transações...' });
 
-      // Call preview API
+      // Call preview API with account_id
       const endpoint = importType === 'csv' ? '/api/import/csv/preview' : '/api/import/ofx/preview';
       const bodyKey = importType === 'csv' ? 'csv_content' : 'ofx_content';
 
@@ -205,7 +250,13 @@ export default function ImportModal({
           [bodyKey]: fileContent,
           account_id: selectedAccountId || undefined,
         }),
+        signal: abortControllerRef.current.signal,
       });
+
+      // Check if request was cancelled or component unmounted
+      if (!isMountedRef.current || currentRequestId !== requestIdRef.current) {
+        return;
+      }
 
       const data = await res.json();
 
@@ -215,26 +266,45 @@ export default function ImportModal({
 
       // Convert to ParsedTransaction format
       const parsedTransactions: ParsedTransaction[] = (data.transactions || []).map(
-        (tx: any, index: number) => ({
-          id: tx.id || `tx-${index}`,
+        (tx: any) => ({
+          id: tx.id,
           date: tx.date,
           description: tx.description,
           amount: tx.amount,
+          type: tx.type,
           selected: true,
-          category_id: null,
-          ai_suggested: false,
+          category_id: tx.category_id || null,
+          category_name: tx.category_name || null,
+          account_id: tx.account_id || null,
+          needs_category_creation: tx.needs_category_creation || false,
+          ai_suggested: tx.ai_suggested || false,
+          ai_confidence: tx.ai_confidence,
         })
       );
 
       setTransactions(parsedTransactions);
+      setPreviewStats(data.stats || null);
       setStep('preview');
       setProgress({ status: 'idle' });
 
-      // Auto-categorize with AI
-      if (parsedTransactions.length > 0) {
-        await categorizeWithAI(parsedTransactions);
+      // Show toast with categorization stats
+      if (data.stats) {
+        const { with_category, needs_creation, ai_suggested } = data.stats;
+        if (with_category > 0) {
+          toast({
+            title: 'Categorização automática',
+            description: `${with_category} transações já categorizadas${
+              ai_suggested > 0 ? `, ${ai_suggested} sugeridas pela IA` : ''
+            }${needs_creation > 0 ? `, ${needs_creation} novas categorias` : ''}`,
+          });
+        }
       }
     } catch (error: any) {
+      // Ignore abort errors
+      if (error.name === 'AbortError') {
+        return;
+      }
+
       setProgress({
         status: 'error',
         message: error.message || `Erro ao processar ${importType.toUpperCase()}`,
@@ -286,8 +356,12 @@ export default function ImportModal({
           date: tx.date,
           description: tx.description,
           amount: signedAmount,
+          type: tx.type === 'debit' ? 'expense' : 'income',
           selected: true,
           category_id: null,
+          category_name: null,
+          account_id: null,
+          needs_category_creation: false,
           ai_suggested: false,
           // Store link metadata for import
           link_id: tx.link_id,
@@ -319,21 +393,39 @@ export default function ImportModal({
     }
   };
 
-  const categorizeWithAI = async (txs: ParsedTransaction[]) => {
+  const categorizeWithAI = useCallback(async (txs: ParsedTransaction[]) => {
+    // Cancel any pending request
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
+    const currentRequestId = ++requestIdRef.current;
+
+    // Only categorize transactions without category
+    const needingCategorization = txs.filter(tx => !tx.category_id);
+    
+    if (needingCategorization.length === 0) {
+      return;
+    }
+
     setCategorizing(true);
     try {
       const res = await fetch('/api/ai/categorize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          transactions: txs.map(tx => ({
+          transactions: needingCategorization.map(tx => ({
             id: tx.id,
             description: tx.description,
             amount: tx.amount,
             date: tx.date,
           })),
         }),
+        signal: abortControllerRef.current.signal,
       });
+
+      // Check if request was cancelled
+      if (!isMountedRef.current || currentRequestId !== requestIdRef.current) {
+        return;
+      }
 
       if (!res.ok) {
         console.warn('AI categorization failed');
@@ -355,6 +447,11 @@ export default function ImportModal({
       // Update transactions with AI suggestions
       setTransactions(prev =>
         prev.map(tx => {
+          // Only update if this transaction was in the batch
+          if (!needingCategorization.find(t => t.id === tx.id)) {
+            return tx;
+          }
+
           const aiResult = categorizationMap.get(tx.id) as any;
           if (aiResult && aiResult.category) {
             const categoryId = categoryNameMap.get(aiResult.category.toLowerCase());
@@ -362,6 +459,7 @@ export default function ImportModal({
               return {
                 ...tx,
                 category_id: categoryId,
+                category_name: aiResult.category,
                 ai_suggested: true,
                 ai_confidence: aiResult.confidence,
               };
@@ -373,14 +471,18 @@ export default function ImportModal({
 
       toast({
         title: 'Categorização automática',
-        description: 'Transações categorizadas pela IA. Você pode ajustar antes de importar.',
+        description: `${needingCategorization.length} transações categorizadas pela IA. Você pode ajustar antes de importar.`,
       });
     } catch (error: any) {
+      // Ignore abort errors
+      if (error.name === 'AbortError') {
+        return;
+      }
       console.error('Error categorizing:', error);
     } finally {
       setCategorizing(false);
     }
-  };
+  }, [categories, toast]);
 
   const handleImport = async () => {
     const selectedTransactions = transactions.filter(tx => tx.selected);
@@ -410,6 +512,20 @@ export default function ImportModal({
       const endpoint = importType === 'csv' ? '/api/import/csv' : '/api/import/ofx';
       const bodyKey = importType === 'csv' ? 'csv_content' : 'ofx_content';
 
+      // Prepare categories to create from selected transactions
+      const categoriesToCreate = selectedTransactions
+        .filter(tx => tx.needs_category_creation && tx.category_name)
+        .reduce((acc, tx) => {
+          const key = `${tx.category_name!.toLowerCase()}_${tx.type}`;
+          if (!acc.find(c => c.name.toLowerCase() === tx.category_name!.toLowerCase() && c.type === tx.type)) {
+            acc.push({
+              name: tx.category_name!,
+              type: tx.type,
+            });
+          }
+          return acc;
+        }, [] as Array<{ name: string; type: 'income' | 'expense' }>);
+
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -422,6 +538,7 @@ export default function ImportModal({
             }
             return acc;
           }, {} as Record<string, string>),
+          categories_to_create: categoriesToCreate,
           selected_ids: selectedTransactions.map(tx => tx.id),
         }),
       });
@@ -570,6 +687,11 @@ export default function ImportModal({
   };
 
   const handleClose = () => {
+    // Abort any pending requests
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    
+    // Reset all states
     setFile(null);
     setSelectedAccountId('');
     setProgress({ status: 'idle' });
@@ -577,6 +699,7 @@ export default function ImportModal({
     setStep('upload');
     setTransactions([]);
     setSelectAll(true);
+    setPreviewStats(null);
     // Reset Open Finance states
     setSelectedLinkId('all');
     setBatchSize(10);
@@ -926,7 +1049,7 @@ export default function ImportModal({
                       <td className={`p-2 text-sm text-right font-medium ${
                         tx.amount >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {formatCurrency(tx.amount)}
+                        {formatCurrencyValue(tx.amount)}
                       </td>
                       <td className="p-2">
                         <Select
