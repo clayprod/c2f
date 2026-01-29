@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import ImportGuide from './ImportGuide';
 import { formatCurrencyValue, formatDate } from '@/lib/utils';
+import * as ReactWindow from 'react-window';
+const List = (ReactWindow as any).FixedSizeList;
 
 interface ImportModalProps {
   open: boolean;
@@ -83,6 +85,12 @@ export default function ImportModal({
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectAll, setSelectAll] = useState(true);
   const [previewStats, setPreviewStats] = useState<PreviewStats | null>(null);
+  
+  // Memoized category name map for O(1) lookups
+  const categoryNameMap = useMemo(() => 
+    new Map(categories.map(c => [c.name.toLowerCase(), c.id])),
+    [categories]
+  );
   
   // Refs for abort control and request tracking
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -434,21 +442,19 @@ export default function ImportModal({
 
       const data = await res.json();
 
-      // Create a map of category name to ID
-      const categoryNameMap = new Map(
-        categories.map(c => [c.name.toLowerCase(), c.id])
-      );
-
       // Create a map of transaction ID to categorization
       const categorizationMap = new Map(
         (data.transactions || []).map((cat: any) => [cat.id, cat])
       );
 
+      // Create Set for O(1) lookup instead of O(n) find
+      const needingIds = new Set(needingCategorization.map(t => t.id));
+
       // Update transactions with AI suggestions
       setTransactions(prev =>
         prev.map(tx => {
-          // Only update if this transaction was in the batch
-          if (!needingCategorization.find(t => t.id === tx.id)) {
+          // Only update if this transaction was in the batch (O(1) lookup)
+          if (!needingIds.has(tx.id)) {
             return tx;
           }
 
@@ -482,7 +488,7 @@ export default function ImportModal({
     } finally {
       setCategorizing(false);
     }
-  }, [categories, toast]);
+  }, [categoryNameMap, toast]);
 
   const handleImport = async () => {
     const selectedTransactions = transactions.filter(tx => tx.selected);
@@ -512,19 +518,20 @@ export default function ImportModal({
       const endpoint = importType === 'csv' ? '/api/import/csv' : '/api/import/ofx';
       const bodyKey = importType === 'csv' ? 'csv_content' : 'ofx_content';
 
-      // Prepare categories to create from selected transactions
-      const categoriesToCreate = selectedTransactions
+      // Prepare categories to create from selected transactions (O(n) with Map)
+      const categoriesMap = new Map<string, { name: string; type: 'income' | 'expense' }>();
+      selectedTransactions
         .filter(tx => tx.needs_category_creation && tx.category_name)
-        .reduce((acc, tx) => {
+        .forEach(tx => {
           const key = `${tx.category_name!.toLowerCase()}_${tx.type}`;
-          if (!acc.find(c => c.name.toLowerCase() === tx.category_name!.toLowerCase() && c.type === tx.type)) {
-            acc.push({
+          if (!categoriesMap.has(key)) {
+            categoriesMap.set(key, {
               name: tx.category_name!,
               type: tx.type,
             });
           }
-          return acc;
-        }, [] as Array<{ name: string; type: 'income' | 'expense' }>);
+        });
+      const categoriesToCreate = Array.from(categoriesMap.values());
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -1013,68 +1020,79 @@ export default function ImportModal({
               </Button>
             </div>
 
-            <div className="flex-1 overflow-auto min-h-0">
-              <table className="w-full">
-                <thead className="sticky top-0 bg-background">
-                  <tr className="text-left text-xs text-muted-foreground border-b">
-                    <th className="p-2 w-10"></th>
-                    <th className="p-2">Data</th>
-                    <th className="p-2">Descrição</th>
-                    <th className="p-2 text-right">Valor</th>
-                    <th className="p-2">Categoria</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transactions.map((tx) => (
-                    <tr key={tx.id} className="border-b hover:bg-muted/50">
-                      <td className="p-2">
-                        <Checkbox
-                          checked={tx.selected}
-                          onCheckedChange={(checked) =>
-                            handleSelectTransaction(tx.id, !!checked)
-                          }
-                        />
-                      </td>
-                      <td className="p-2 text-sm">
-                        {formatDate(tx.date)}
-                      </td>
-                      <td className="p-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate max-w-[200px]" title={tx.description}>
+            <div className="flex-1 overflow-hidden min-h-0 border rounded-md">
+              {/* Header */}
+              <div className="grid grid-cols-[40px_100px_1fr_100px_180px] gap-2 p-2 text-xs text-muted-foreground border-b bg-background sticky top-0 z-10">
+                <div></div>
+                <div>Data</div>
+                <div>Descrição</div>
+                <div className="text-right">Valor</div>
+                <div>Categoria</div>
+              </div>
+              
+              {/* Virtualized List */}
+              <div style={{ height: '400px' }}>
+                <List
+                  height={400}
+                  itemCount={transactions.length}
+                  itemSize={48}
+                  width="100%"
+                  itemData={transactions}
+                >
+                  {({ index, style }: { index: number; style: React.CSSProperties }) => {
+                    const tx = transactions[index];
+                    return (
+                      <div 
+                        style={style} 
+                        className="grid grid-cols-[40px_100px_1fr_100px_180px] gap-2 p-2 text-sm border-b hover:bg-muted/50 items-center"
+                      >
+                        <div>
+                          <Checkbox
+                            checked={tx.selected}
+                            onCheckedChange={(checked) =>
+                              handleSelectTransaction(tx.id, !!checked)
+                            }
+                          />
+                        </div>
+                        <div className="text-xs">
+                          {formatDate(tx.date)}
+                        </div>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="truncate" title={tx.description}>
                             {tx.description}
                           </span>
                           {tx.ai_suggested && getConfidenceBadge(tx.ai_confidence)}
                         </div>
-                      </td>
-                      <td className={`p-2 text-sm text-right font-medium ${
-                        tx.amount >= 0 ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {formatCurrencyValue(tx.amount)}
-                      </td>
-                      <td className="p-2">
-                        <Select
-                          value={tx.category_id || ''}
-                          onValueChange={(value) => handleCategoryChange(tx.id, value)}
-                        >
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue placeholder="Selecionar..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {categories.map((cat) => (
-                              <SelectItem key={cat.id} value={cat.id}>
-                                <span className="flex items-center gap-2">
-                                  <span>{cat.icon}</span>
-                                  <span>{cat.name}</span>
-                                </span>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        <div className={`text-right font-medium text-xs ${
+                          tx.amount >= 0 ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {formatCurrencyValue(tx.amount)}
+                        </div>
+                        <div>
+                          <Select
+                            value={tx.category_id || ''}
+                            onValueChange={(value) => handleCategoryChange(tx.id, value)}
+                          >
+                            <SelectTrigger className="h-7 text-xs">
+                              <SelectValue placeholder="Selecionar..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categories.map((cat) => (
+                                <SelectItem key={cat.id} value={cat.id}>
+                                  <span className="flex items-center gap-2">
+                                    <span>{cat.icon}</span>
+                                    <span>{cat.name}</span>
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    );
+                  }}
+                </List>
+              </div>
             </div>
 
             <div className="text-sm text-muted-foreground pt-2 border-t shrink-0">

@@ -11,6 +11,8 @@ import {
   type CategoryToCreate,
 } from '@/services/import/categoryMatcher';
 
+const BATCH_SIZE = 500; // Process 500 transactions at a time
+
 export async function POST(request: NextRequest) {
   try {
     const userId = await getUserId();
@@ -184,67 +186,91 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Step 4: Process transactions
+    // Step 4: Check for existing transactions in batch
+    // Get all provider_tx_ids to check for duplicates
+    const providerTxIds = finalTransactions.map(tx => tx.id);
+    const { data: existingByIds } = await supabase
+      .from('transactions')
+      .select('provider_tx_id')
+      .eq('user_id', userId)
+      .in('provider_tx_id', providerTxIds);
+
+    const existingIdsSet = new Set(existingByIds?.map(tx => tx.provider_tx_id) || []);
+
+    // Get all transaction content hashes to check for duplicates by content
+    const contentHashes = finalTransactions.map(tx => ({
+      date: tx.date,
+      description: tx.description,
+      amount: tx.type === 'expense' ? -Math.abs(tx.amount) : Math.abs(tx.amount),
+    }));
+
+    const { data: existingByContent } = await supabase
+      .from('transactions')
+      .select('posted_at, description, amount')
+      .eq('user_id', userId)
+      .in('posted_at', contentHashes.map(h => h.date))
+      .in('description', contentHashes.map(h => h.description));
+
+    const existingContentSet = new Set(
+      existingByContent?.map(tx => 
+        `${tx.posted_at}|${tx.description}|${tx.amount}`
+      ) || []
+    );
+
+    // Step 5: Prepare transactions for batch insert
+    const transactionsToInsert = [];
+    
     for (const tx of finalTransactions) {
+      const signedAmount = tx.type === 'expense' ? -Math.abs(tx.amount) : Math.abs(tx.amount);
+      
+      // Check for duplicates by ID
+      if (existingIdsSet.has(tx.id)) {
+        skipped++;
+        continue;
+      }
+
+      // Check for duplicates by content
+      const contentKey = `${tx.date}|${tx.description}|${signedAmount}`;
+      if (existingContentSet.has(contentKey)) {
+        skipped++;
+        continue;
+      }
+
+      transactionsToInsert.push({
+        user_id: userId,
+        account_id: defaultAccountId,
+        category_id: tx.category_id || fallbackCategoryId,
+        posted_at: tx.date,
+        description: tx.description,
+        amount: signedAmount,
+        currency: 'BRL',
+        source: 'import',
+        provider_tx_id: tx.id,
+        notes: `Importado via CSV - ${tx.type}`,
+      });
+    }
+
+    // Step 6: Batch insert transactions
+    const totalToInsert = transactionsToInsert.length;
+    
+    for (let i = 0; i < totalToInsert; i += BATCH_SIZE) {
+      const batch = transactionsToInsert.slice(i, i + BATCH_SIZE);
+      
       try {
-        // Check for duplicates
-        const { data: existingById } = await supabase
+        const { error: insertError } = await supabase
           .from('transactions')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('provider_tx_id', tx.id)
-          .maybeSingle();
+          .insert(batch);
 
-        if (existingById) {
-          skipped++;
-          continue;
+        if (insertError) {
+          console.error('Batch insert error:', insertError);
+          errors.push(`Erro ao inserir lote ${Math.floor(i / BATCH_SIZE) + 1}: ${insertError.message}`);
+          // Continue with next batch
+        } else {
+          imported += batch.length;
         }
-
-        // Determine amount (with sign)
-        const signedAmount = tx.type === 'expense' ? -Math.abs(tx.amount) : Math.abs(tx.amount);
-
-        // Check by content as fallback
-        const { data: existingByContent } = await supabase
-          .from('transactions')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('posted_at', tx.date)
-          .eq('description', tx.description)
-          .eq('amount', signedAmount)
-          .maybeSingle();
-
-        if (existingByContent) {
-          skipped++;
-          continue;
-        }
-
-        // Use transaction's category_id or fallback
-        const categoryId = tx.category_id || fallbackCategoryId;
-
-        // Insert transaction
-        const { error: txError } = await supabase
-          .from('transactions')
-          .insert({
-            user_id: userId,
-            account_id: defaultAccountId,
-            category_id: categoryId,
-            posted_at: tx.date,
-            description: tx.description,
-            amount: signedAmount,
-            currency: 'BRL',
-            source: 'import',
-            provider_tx_id: tx.id,
-            notes: `Importado via CSV - ${tx.type}`,
-          });
-
-        if (txError) {
-          errors.push(`Erro ao importar transação: ${txError.message}`);
-          continue;
-        }
-
-        imported++;
       } catch (error: any) {
-        errors.push(`Erro ao processar transação: ${error.message}`);
+        console.error('Batch insert exception:', error);
+        errors.push(`Erro ao inserir lote ${Math.floor(i / BATCH_SIZE) + 1}: ${error.message}`);
       }
     }
 
