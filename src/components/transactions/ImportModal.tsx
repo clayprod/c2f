@@ -15,8 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import ImportGuide from './ImportGuide';
 import { formatCurrencyValue, formatDate } from '@/lib/utils';
-import * as ReactWindow from 'react-window';
-const List = (ReactWindow as any).FixedSizeList;
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface ImportModalProps {
   open: boolean;
@@ -103,6 +102,11 @@ export default function ImportModal({
   const [accountLinks, setAccountLinks] = useState<AccountLink[]>([]);
   const [selectedLinkId, setSelectedLinkId] = useState<string>('all');
   const [batchSize, setBatchSize] = useState<5 | 10 | 25 | 50 | 100>(10);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  
   const [progress, setProgress] = useState<{
     status: 'idle' | 'uploading' | 'processing' | 'completed' | 'error';
     message?: string;
@@ -764,6 +768,13 @@ export default function ImportModal({
 
   const selectedCount = transactions.filter(tx => tx.selected).length;
 
+  // Pagination calculations
+  const totalPages = Math.ceil(transactions.length / itemsPerPage);
+  const paginatedTransactions = transactions.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] !grid-cols-1 flex flex-col overflow-hidden">
@@ -1030,69 +1041,85 @@ export default function ImportModal({
                 <div>Categoria</div>
               </div>
               
-              {/* Virtualized List */}
-              <div style={{ height: '400px' }}>
-                <List
-                  height={400}
-                  itemCount={transactions.length}
-                  itemSize={48}
-                  width="100%"
-                  itemData={transactions}
-                >
-                  {({ index, style }: { index: number; style: React.CSSProperties }) => {
-                    const tx = transactions[index];
-                    return (
-                      <div 
-                        style={style} 
-                        className="grid grid-cols-[40px_100px_1fr_100px_180px] gap-2 p-2 text-sm border-b hover:bg-muted/50 items-center"
+              {/* Paginated List */}
+              <div className="max-h-[400px] overflow-y-auto">
+                {paginatedTransactions.map((tx) => (
+                  <div
+                    key={tx.id}
+                    className="grid grid-cols-[40px_100px_1fr_100px_180px] gap-2 p-2 text-sm border-b hover:bg-muted/50 items-center"
+                  >
+                    <div>
+                      <Checkbox
+                        checked={tx.selected}
+                        onCheckedChange={(checked) =>
+                          handleSelectTransaction(tx.id, !!checked)
+                        }
+                      />
+                    </div>
+                    <div className="text-xs">
+                      {formatDate(tx.date)}
+                    </div>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="truncate" title={tx.description}>
+                        {tx.description}
+                      </span>
+                      {tx.ai_suggested && getConfidenceBadge(tx.ai_confidence)}
+                    </div>
+                    <div className={`text-right font-medium text-xs ${
+                      tx.amount >= 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {formatCurrencyValue(tx.amount)}
+                    </div>
+                    <div>
+                      <Select
+                        value={tx.category_id || ''}
+                        onValueChange={(value) => handleCategoryChange(tx.id, value)}
                       >
-                        <div>
-                          <Checkbox
-                            checked={tx.selected}
-                            onCheckedChange={(checked) =>
-                              handleSelectTransaction(tx.id, !!checked)
-                            }
-                          />
-                        </div>
-                        <div className="text-xs">
-                          {formatDate(tx.date)}
-                        </div>
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="truncate" title={tx.description}>
-                            {tx.description}
-                          </span>
-                          {tx.ai_suggested && getConfidenceBadge(tx.ai_confidence)}
-                        </div>
-                        <div className={`text-right font-medium text-xs ${
-                          tx.amount >= 0 ? 'text-green-600' : 'text-red-600'
-                        }`}>
-                          {formatCurrencyValue(tx.amount)}
-                        </div>
-                        <div>
-                          <Select
-                            value={tx.category_id || ''}
-                            onValueChange={(value) => handleCategoryChange(tx.id, value)}
-                          >
-                            <SelectTrigger className="h-7 text-xs">
-                              <SelectValue placeholder="Selecionar..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {categories.map((cat) => (
-                                <SelectItem key={cat.id} value={cat.id}>
-                                  <span className="flex items-center gap-2">
-                                    <span>{cat.icon}</span>
-                                    <span>{cat.name}</span>
-                                  </span>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    );
-                  }}
-                </List>
+                        <SelectTrigger className="h-7 text-xs">
+                          <SelectValue placeholder="Selecionar..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              <span className="flex items-center gap-2">
+                                <span>{cat.icon}</span>
+                                <span>{cat.name}</span>
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                ))}
               </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between py-2 border-t shrink-0">
+                  <span className="text-sm text-muted-foreground">
+                    Página {currentPage} de {totalPages}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="text-sm text-muted-foreground pt-2 border-t shrink-0">

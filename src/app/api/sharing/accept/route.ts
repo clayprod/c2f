@@ -4,7 +4,7 @@ import { getUserId } from '@/lib/auth';
 import { createErrorResponse } from '@/lib/errors';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendEmail, inviteAcceptedTemplate } from '@/services/email';
-import { MAX_SHARING_MEMBERS } from '../invites/route';
+import { MAX_SHARING_MEMBERS } from '../constants';
 
 // GET - Get invite details by token (for preview)
 export async function GET(request: NextRequest) {

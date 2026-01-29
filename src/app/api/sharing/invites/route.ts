@@ -4,9 +4,7 @@ import { getUserId } from '@/lib/auth';
 import { createErrorResponse } from '@/lib/errors';
 import { sendEmail, inviteNewUserTemplate, inviteExistingUserTemplate } from '@/services/email';
 import { z } from 'zod';
-
-// Limite máximo de membros que podem ter acesso a uma conta
-export const MAX_SHARING_MEMBERS = 2;
+import { MAX_SHARING_MEMBERS } from '../constants';
 
 const createInviteSchema = z.object({
   email: z.string().email('Email invalido'),

@@ -7,6 +7,14 @@ import TransactionForm, { Transaction as TransactionFormType } from '@/component
 import ImportModal from '@/components/transactions/ImportModal';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useMembers } from '@/hooks/useMembers';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
@@ -57,6 +65,12 @@ export default function TransactionsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
+  const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
+  const [deleteAllData, setDeleteAllData] = useState<{
+    transactions: number;
+    dependencies: { table: string; name: string; count: number }[];
+  } | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<TransactionFormType | undefined>();
   const { toast } = useToast();
   const { confirm, ConfirmDialog } = useConfirmDialog();
@@ -352,6 +366,75 @@ export default function TransactionsPage() {
     }
   };
 
+  const handleDeleteAllTransactions = async () => {
+    try {
+      setDeletingAll(true);
+      
+      // Primeiro, verificar dependências
+      const checkRes = await fetch('/api/transactions/bulk');
+      const checkData = await checkRes.json();
+      
+      if (!checkRes.ok) {
+        throw new Error(checkData.error || 'Erro ao verificar transações');
+      }
+      
+      if (checkData.transactions === 0) {
+        toast({
+          title: 'Nenhuma transação',
+          description: 'Não há transações para remover.',
+        });
+        return;
+      }
+      
+      // Abrir diálogo com informações das dependências
+      setDeleteAllData({
+        transactions: checkData.transactions,
+        dependencies: checkData.dependencies || [],
+      });
+      setDeleteAllDialogOpen(true);
+    } catch (error: any) {
+      toast({
+        title: 'Falha ao verificar transações',
+        description: error.message || 'Não foi possível verificar as transações. Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
+  const confirmDeleteAllTransactions = async () => {
+    try {
+      setDeletingAll(true);
+      const res = await fetch('/api/transactions/bulk', {
+        method: 'DELETE',
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Erro ao apagar transações');
+      }
+
+      toast({
+        title: 'Sucesso',
+        description: data.message || 'Todas as transações foram removidas',
+      });
+
+      setDeleteAllDialogOpen(false);
+      setDeleteAllData(null);
+      fetchTransactions();
+    } catch (error: any) {
+      toast({
+        title: 'Falha ao apagar transações',
+        description: error.message || 'Não foi possível apagar as transações. Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
   const totalPages = Math.ceil(pagination.count / pagination.limit);
   const currentPage = Math.floor(pagination.offset / pagination.limit) + 1;
 
@@ -378,6 +461,18 @@ export default function TransactionsPage() {
             <span className="hidden sm:inline">Nova Transação</span>
             <span className="sm:hidden">Nova</span>
           </Button>
+          {pagination.count > 0 && (
+            <Button 
+              onClick={handleDeleteAllTransactions} 
+              variant="outline" 
+              disabled={deletingAll}
+              className="flex-shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              <i className='bx bx-trash mr-1 sm:mr-2'></i>
+              <span className="hidden sm:inline">Apagar Todas</span>
+              <span className="sm:hidden">Apagar</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -479,6 +574,67 @@ export default function TransactionsPage() {
 
       {/* Delete Confirmation Dialog */}
       {ConfirmDialog}
+
+      {/* Delete All Transactions Dialog */}
+      <Dialog open={deleteAllDialogOpen} onOpenChange={setDeleteAllDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Apagar Todas as Transações</DialogTitle>
+            <DialogDescription>
+              Você está prestes a apagar <strong>{deleteAllData?.transactions || 0} transações</strong>.
+              Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+
+          {deleteAllData && deleteAllData.dependencies.length > 0 && (
+            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+              <p className="font-medium text-amber-700 mb-2">
+                <i className='bx bx-info-circle mr-2'></i>
+                Os seguintes itens também serão removidos:
+              </p>
+              <ul className="space-y-1 text-sm">
+                {deleteAllData.dependencies.map((dep) => (
+                  <li key={dep.table} className="flex items-center gap-2">
+                    <i className='bx bx-chevron-right text-amber-600'></i>
+                    <span>{dep.name}: <strong>{dep.count}</strong></span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteAllDialogOpen(false);
+                setDeleteAllData(null);
+              }}
+              className="w-full sm:w-auto"
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDeleteAllTransactions}
+              disabled={deletingAll}
+              className="w-full sm:w-auto"
+            >
+              {deletingAll ? (
+                <>
+                  <i className='bx bx-loader-alt bx-spin mr-2'></i>
+                  Apagando...
+                </>
+              ) : (
+                <>
+                  <i className='bx bx-trash mr-2'></i>
+                  Apagar Todas ({deleteAllData?.transactions || 0})
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

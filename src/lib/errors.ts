@@ -31,6 +31,30 @@ export function createErrorResponse(error: unknown) {
   };
 }
 
+import { NextResponse } from 'next/server';
+
+export function createErrorResponseNext(error: unknown): NextResponse {
+  if (error instanceof AppError) {
+    return NextResponse.json({
+      error: error.message,
+      code: error.code,
+      statusCode: error.statusCode,
+    }, { status: error.statusCode });
+  }
+
+  if (error instanceof Error) {
+    return NextResponse.json({
+      error: error.message,
+      statusCode: 500,
+    }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    error: 'Internal server error',
+    statusCode: 500,
+  }, { status: 500 });
+}
+
 
 
 

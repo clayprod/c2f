@@ -49,15 +49,15 @@ export async function GET(request: NextRequest) {
       .eq('user_id', ownerId)
       .range(offset, offset + limit - 1);
 
-    // Apply sorting
+    // Apply sorting - posted_at primary, created_at DESC secondary for consistent ordering
     const ascending = sortOrder === 'asc';
     if (sortBy === 'amount') {
       query = query.order('amount', { ascending });
-    } else if (sortBy === 'created_at') {
-      query = query.order('created_at', { ascending });
     } else {
-      // Fallback to posted_at
-      query = query.order('posted_at', { ascending });
+      // Default: order by posted_at first, then created_at DESC as secondary
+      // This ensures transactions on the same date are sorted with newest first
+      query = query.order('posted_at', { ascending })
+                   .order('created_at', { ascending: false });
     }
 
     if (accountId) {

@@ -56,6 +56,9 @@ export default function CategoriesPage() {
   const [migrationModalOpen, setMigrationModalOpen] = useState(false);
   const [categoryToMigrate, setCategoryToMigrate] = useState<Category | null>(null);
   const [categoriesWithTransactions, setCategoriesWithTransactions] = useState<Map<string, number>>(new Map());
+  const [deletingAll, setDeletingAll] = useState(false);
+  const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
+  const [deleteAllError, setDeleteAllError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     type: 'expense' as 'income' | 'expense',
@@ -335,6 +338,43 @@ export default function CategoriesPage() {
     fetchCategoriesWithTransactions();
   };
 
+  const handleDeleteAllCategories = async () => {
+    try {
+      setDeletingAll(true);
+      setDeleteAllError(null);
+      
+      const res = await fetch('/api/categories/bulk', {
+        method: 'DELETE',
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (data.code === 'DEPENDENCIES_EXIST' && data.dependencies) {
+          const dependencyList = data.dependencies
+            .map((d: { name: string; count: number }) => `${d.name} (${d.count})`)
+            .join(', ');
+          setDeleteAllError(`Não é possível remover as categorias. Remova estas entidades primeiro: ${dependencyList}`);
+          return;
+        }
+        throw new Error(data.error || 'Erro ao apagar categorias');
+      }
+
+      toast({
+        title: 'Sucesso',
+        description: data.message || 'Todas as categorias foram removidas',
+      });
+
+      setDeleteAllDialogOpen(false);
+      fetchCategories();
+      fetchCategoriesWithTransactions();
+    } catch (error: any) {
+      setDeleteAllError(error.message || 'Não foi possível apagar as categorias. Tente novamente.');
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
   const filteredCategories = categories.filter(category => {
     const matchesSearch = category.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = filterType === 'all' || category.type === filterType;
@@ -372,11 +412,28 @@ export default function CategoriesPage() {
           <h1 className="font-display text-2xl sm:text-2xl md:text-3xl font-bold">Categorias</h1>
           <p className="text-muted-foreground text-sm sm:text-base">Organize suas transações por categoria</p>
         </div>
-        <Button onClick={openNewDialog} className="btn-primary w-full sm:w-auto flex-shrink-0">
-          <i className='bx bx-plus mr-2'></i>
-          <span className="hidden sm:inline">Nova Categoria</span>
-          <span className="sm:hidden">Nova</span>
-        </Button>
+        <div className="flex gap-2">
+          {filteredCategories.length > 0 && (
+            <Button 
+              onClick={() => {
+                setDeleteAllError(null);
+                setDeleteAllDialogOpen(true);
+              }} 
+              variant="outline"
+              disabled={deletingAll}
+              className="flex-shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              <i className='bx bx-trash mr-2'></i>
+              <span className="hidden sm:inline">Apagar Todas</span>
+              <span className="sm:hidden">Apagar</span>
+            </Button>
+          )}
+          <Button onClick={openNewDialog} className="btn-primary flex-shrink-0">
+            <i className='bx bx-plus mr-2'></i>
+            <span className="hidden sm:inline">Nova Categoria</span>
+            <span className="sm:hidden">Nova</span>
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -836,6 +893,63 @@ export default function CategoriesPage() {
                 Migrar Transações
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete All Categories Dialog */}
+      <Dialog open={deleteAllDialogOpen} onOpenChange={setDeleteAllDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Apagar Todas as Categorias</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja apagar TODAS as categorias? Esta ação não pode ser desfeita.
+              <br /><br />
+              <strong>Nota:</strong> Categorias que possuem transações, cartões de crédito, objetivos, dívidas ou investimentos vinculados não serão removidas. Você precisará remover ou migrar essas entidades primeiro.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {deleteAllError && (
+            <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-sm text-destructive">
+              <div className="flex items-start gap-2">
+                <i className='bx bx-error-circle text-lg flex-shrink-0 mt-0.5'></i>
+                <div>
+                  <p className="font-medium mb-1">Não é possível apagar as categorias</p>
+                  <p>{deleteAllError}</p>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setDeleteAllDialogOpen(false);
+                setDeleteAllError(null);
+              }}
+              className="w-full sm:w-auto"
+            >
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteAllCategories}
+              disabled={deletingAll}
+              className="w-full sm:w-auto"
+            >
+              {deletingAll ? (
+                <>
+                  <i className='bx bx-loader-alt bx-spin mr-2'></i>
+                  Apagando...
+                </>
+              ) : (
+                <>
+                  <i className='bx bx-trash mr-2'></i>
+                  Apagar Todas
+                </>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
