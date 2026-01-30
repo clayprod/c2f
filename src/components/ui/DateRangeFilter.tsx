@@ -12,6 +12,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { parseDateOnly } from '@/lib/date';
 
 interface DateRangeFilterProps {
   startDate: string;
@@ -80,8 +81,8 @@ export default function DateRangeFilter({
   // Initialize on mount and when external dates change
   useEffect(() => {
     if (startDate && endDate) {
-      setLocalFrom(new Date(startDate));
-      setLocalTo(new Date(endDate));
+      setLocalFrom(parseDateOnly(startDate));
+      setLocalTo(parseDateOnly(endDate));
       const detected = detectPreset(startDate, endDate);
       setActivePreset(detected);
       return;

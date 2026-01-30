@@ -11,6 +11,7 @@ import { pt } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import { useMembers } from '@/hooks/useMembers';
+import { parseDateOnly } from '@/lib/date';
 
 export default function NewReceivablePage() {
   const router = useRouter();
@@ -245,7 +246,7 @@ export default function NewReceivablePage() {
           <div>
             <label className="block text-sm font-medium mb-2">Data de Vencimento</label>
             <DatePicker
-              date={formData.due_date ? new Date(formData.due_date) : undefined}
+              date={parseDateOnly(formData.due_date)}
               setDate={(date) => {
                 if (date) {
                   const formattedDate = format(date, 'yyyy-MM-dd');

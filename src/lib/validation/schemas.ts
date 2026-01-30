@@ -3,7 +3,8 @@ import { z } from 'zod';
 export const accountSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
   type: z.enum(['checking', 'savings', 'credit', 'investment']),
-  balance_cents: z.number().int().default(0),
+  balance_cents: z.number().int().optional(),
+  initial_balance_cents: z.number().int().optional(),
   currency: z.string().default('BRL'),
   institution: z.string().optional(),
   overdraft_limit_cents: z.number().int().min(0).optional(),

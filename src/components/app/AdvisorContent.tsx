@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { useUpgradeModal } from '@/hooks/useUpgradeModal';
 import { useToast } from '@/hooks/use-toast';
 
 interface AdvisorInsight {
@@ -58,8 +59,9 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
   const [isInitialized, setIsInitialized] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastAssistantRef = useRef<HTMLDivElement>(null);
-  const [usage, setUsage] = useState<{ used: number; limit: number; unlimited: boolean } | null>(null);
+  const [usage, setUsage] = useState<{ used: number; limit: number; unlimited: boolean; plan?: 'free' | 'pro' | 'premium' } | null>(null);
   const { toast } = useToast();
+  const { openUpgradeModal } = useUpgradeModal();
 
   // Load persisted chat from localStorage on mount
   useEffect(() => {
@@ -171,7 +173,16 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
 
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.error || 'Erro ao processar mensagem');
+        const errorMessage = error.error || 'Erro ao processar mensagem';
+        if (res.status === 403) {
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: errorMessage,
+          }]);
+          refreshUsage();
+          return;
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await res.json();
@@ -303,11 +314,11 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
   const getConfidenceLabel = (confidence: string) => {
     switch (confidence) {
       case 'high':
-        return 'Alta confianca';
+        return 'Alta confiança';
       case 'medium':
-        return 'Media confianca';
+        return 'Média confiança';
       default:
-        return 'Baixa confianca';
+        return 'Baixa confiança';
     }
   };
 
@@ -337,6 +348,16 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
                 <span className="text-xs sm:text-sm text-muted-foreground">
                   Consultas do mês: {usage.unlimited ? 'Ilimitado' : `${usage.used}/${usage.limit}`}
                 </span>
+              )}
+              {usage && usage.plan === 'pro' && !usage.unlimited && usage.limit > 0 && usage.used >= usage.limit && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={openUpgradeModal}
+                  className="text-xs sm:text-sm"
+                >
+                  Fazer upgrade
+                </Button>
               )}
               {messages.length > 1 && (
                 <Button

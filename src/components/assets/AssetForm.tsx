@@ -22,6 +22,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useMembers } from '@/hooks/useMembers';
+import { parseDateOnly } from '@/lib/date';
 
 type AssetFormData = z.infer<typeof assetSchema>;
 
@@ -258,7 +259,7 @@ export default function AssetForm({
       <div>
         <Label htmlFor="purchase_date">Data de Compra *</Label>
         <DatePicker
-          date={watch('purchase_date') ? new Date(watch('purchase_date')) : undefined}
+          date={parseDateOnly(watch('purchase_date'))}
           setDate={(date) => {
             if (date) {
               setValue('purchase_date', format(date, 'yyyy-MM-dd'), { shouldValidate: true });
@@ -378,7 +379,7 @@ export default function AssetForm({
         <div>
           <Label htmlFor="insurance_expiry_date">Vencimento do Seguro</Label>
           <DatePicker
-            date={watch('insurance_expiry_date') ? new Date(watch('insurance_expiry_date') as string) : undefined}
+            date={parseDateOnly(watch('insurance_expiry_date') as string)}
             setDate={(date) => {
               if (date) {
                 setValue('insurance_expiry_date', format(date, 'yyyy-MM-dd'));
@@ -465,7 +466,7 @@ export default function AssetForm({
           <div>
             <Label htmlFor="sale_date">Data de Venda *</Label>
             <DatePicker
-              date={watch('sale_date') ? new Date(watch('sale_date') as string) : undefined}
+              date={parseDateOnly(watch('sale_date') as string)}
               setDate={(date) => {
                 if (date) {
                   setValue('sale_date', format(date, 'yyyy-MM-dd'), { shouldValidate: true });

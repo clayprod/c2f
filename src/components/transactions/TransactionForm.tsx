@@ -21,6 +21,7 @@ import { Progress } from '@/components/ui/progress';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { useMembers } from '@/hooks/useMembers';
+import { formatDateOnly, parseDateOnly } from '@/lib/date';
 
 export interface Transaction {
   id?: string;
@@ -101,9 +102,9 @@ export default function TransactionForm({
     defaultValues: {
       account_id: transaction?.account_id || '',
       category_id: transaction?.category_id || '',
-      posted_at: transaction?.posted_at || new Date().toISOString().split('T')[0],
+      posted_at: transaction?.posted_at || formatDateOnly(new Date()),
       description: transaction?.description || '',
-      amount: transaction?.amount ? (typeof transaction.amount === 'string' ? transaction.amount : Math.abs(transaction.amount / 100).toFixed(2)) : '',
+      amount: transaction?.amount ? (typeof transaction.amount === 'string' ? transaction.amount : Math.abs(transaction.amount).toFixed(2)) : '',
       currency: 'BRL',
       notes: transaction?.notes || '',
     },
@@ -170,7 +171,7 @@ export default function TransactionForm({
         description: transaction.description,
         amount: typeof transaction.amount === 'string'
           ? transaction.amount
-          : Math.abs(transaction.amount / 100).toFixed(2),
+          : Math.abs(transaction.amount).toFixed(2),
         currency: 'BRL',
         notes: transaction.notes || '',
       });
@@ -183,7 +184,7 @@ export default function TransactionForm({
       reset({
         account_id: '',
         category_id: '',
-        posted_at: new Date().toISOString().split('T')[0],
+        posted_at: formatDateOnly(new Date()),
         description: '',
         amount: '',
         currency: 'BRL',
@@ -197,7 +198,7 @@ export default function TransactionForm({
 
   const onFormSubmit = async (data: TransactionFormData) => {
     // Check if date is in the future
-    const transactionDate = new Date(data.posted_at);
+    const transactionDate = parseDateOnly(data.posted_at) || new Date(data.posted_at);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     transactionDate.setHours(0, 0, 0, 0);
@@ -457,7 +458,7 @@ export default function TransactionForm({
             <div>
               <Label htmlFor="posted_at">Data *</Label>
               <DatePicker
-                date={watch('posted_at') ? new Date(watch('posted_at')) : undefined}
+                date={parseDateOnly(watch('posted_at'))}
                 setDate={(date) => {
                   if (date) {
                     const formattedDate = format(date, 'yyyy-MM-dd');

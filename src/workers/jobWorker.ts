@@ -18,6 +18,26 @@ import {
   hashContext,
   type ChatMessage,
 } from '../services/advisor';
+import {
+  createTransactionFromWhatsApp,
+  createInstallmentTransactionsFromWhatsApp,
+  logWhatsAppMessage,
+  getRecentTransactions,
+  getUserContextForAI,
+  formatBalanceInfo,
+  formatTransactionsList,
+  deleteTransaction,
+  updateTransaction,
+  getInvestments,
+  getCreditCardsWithBills,
+  getUpcomingPayments,
+  getBudgetStatus,
+} from '../services/whatsapp/transactions';
+import {
+  suggestFromHistory,
+  normalizeDescription,
+  extractCoreWords,
+} from '../services/categorization/historySuggester';
 import { projectionCache } from '../services/projections/cache';
 
 interface CsvImportOptions {
@@ -66,6 +86,27 @@ interface ManualTransactionPayload {
   owner_id: string;
   user_id: string;
   data: Record<string, any>;
+}
+
+interface WhatsAppIngestPayload {
+  action: string;
+  phone_number: string;
+  transaction?: Record<string, any> | null;
+  user?: { userId: string; fullName?: string } | null;
+}
+
+interface N8nOperationPayload {
+  operation: string;
+  phone_number: string;
+  data?: any;
+  message_id?: string;
+  buffer_message?: { text: string; type: 'text' | 'audio' };
+  user?: { userId: string; fullName?: string } | null;
+}
+
+function formatCurrency(cents: number): string {
+  const value = Math.abs(cents) / 100;
+  return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 const INSERT_BATCH_SIZE = Number(process.env.IMPORT_BATCH_SIZE) || 200;
@@ -1620,6 +1661,1145 @@ async function runManualTransactionCreate(jobId: string, payload: ManualTransact
   });
 }
 
+async function runWhatsAppIngest(jobId: string, payload: WhatsAppIngestPayload) {
+  const user = payload.user;
+  if (!user) {
+    await updateJob(jobId, { status: 'failed', error_summary: 'Usuário não encontrado' });
+    return;
+  }
+
+  const transaction = payload.transaction || null;
+
+  switch (payload.action) {
+    case 'create': {
+      if (!transaction) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Missing transaction data' });
+        return;
+      }
+
+      if (transaction.amount_cents === undefined || transaction.amount_cents === null) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Valor da transação é obrigatório' });
+        return;
+      }
+
+      if (transaction.amount_cents === 0) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Valor da transação não pode ser zero' });
+        return;
+      }
+
+      const installmentTotal = transaction.installment_total || 1;
+      if (installmentTotal > 1) {
+        const result = await createInstallmentTransactionsFromWhatsApp({
+          userId: user.userId,
+          description: transaction.description || 'Compra parcelada via WhatsApp',
+          totalAmountCents: Math.abs(transaction.amount_cents || 0),
+          installmentTotal,
+          postedAt: transaction.posted_at || new Date().toISOString().split('T')[0],
+          categoryName: transaction.category_name,
+          accountName: transaction.account_name,
+          notes: transaction.notes,
+        });
+
+        await logWhatsAppMessage(user.userId, payload.phone_number, 'incoming', 'text', {
+          contentSummary: `Criar parcelado: ${transaction.description} (${installmentTotal}x)`,
+          transactionId: result.parentTransactionId,
+          actionType: 'create_installment',
+          status: result.success ? 'processed' : 'failed',
+          errorMessage: result.error,
+        });
+
+        if (!result.success) {
+          await updateJob(jobId, { status: 'failed', error_summary: result.error });
+          return;
+        }
+
+        projectionCache.invalidateUser(user.userId);
+        await updateJob(jobId, {
+          status: 'completed',
+          progress: {
+            processed: 1,
+            total: 1,
+            result: {
+              transaction_id: result.parentTransactionId,
+              installments_created: result.installmentsCreated,
+              message: `Compra parcelada em ${installmentTotal}x criada com sucesso`,
+            },
+          },
+        });
+        return;
+      }
+
+      const result = await createTransactionFromWhatsApp({
+        userId: user.userId,
+        description: transaction.description || 'Transação via WhatsApp',
+        amountCents: transaction.amount_cents || 0,
+        postedAt: transaction.posted_at || new Date().toISOString().split('T')[0],
+        categoryName: transaction.category_name,
+        accountName: transaction.account_name,
+        notes: transaction.notes,
+      });
+
+      await logWhatsAppMessage(user.userId, payload.phone_number, 'incoming', 'text', {
+        contentSummary: `Criar: ${transaction.description}`,
+        transactionId: result.transactionId,
+        actionType: 'create',
+        status: result.success ? 'processed' : 'failed',
+        errorMessage: result.error,
+      });
+
+      if (!result.success) {
+        await updateJob(jobId, { status: 'failed', error_summary: result.error });
+        return;
+      }
+
+      projectionCache.invalidateUser(user.userId);
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: {
+          processed: 1,
+          total: 1,
+          result: {
+            transaction_id: result.transactionId,
+            message: 'Transação criada com sucesso',
+          },
+        },
+      });
+      return;
+    }
+    case 'update': {
+      if (!transaction || !transaction.id) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Missing transaction id' });
+        return;
+      }
+
+      const updateResult = await updateTransaction({
+        userId: user.userId,
+        transactionId: transaction.id,
+        updates: {
+          description: transaction.description,
+          amountCents: transaction.amount_cents,
+          postedAt: transaction.posted_at,
+          categoryName: transaction.category_name,
+          accountName: transaction.account_name,
+          notes: transaction.notes,
+        },
+      });
+
+      await logWhatsAppMessage(user.userId, payload.phone_number, 'incoming', 'text', {
+        contentSummary: `Atualizar: ${transaction.description}`,
+        transactionId: transaction.id,
+        actionType: 'update',
+        status: updateResult.success ? 'processed' : 'failed',
+        errorMessage: updateResult.error,
+      });
+
+      if (!updateResult.success) {
+        await updateJob(jobId, { status: 'failed', error_summary: updateResult.error });
+        return;
+      }
+
+      projectionCache.invalidateUser(user.userId);
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: {
+          processed: 1,
+          total: 1,
+          result: {
+            transaction_id: transaction.id,
+            message: 'Transação atualizada com sucesso',
+          },
+        },
+      });
+      return;
+    }
+    case 'delete': {
+      if (!transaction || !transaction.id) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Missing transaction id' });
+        return;
+      }
+
+      const deleteResult = await deleteTransaction({
+        userId: user.userId,
+        transactionId: transaction.id,
+      });
+
+      await logWhatsAppMessage(user.userId, payload.phone_number, 'incoming', 'text', {
+        contentSummary: `Excluir: ${transaction.description}`,
+        transactionId: transaction.id,
+        actionType: 'delete',
+        status: deleteResult.success ? 'processed' : 'failed',
+        errorMessage: deleteResult.error,
+      });
+
+      if (!deleteResult.success) {
+        await updateJob(jobId, { status: 'failed', error_summary: deleteResult.error });
+        return;
+      }
+
+      projectionCache.invalidateUser(user.userId);
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: {
+          processed: 1,
+          total: 1,
+          result: { message: 'Transação excluída com sucesso' },
+        },
+      });
+      return;
+    }
+    case 'balance': {
+      const context = await getUserContextForAI(user.userId);
+      if (!context) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Erro ao obter contexto do usuário' });
+        return;
+      }
+
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: {
+          processed: 1,
+          total: 1,
+          result: { balance: formatBalanceInfo(context) },
+        },
+      });
+      return;
+    }
+    case 'list': {
+      const transactions = await getRecentTransactions(user.userId, { limit: 5 });
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: {
+          processed: 1,
+          total: 1,
+          result: { transactions: formatTransactionsList(transactions) },
+        },
+      });
+      return;
+    }
+    default: {
+      await updateJob(jobId, { status: 'failed', error_summary: `Unknown action: ${payload.action}` });
+      return;
+    }
+  }
+}
+
+async function runN8nOperation(jobId: string, payload: N8nOperationPayload) {
+  const user = payload.user;
+  if (!user) {
+    await updateJob(jobId, { status: 'failed', error_summary: 'Usuário não encontrado' });
+    return;
+  }
+
+  const supabase = getAdminClient();
+  const data = payload.data || {};
+
+  switch (payload.operation) {
+    case 'categorize': {
+      const { description, amount } = data;
+      if (!description) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Missing description' });
+        return;
+      }
+
+      const transactions = [{
+        id: 'temp',
+        description,
+        amount: amount || -100,
+        date: new Date().toISOString().split('T')[0],
+      }];
+
+      const result = await suggestFromHistory(transactions, user.userId, supabase);
+      if (result.matched.length > 0) {
+        const match = result.matched[0];
+        await updateJob(jobId, {
+          status: 'completed',
+          progress: {
+            processed: 1,
+            total: 1,
+            result: {
+              success: true,
+              category_name: match.category_name,
+              category_id: match.category_id,
+              confidence: match.confidence,
+              match_type: match.match_type,
+              source: 'history',
+            },
+          },
+        });
+        return;
+      }
+
+      const normalized = normalizeDescription(description);
+      const coreWords = extractCoreWords(description);
+      const keywordCategories: Record<string, string> = {
+        'supermercado': 'Supermercado',
+        'mercado': 'Supermercado',
+        'uber': 'Transporte',
+        '99': 'Transporte',
+        'ifood': 'Alimentação',
+        'rappi': 'Alimentação',
+        'restaurante': 'Alimentação',
+        'farmacia': 'Saúde',
+        'drogaria': 'Saúde',
+        'netflix': 'Assinaturas',
+        'spotify': 'Assinaturas',
+        'amazon': 'Compras',
+        'magalu': 'Compras',
+        'americanas': 'Compras',
+        'salario': 'Salário',
+        'aluguel': 'Moradia',
+        'condominio': 'Moradia',
+        'luz': 'Contas',
+        'energia': 'Contas',
+        'agua': 'Contas',
+        'internet': 'Contas',
+        'celular': 'Contas',
+        'gasolina': 'Transporte',
+        'combustivel': 'Transporte',
+        'estacionamento': 'Transporte',
+        'academia': 'Saúde',
+        'medico': 'Saúde',
+        'dentista': 'Saúde',
+        'escola': 'Educação',
+        'curso': 'Educação',
+        'faculdade': 'Educação',
+      };
+
+      let suggestedCategory = 'Outros';
+      for (const word of coreWords) {
+        if (keywordCategories[word]) {
+          suggestedCategory = keywordCategories[word];
+          break;
+        }
+      }
+
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: {
+          processed: 1,
+          total: 1,
+          result: {
+            success: true,
+            category_name: suggestedCategory,
+            confidence: normalized ? 0.5 : 0.3,
+            match_type: 'keyword',
+            source: 'keyword',
+          },
+        },
+      });
+      return;
+    }
+    case 'create_transaction': {
+      const tx = data.transaction || {};
+      if (tx.amount_cents === undefined || tx.amount_cents === null || tx.amount_cents === 0) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Valor da transação é obrigatório' });
+        return;
+      }
+
+      const installmentTotal = tx.installment_total || 1;
+      if (installmentTotal > 1) {
+        const result = await createInstallmentTransactionsFromWhatsApp({
+          userId: user.userId,
+          description: tx.description || 'Compra parcelada via WhatsApp',
+          totalAmountCents: Math.abs(tx.amount_cents || 0),
+          installmentTotal,
+          postedAt: tx.posted_at || new Date().toISOString().split('T')[0],
+          categoryName: tx.category_name,
+          accountName: tx.account_name,
+          notes: tx.notes,
+        });
+
+        if (!result.success) {
+          await updateJob(jobId, { status: 'failed', error_summary: result.error });
+          return;
+        }
+
+        projectionCache.invalidateUser(user.userId);
+        await updateJob(jobId, {
+          status: 'completed',
+          progress: { processed: 1, total: 1, result },
+        });
+        return;
+      }
+
+      const result = await createTransactionFromWhatsApp({
+        userId: user.userId,
+        description: tx.description || 'Transação via WhatsApp',
+        amountCents: tx.amount_cents || 0,
+        postedAt: tx.posted_at || new Date().toISOString().split('T')[0],
+        categoryName: tx.category_name,
+        accountName: tx.account_name,
+        notes: tx.notes,
+      });
+
+      if (!result.success) {
+        await updateJob(jobId, { status: 'failed', error_summary: result.error });
+        return;
+      }
+
+      projectionCache.invalidateUser(user.userId);
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: { processed: 1, total: 1, result },
+      });
+      return;
+    }
+    case 'update_transaction': {
+      const tx = data.transaction || {};
+      if (!tx.id) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Missing transaction id' });
+        return;
+      }
+
+      const result = await updateTransaction({
+        userId: user.userId,
+        transactionId: tx.id,
+        updates: {
+          description: tx.description,
+          amountCents: tx.amount_cents,
+          postedAt: tx.posted_at,
+          categoryName: tx.category_name,
+          accountName: tx.account_name,
+          notes: tx.notes,
+        },
+      });
+
+      if (!result.success) {
+        await updateJob(jobId, { status: 'failed', error_summary: result.error });
+        return;
+      }
+
+      projectionCache.invalidateUser(user.userId);
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: { processed: 1, total: 1, result },
+      });
+      return;
+    }
+    case 'delete_transaction': {
+      const tx = data.transaction || {};
+      if (!tx.id) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Missing transaction id' });
+        return;
+      }
+
+      const result = await deleteTransaction({
+        userId: user.userId,
+        transactionId: tx.id,
+      });
+
+      if (!result.success) {
+        await updateJob(jobId, { status: 'failed', error_summary: result.error });
+        return;
+      }
+
+      projectionCache.invalidateUser(user.userId);
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: { processed: 1, total: 1, result },
+      });
+      return;
+    }
+    case 'query_balance': {
+      const context = await getUserContextForAI(user.userId);
+      if (!context) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Erro ao obter contexto' });
+        return;
+      }
+
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: { processed: 1, total: 1, result: { balance: formatBalanceInfo(context) } },
+      });
+      return;
+    }
+    case 'list_transactions': {
+      const transactions = await getRecentTransactions(user.userId, {
+        limit: data.limit || 5,
+        period: data.period,
+      });
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: { processed: 1, total: 1, result: { transactions: formatTransactionsList(transactions) } },
+      });
+      return;
+    }
+    case 'query_budgets': {
+      const month = data.month || new Date().toISOString().slice(0, 7);
+      const [yearStr, monthStr] = month.split('-');
+      const year = parseInt(yearStr, 10);
+      const monthNum = parseInt(monthStr, 10);
+
+      const { data: budgets, error } = await supabase
+        .from('budgets')
+        .select(`
+          id,
+          year,
+          month,
+          amount_planned_cents,
+          categories (
+            id,
+            name,
+            type,
+            icon
+          )
+        `)
+        .eq('user_id', user.userId)
+        .eq('year', year)
+        .eq('month', monthNum);
+
+      if (error) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Erro ao buscar orçamentos' });
+        return;
+      }
+
+      const startDate = `${month}-01`;
+      const endDate = new Date(year, monthNum, 0).toISOString().split('T')[0];
+      const { data: transactions } = await supabase
+        .from('transactions')
+        .select('category_id, amount')
+        .eq('user_id', user.userId)
+        .gte('posted_at', startDate)
+        .lte('posted_at', endDate)
+        .lt('amount', 0);
+
+      const spentByCategory: Record<string, number> = {};
+      for (const tx of transactions || []) {
+        if (tx.category_id) {
+          spentByCategory[tx.category_id] = (spentByCategory[tx.category_id] || 0) + Math.abs(tx.amount * 100);
+        }
+      }
+
+      const formattedBudgets = (budgets || []).map((b: any) => ({
+        id: b.id,
+        category_name: b.categories?.name || 'Sem categoria',
+        planned_cents: b.amount_planned_cents,
+        planned_formatted: formatCurrency(b.amount_planned_cents),
+        spent_cents: spentByCategory[b.categories?.id] || 0,
+        spent_formatted: formatCurrency(spentByCategory[b.categories?.id] || 0),
+        remaining_cents: b.amount_planned_cents - (spentByCategory[b.categories?.id] || 0),
+        percentage_used: Math.round(((spentByCategory[b.categories?.id] || 0) / b.amount_planned_cents) * 100),
+      }));
+
+      let message = `📊 *Orçamentos de ${month}*\n\n`;
+      for (const b of formattedBudgets) {
+        const emoji = b.percentage_used > 100 ? '🔴' : b.percentage_used > 80 ? '🟡' : '🟢';
+        message += `${emoji} *${b.category_name}*\n`;
+        message += `   Planejado: ${b.planned_formatted}\n`;
+        message += `   Gasto: ${b.spent_formatted} (${b.percentage_used}%)\n\n`;
+      }
+
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: { processed: 1, total: 1, result: { success: true, data: formattedBudgets, month, message } },
+      });
+      return;
+    }
+    case 'update_budget': {
+      const { category_name, amount_cents, month } = data || {};
+      if (!category_name || !amount_cents) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Missing category_name or amount_cents' });
+        return;
+      }
+
+      const targetMonth = month || new Date().toISOString().slice(0, 7);
+      const [year, monthNum] = targetMonth.split('-').map(Number);
+
+      const { data: category } = await supabase
+        .from('categories')
+        .select('id, name')
+        .eq('user_id', user.userId)
+        .ilike('name', category_name)
+        .single();
+
+      if (!category) {
+        await updateJob(jobId, { status: 'failed', error_summary: `Categoria "${category_name}" não encontrada` });
+        return;
+      }
+
+      const { data: budget, error } = await supabase
+        .from('budgets')
+        .upsert({
+          user_id: user.userId,
+          category_id: category.id,
+          year,
+          month: monthNum,
+          amount_planned_cents: amount_cents,
+        }, {
+          onConflict: 'user_id,category_id,year,month',
+        })
+        .select()
+        .single();
+
+      if (error) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Erro ao atualizar orçamento' });
+        return;
+      }
+
+      projectionCache.invalidateUser(user.userId);
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: {
+          processed: 1,
+          total: 1,
+          result: {
+            success: true,
+            budget_id: budget.id,
+            message: `Orçamento de "${category.name}" atualizado para ${formatCurrency(amount_cents)} em ${targetMonth}`,
+          },
+        },
+      });
+      return;
+    }
+    case 'query_goals': {
+      const { data: goals, error } = await supabase
+        .from('goals')
+        .select(`
+          id,
+          name,
+          description,
+          target_amount_cents,
+          current_amount_cents,
+          target_date,
+          status,
+          monthly_contribution_cents
+        `)
+        .eq('user_id', user.userId)
+        .eq('status', 'active');
+
+      if (error) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Erro ao buscar metas' });
+        return;
+      }
+
+      let message = `🎯 *Suas Metas*\n\n`;
+      for (const g of goals || []) {
+        const progress = Math.round((g.current_amount_cents / g.target_amount_cents) * 100);
+        const remaining = g.target_amount_cents - g.current_amount_cents;
+        message += `*${g.name}*\n`;
+        message += `   Meta: ${formatCurrency(g.target_amount_cents)}\n`;
+        message += `   Atual: ${formatCurrency(g.current_amount_cents)} (${progress}%)\n`;
+        message += `   Falta: ${formatCurrency(remaining)}\n`;
+        if (g.target_date) {
+          message += `   Prazo: ${new Date(g.target_date).toLocaleDateString('pt-BR')}\n`;
+        }
+        if (g.monthly_contribution_cents) {
+          message += `   Aporte mensal: ${formatCurrency(g.monthly_contribution_cents)}\n`;
+        }
+        message += '\n';
+      }
+
+      if ((goals || []).length === 0) {
+        message = 'Você ainda não tem metas cadastradas. Que tal criar uma?';
+      }
+
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: { processed: 1, total: 1, result: { success: true, data: goals, count: (goals || []).length, message } },
+      });
+      return;
+    }
+    case 'create_goal': {
+      const { name, target_amount_cents, target_date, description, monthly_contribution_cents } = data || {};
+      if (!name || !target_amount_cents) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Missing name or target_amount_cents' });
+        return;
+      }
+
+      const { data: category, error: catError } = await supabase
+        .from('categories')
+        .insert({
+          user_id: user.userId,
+          name: `Meta: ${name}`,
+          type: 'expense',
+          source_type: 'goal',
+          icon: 'bx-target-lock',
+          color: '#10B981',
+        })
+        .select()
+        .single();
+
+      if (catError) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Erro ao criar categoria da meta' });
+        return;
+      }
+
+      let monthlyContribution = monthly_contribution_cents;
+      if (!monthlyContribution && target_date) {
+        const now = new Date();
+        const targetDateObj = new Date(target_date);
+        const monthsRemaining = Math.max(1,
+          (targetDateObj.getFullYear() - now.getFullYear()) * 12 +
+          (targetDateObj.getMonth() - now.getMonth())
+        );
+        monthlyContribution = Math.ceil(target_amount_cents / monthsRemaining);
+      }
+
+      const { data: goal, error } = await supabase
+        .from('goals')
+        .insert({
+          user_id: user.userId,
+          name,
+          description,
+          target_amount_cents,
+          current_amount_cents: 0,
+          target_date,
+          status: 'active',
+          category_id: category.id,
+          monthly_contribution_cents: monthlyContribution,
+          include_in_budget: true,
+          contribution_frequency: 'monthly',
+        })
+        .select()
+        .single();
+
+      if (error) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Erro ao criar meta' });
+        return;
+      }
+
+      projectionCache.invalidateUser(user.userId);
+      let message = `🎯 Meta "${name}" criada com sucesso!\n\n`;
+      message += `Meta: ${formatCurrency(target_amount_cents)}\n`;
+      if (target_date) {
+        message += `Prazo: ${new Date(target_date).toLocaleDateString('pt-BR')}\n`;
+      }
+      if (monthlyContribution) {
+        message += `Aporte sugerido: ${formatCurrency(monthlyContribution)}/mês`;
+      }
+
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: {
+          processed: 1,
+          total: 1,
+          result: {
+            success: true,
+            goal_id: goal.id,
+            category_id: category.id,
+            monthly_contribution_cents: monthlyContribution,
+            message,
+          },
+        },
+      });
+      return;
+    }
+    case 'contribute_goal': {
+      const { goal_name, amount_cents } = data || {};
+      if (!goal_name || !amount_cents) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Missing goal_name or amount_cents' });
+        return;
+      }
+
+      const { data: goal } = await supabase
+        .from('goals')
+        .select('id, name, target_amount_cents, current_amount_cents, category_id')
+        .eq('user_id', user.userId)
+        .ilike('name', `%${goal_name}%`)
+        .eq('status', 'active')
+        .single();
+
+      if (!goal) {
+        await updateJob(jobId, { status: 'failed', error_summary: `Meta "${goal_name}" não encontrada` });
+        return;
+      }
+
+      await createTransactionFromWhatsApp({
+        userId: user.userId,
+        description: `Aporte para meta: ${goal.name}`,
+        amountCents: -Math.abs(amount_cents),
+        postedAt: new Date().toISOString().split('T')[0],
+        categoryName: `Meta: ${goal.name}`,
+      });
+
+      const newAmount = goal.current_amount_cents + Math.abs(amount_cents);
+      await supabase
+        .from('goals')
+        .update({
+          current_amount_cents: newAmount,
+          status: newAmount >= goal.target_amount_cents ? 'achieved' : 'active',
+        })
+        .eq('id', goal.id);
+
+      projectionCache.invalidateUser(user.userId);
+      const progress = Math.round((newAmount / goal.target_amount_cents) * 100);
+      let message = `💰 Aporte de ${formatCurrency(Math.abs(amount_cents))} para "${goal.name}" registrado!\n\n`;
+      message += `Progresso: ${formatCurrency(newAmount)} de ${formatCurrency(goal.target_amount_cents)} (${progress}%)`;
+      if (newAmount >= goal.target_amount_cents) {
+        message += '\n\n🎉 Parabéns! Você atingiu sua meta!';
+      }
+
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: {
+          processed: 1,
+          total: 1,
+          result: {
+            success: true,
+            goal_id: goal.id,
+            new_amount_cents: newAmount,
+            progress_percentage: progress,
+            message,
+          },
+        },
+      });
+      return;
+    }
+    case 'query_debts': {
+      const { data: debts, error } = await supabase
+        .from('debts')
+        .select(`
+          id,
+          name,
+          creditor,
+          total_amount_cents,
+          paid_amount_cents,
+          due_date,
+          priority,
+          status,
+          installment_count,
+          monthly_payment_cents
+        `)
+        .eq('user_id', user.userId)
+        .in('status', ['active', 'negotiating', 'negociando']);
+
+      if (error) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Erro ao buscar dívidas' });
+        return;
+      }
+
+      let message = `💳 *Suas Dívidas*\n\n`;
+      let totalDebt = 0;
+      let totalPaid = 0;
+
+      for (const d of debts || []) {
+        const remaining = d.total_amount_cents - (d.paid_amount_cents || 0);
+        totalDebt += d.total_amount_cents;
+        totalPaid += d.paid_amount_cents || 0;
+
+        const priorityEmoji = d.priority === 'high' ? '🔴' : d.priority === 'medium' ? '🟡' : '🟢';
+        message += `${priorityEmoji} *${d.name}*`;
+        if (d.creditor) message += ` (${d.creditor})`;
+        message += '\n';
+        message += `   Total: ${formatCurrency(d.total_amount_cents)}\n`;
+        message += `   Pago: ${formatCurrency(d.paid_amount_cents || 0)}\n`;
+        message += `   Restante: ${formatCurrency(remaining)}\n`;
+        if (d.monthly_payment_cents) {
+          message += `   Parcela: ${formatCurrency(d.monthly_payment_cents)}\n`;
+        }
+        if (d.due_date) {
+          message += `   Vencimento: ${new Date(d.due_date).toLocaleDateString('pt-BR')}\n`;
+        }
+        message += '\n';
+      }
+
+      if ((debts || []).length === 0) {
+        message = '🎉 Você não tem dívidas cadastradas. Continue assim!';
+      } else {
+        message += `\n📊 *Resumo*\n`;
+        message += `Total em dívidas: ${formatCurrency(totalDebt)}\n`;
+        message += `Total pago: ${formatCurrency(totalPaid)}\n`;
+        message += `Restante: ${formatCurrency(totalDebt - totalPaid)}`;
+      }
+
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: {
+          processed: 1,
+          total: 1,
+          result: {
+            success: true,
+            data: debts,
+            count: (debts || []).length,
+            total_debt_cents: totalDebt,
+            total_paid_cents: totalPaid,
+            message,
+          },
+        },
+      });
+      return;
+    }
+    case 'create_debt': {
+      const { name, creditor, total_amount_cents, due_date, priority, installment_count, monthly_payment_cents } = data || {};
+      if (!name || !total_amount_cents) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Missing name or total_amount_cents' });
+        return;
+      }
+
+      const { data: category, error: catError } = await supabase
+        .from('categories')
+        .insert({
+          user_id: user.userId,
+          name: `Dívida: ${name}`,
+          type: 'expense',
+          source_type: 'debt',
+          icon: 'bx-credit-card',
+          color: '#EF4444',
+        })
+        .select()
+        .single();
+
+      if (catError) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Erro ao criar categoria' });
+        return;
+      }
+
+      const { data: debt, error } = await supabase
+        .from('debts')
+        .insert({
+          user_id: user.userId,
+          name,
+          creditor,
+          total_amount_cents,
+          paid_amount_cents: 0,
+          due_date,
+          priority: priority || 'medium',
+          status: 'active',
+          category_id: category.id,
+          installment_count,
+          monthly_payment_cents: monthly_payment_cents || (installment_count ? Math.ceil(total_amount_cents / installment_count) : null),
+          include_in_budget: true,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Erro ao criar dívida' });
+        return;
+      }
+
+      projectionCache.invalidateUser(user.userId);
+      let message = `💳 Dívida "${name}" cadastrada!\n\n`;
+      message += `Valor total: ${formatCurrency(total_amount_cents)}\n`;
+      if (creditor) message += `Credor: ${creditor}\n`;
+      if (installment_count) {
+        const parcela = Math.ceil(total_amount_cents / installment_count);
+        message += `Parcelas: ${installment_count}x de ${formatCurrency(parcela)}\n`;
+      }
+      if (due_date) {
+        message += `Vencimento: ${new Date(due_date).toLocaleDateString('pt-BR')}`;
+      }
+
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: {
+          processed: 1,
+          total: 1,
+          result: {
+            success: true,
+            debt_id: debt.id,
+            category_id: category.id,
+            message,
+          },
+        },
+      });
+      return;
+    }
+    case 'pay_debt': {
+      const { debt_name, amount_cents } = data || {};
+      if (!debt_name || !amount_cents) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Missing debt_name or amount_cents' });
+        return;
+      }
+
+      const { data: debt } = await supabase
+        .from('debts')
+        .select('id, name, total_amount_cents, paid_amount_cents, category_id')
+        .eq('user_id', user.userId)
+        .ilike('name', `%${debt_name}%`)
+        .in('status', ['active', 'negotiating', 'negociando'])
+        .single();
+
+      if (!debt) {
+        await updateJob(jobId, { status: 'failed', error_summary: `Dívida "${debt_name}" não encontrada` });
+        return;
+      }
+
+      await createTransactionFromWhatsApp({
+        userId: user.userId,
+        description: `Pagamento dívida: ${debt.name}`,
+        amountCents: -Math.abs(amount_cents),
+        postedAt: new Date().toISOString().split('T')[0],
+        categoryName: `Dívida: ${debt.name}`,
+      });
+
+      const newPaidAmount = (debt.paid_amount_cents || 0) + Math.abs(amount_cents);
+      const isPaid = newPaidAmount >= debt.total_amount_cents;
+
+      await supabase
+        .from('debts')
+        .update({
+          paid_amount_cents: newPaidAmount,
+          status: isPaid ? 'paid' : 'active',
+        })
+        .eq('id', debt.id);
+
+      projectionCache.invalidateUser(user.userId);
+      const remaining = debt.total_amount_cents - newPaidAmount;
+      let message = `💰 Pagamento de ${formatCurrency(Math.abs(amount_cents))} registrado para "${debt.name}"!\n\n`;
+      message += `Total pago: ${formatCurrency(newPaidAmount)}\n`;
+      message += `Restante: ${formatCurrency(Math.max(0, remaining))}`;
+      if (isPaid) {
+        message += '\n\n🎉 Parabéns! Dívida quitada!';
+      }
+
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: {
+          processed: 1,
+          total: 1,
+          result: {
+            success: true,
+            debt_id: debt.id,
+            new_paid_amount_cents: newPaidAmount,
+            remaining_cents: Math.max(0, remaining),
+            is_paid: isPaid,
+            message,
+          },
+        },
+      });
+      return;
+    }
+    case 'generate_report': {
+      const month = data?.month || new Date().toISOString().slice(0, 7);
+      const [year, monthNum] = month.split('-').map(Number);
+      const startDate = `${month}-01`;
+      const endDate = new Date(year, monthNum, 0).toISOString().split('T')[0];
+
+      const { data: transactions } = await supabase
+        .from('transactions')
+        .select(`
+          id,
+          description,
+          amount,
+          posted_at,
+          categories (
+            id,
+            name,
+            type
+          )
+        `)
+        .eq('user_id', user.userId)
+        .gte('posted_at', startDate)
+        .lte('posted_at', endDate)
+        .order('posted_at', { ascending: false });
+
+      const categoryTotals: Record<string, { name: string; total: number; count: number; type: string }> = {};
+      let totalIncome = 0;
+      let totalExpenses = 0;
+
+      for (const tx of transactions || []) {
+        const cat = tx.categories as any;
+        const categoryName = cat?.name || 'Sem categoria';
+        const categoryType = cat?.type || (tx.amount >= 0 ? 'income' : 'expense');
+
+        if (!categoryTotals[categoryName]) {
+          categoryTotals[categoryName] = { name: categoryName, total: 0, count: 0, type: categoryType };
+        }
+        categoryTotals[categoryName].total += tx.amount * 100;
+        categoryTotals[categoryName].count++;
+
+        if (tx.amount >= 0) {
+          totalIncome += tx.amount * 100;
+        } else {
+          totalExpenses += Math.abs(tx.amount * 100);
+        }
+      }
+
+      const sortedCategories = Object.values(categoryTotals)
+        .sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
+
+      const monthName = new Date(year, monthNum - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      let message = `📊 *Relatório de ${monthName}*\n\n`;
+      message += `💰 *Resumo*\n`;
+      message += `   Receitas: ${formatCurrency(totalIncome)}\n`;
+      message += `   Despesas: ${formatCurrency(totalExpenses)}\n`;
+      message += `   Saldo: ${formatCurrency(totalIncome - totalExpenses)}\n\n`;
+
+      message += `📈 *Por Categoria*\n`;
+      for (const cat of sortedCategories.slice(0, 10)) {
+        const emoji = cat.type === 'income' ? '🟢' : '🔴';
+        message += `${emoji} ${cat.name}: ${formatCurrency(Math.abs(cat.total))} (${cat.count}x)\n`;
+      }
+      if (sortedCategories.length > 10) {
+        message += `... e mais ${sortedCategories.length - 10} categorias`;
+      }
+
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: {
+          processed: 1,
+          total: 1,
+          result: {
+            success: true,
+            data: {
+              month,
+              total_income_cents: totalIncome,
+              total_expenses_cents: totalExpenses,
+              balance_cents: totalIncome - totalExpenses,
+              transaction_count: (transactions || []).length,
+              categories: sortedCategories,
+            },
+            message,
+          },
+        },
+      });
+      return;
+    }
+    case 'query_investments': {
+      const investments = await getInvestments(user.userId);
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: { processed: 1, total: 1, result: investments },
+      });
+      return;
+    }
+    case 'query_credit_cards': {
+      const cardName = data?.card_name;
+      const cards = await getCreditCardsWithBills(user.userId, cardName);
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: { processed: 1, total: 1, result: cards },
+      });
+      return;
+    }
+    case 'query_upcoming_payments': {
+      const days = data?.days || 30;
+      const payments = await getUpcomingPayments(user.userId, days);
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: { processed: 1, total: 1, result: payments },
+      });
+      return;
+    }
+    case 'query_budget_status': {
+      const month = data?.month;
+      const status = await getBudgetStatus(user.userId, month);
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: { processed: 1, total: 1, result: status },
+      });
+      return;
+    }
+    case 'get_context': {
+      const context = await getUserContextForAI(user.userId);
+      if (!context) {
+        await updateJob(jobId, { status: 'failed', error_summary: 'Erro ao obter contexto' });
+        return;
+      }
+      await updateJob(jobId, {
+        status: 'completed',
+        progress: { processed: 1, total: 1, result: context },
+      });
+      return;
+    }
+    default: {
+      await updateJob(jobId, { status: 'failed', error_summary: `Operacao nao suportada: ${payload.operation}` });
+      return;
+    }
+  }
+}
+
 async function handleJob(jobId: string) {
   const supabase = getAdminClient();
   const { data: job } = (await (supabase as any)
@@ -1665,6 +2845,16 @@ async function handleJob(jobId: string) {
 
   if (job.type === 'transaction_manual_create') {
     await runManualTransactionCreate(jobId, job.payload as ManualTransactionPayload);
+    return;
+  }
+
+  if (job.type === 'whatsapp_ingest') {
+    await runWhatsAppIngest(jobId, job.payload as WhatsAppIngestPayload);
+    return;
+  }
+
+  if (job.type === 'n8n_operation') {
+    await runN8nOperation(jobId, job.payload as N8nOperationPayload);
     return;
   }
 

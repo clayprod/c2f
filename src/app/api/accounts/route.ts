@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     const { supabase } = createClientFromRequest(request);
     const { data, error } = await supabase
       .from('accounts')
-      .select('*')
+      .select('*, transactions(count)')
       .eq('user_id', ownerId)
       .neq('type', 'credit_card')
       .order('created_at', { ascending: false });
@@ -30,10 +30,16 @@ export async function GET(request: NextRequest) {
     );
 
     // Convert current_balance (NUMERIC) to balance_cents (BIGINT) for API response
-    const transformedData = (data || []).map((account: any) => ({
-      ...account,
-      balance_cents: Math.round((account.current_balance || 0) * 100),
-    }));
+    const transformedData = (data || []).map((account: any) => {
+      const transactionsCount = account.transactions?.[0]?.count ?? 0;
+      const { transactions, ...rest } = account;
+      return {
+        ...rest,
+        balance_cents: Math.round((account.current_balance || 0) * 100),
+        initial_balance_cents: Math.round((account.initial_balance || 0) * 100),
+        has_transactions: transactionsCount > 0,
+      };
+    });
 
     return NextResponse.json({ data: transformedData });
   } catch (error) {
@@ -57,10 +63,13 @@ export async function POST(request: NextRequest) {
     const validated = accountSchema.parse(body);
 
     const { supabase } = createClientFromRequest(request);
+    const initialBalanceCents =
+      validated.initial_balance_cents ?? validated.balance_cents ?? 0;
     const insertData: any = {
       name: validated.name,
       type: validated.type,
-      current_balance: validated.balance_cents / 100, // Convert cents to NUMERIC (reais)
+      initial_balance: initialBalanceCents / 100,
+      current_balance: initialBalanceCents / 100, // Convert cents to NUMERIC (reais)
       currency: validated.currency,
       institution: validated.institution,
       user_id: ownerId,
@@ -107,6 +116,7 @@ export async function POST(request: NextRequest) {
     const transformedData = {
       ...data,
       balance_cents: Math.round((data.current_balance || 0) * 100),
+      initial_balance_cents: Math.round((data.initial_balance || 0) * 100),
     };
 
     return NextResponse.json({ data: transformedData }, { status: 201 });
@@ -124,4 +134,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

@@ -18,6 +18,8 @@ import { getGlobalSettings } from '@/services/admin/globalSettings';
 import { getUserByPhoneNumber, normalizePhoneNumber } from '@/services/whatsapp/verification';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { projectionCache } from '@/services/projections/cache';
+import { getJobQueue } from '@/lib/queue/jobQueue';
+import { randomUUID } from 'crypto';
 import {
   createTransactionFromWhatsApp,
   createInstallmentTransactionsFromWhatsApp,
@@ -83,7 +85,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const body: OperationRequest = await request.json();
-    operation = body.operation;
+    const operationName = body.operation as string;
+    operation = operationName;
     const normalizedPhone = normalizePhoneNumber(body.phone_number);
 
     // Get user
@@ -101,8 +104,41 @@ export async function POST(request: NextRequest) {
     // Log operation start
     console.log(`[n8n Operations] ${operation} for user ${user.userId} (${normalizedPhone})`);
 
+    if (!['buffer_message', 'get_buffered_messages'].includes(operationName)) {
+      const jobId = randomUUID();
+      const { error: jobError } = await supabase
+        .from('jobs')
+        .insert({
+          id: jobId,
+          user_id: user.userId,
+          type: 'n8n_operation',
+          status: 'queued',
+          payload: {
+            operation: operationName,
+            phone_number: normalizedPhone,
+            data: body.data,
+            message_id: body.message_id,
+            buffer_message: body.buffer_message,
+            user,
+          },
+          progress: { processed: 0, total: 1 },
+        });
+
+      if (jobError) {
+        throw jobError;
+      }
+
+      const queue = getJobQueue();
+      await queue.add('job', { jobId });
+
+      return NextResponse.json({
+        success: true,
+        job_id: jobId,
+      });
+    }
+
     // Handle different operations
-    switch (body.operation) {
+    switch (operationName) {
       // ==================== MESSAGE BUFFERING ====================
       case 'buffer_message': {
         const bufferData = body.buffer_message;

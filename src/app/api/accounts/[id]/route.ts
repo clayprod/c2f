@@ -26,9 +26,17 @@ export async function GET(
     if (error) throw error;
 
     // Convert current_balance (NUMERIC) to balance_cents (BIGINT) for API response
+    const { count: transactionsCount } = await supabase
+      .from('transactions')
+      .select('*', { count: 'exact', head: true })
+      .eq('account_id', params.id)
+      .eq('user_id', ownerId);
+
     const transformedData = {
       ...data,
       balance_cents: Math.round((data.current_balance || 0) * 100),
+      initial_balance_cents: Math.round((data.initial_balance || 0) * 100),
+      has_transactions: (transactionsCount || 0) > 0,
     };
 
     return NextResponse.json({ data: transformedData });
@@ -57,11 +65,15 @@ export async function PATCH(
 
     // Build update object with only provided fields
     const updateData: Record<string, any> = {};
+    const hasInitialBalanceUpdate = body.initial_balance_cents !== undefined;
+    const hasBalanceUpdate = body.balance_cents !== undefined;
     if (body.name !== undefined) updateData.name = body.name;
     if (body.type !== undefined) updateData.type = body.type;
     if (body.institution !== undefined) updateData.institution = body.institution;
     if (body.currency !== undefined) updateData.currency = body.currency;
-    if (body.balance_cents !== undefined) updateData.current_balance = body.balance_cents / 100;
+    if (hasInitialBalanceUpdate) {
+      updateData.initial_balance = body.initial_balance_cents / 100;
+    }
     if (body.color !== undefined) updateData.color = body.color;
     if (body.icon !== undefined) updateData.icon = body.icon;
     if (body.is_default !== undefined) updateData.is_default = body.is_default;
@@ -70,6 +82,43 @@ export async function PATCH(
     if (body.yield_type !== undefined) updateData.yield_type = body.yield_type;
     if (body.yield_rate_monthly !== undefined) updateData.yield_rate_monthly = body.yield_rate_monthly;
     if (body.cdi_percentage !== undefined) updateData.cdi_percentage = body.cdi_percentage;
+
+    let transactionsCount: number | null = null;
+    if (hasBalanceUpdate || hasInitialBalanceUpdate) {
+      const countResponse = await supabase
+        .from('transactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('account_id', params.id)
+        .eq('user_id', ownerId);
+      transactionsCount = countResponse.count || 0;
+    }
+
+    if (hasBalanceUpdate && !hasInitialBalanceUpdate && (transactionsCount || 0) > 0) {
+      return NextResponse.json(
+        { error: 'Não é possível editar o saldo atual quando há transações. Edite o saldo inicial ou ajuste as transações.' },
+        { status: 400 }
+      );
+    }
+
+    if (hasInitialBalanceUpdate) {
+      const { data: transactions, error: txError } = await supabase
+        .from('transactions')
+        .select('amount')
+        .eq('account_id', params.id)
+        .eq('user_id', ownerId);
+
+      if (txError) throw txError;
+
+      const totalTransactionsAmount = (transactions || []).reduce(
+        (sum: number, tx: { amount: any }) => sum + (typeof tx.amount === 'number' ? tx.amount : parseFloat(tx.amount) || 0),
+        0
+      );
+
+      updateData.current_balance = updateData.initial_balance + totalTransactionsAmount;
+    } else if (hasBalanceUpdate) {
+      updateData.current_balance = body.balance_cents / 100;
+      updateData.initial_balance = body.balance_cents / 100;
+    }
 
     const { data, error } = await supabase
       .from('accounts')
@@ -82,9 +131,20 @@ export async function PATCH(
     if (error) throw error;
 
     // Convert current_balance (NUMERIC) to balance_cents (BIGINT) for API response
+    if (transactionsCount === null) {
+      const countResponse = await supabase
+        .from('transactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('account_id', params.id)
+        .eq('user_id', ownerId);
+      transactionsCount = countResponse.count || 0;
+    }
+
     const transformedData = {
       ...data,
       balance_cents: Math.round((data.current_balance || 0) * 100),
+      initial_balance_cents: Math.round((data.initial_balance || 0) * 100),
+      has_transactions: (transactionsCount || 0) > 0,
     };
 
     return NextResponse.json({ data: transformedData });

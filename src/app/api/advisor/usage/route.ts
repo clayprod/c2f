@@ -87,6 +87,7 @@ export async function GET(request: NextRequest) {
       used,
       limit: monthlyLimit,
       unlimited,
+      plan: userPlan.plan,
     });
   } catch (error) {
     console.error('Advisor usage API error:', error);

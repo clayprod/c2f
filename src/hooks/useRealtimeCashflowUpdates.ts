@@ -30,11 +30,11 @@ export function useRealtimeCashflowUpdates({
   enabled = true,
   debounceMs = 400,
   minIntervalMs = 1000,
-  pollingIntervalMs = 60000,
+  pollingIntervalMs = 0,
   tables = CASHFLOW_TABLES,
   events = ['*'],
-  refreshOnFocus = true,
-  refreshOnVisibility = true,
+  refreshOnFocus = false,
+  refreshOnVisibility = false,
 }: UseRealtimeCashflowUpdatesOptions) {
   const [supabase] = useState(() => createClient());
   const refreshRef = useRef(onRefresh);

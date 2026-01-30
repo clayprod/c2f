@@ -1,6 +1,7 @@
 'use client';
 
 import { formatCurrencyValue } from '@/lib/utils';
+import { parseDateOnly } from '@/lib/date';
 
 export interface Transaction {
   id: string;
@@ -140,7 +141,8 @@ export default function TransactionTable({
   };
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('pt-BR');
+    const parsed = parseDateOnly(date) || new Date(date);
+    return parsed.toLocaleDateString('pt-BR');
   };
 
   const handleSort = (column: 'posted_at' | 'amount' | 'created_at') => {

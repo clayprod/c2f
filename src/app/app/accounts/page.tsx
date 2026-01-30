@@ -23,6 +23,8 @@ interface Account {
   institution: string | null;
   currency: string;
   current_balance: number;
+  initial_balance?: number;
+  has_transactions?: boolean;
   color?: string;
   icon?: string;
   is_default?: boolean;
@@ -72,7 +74,7 @@ export default function AccountsPage() {
     type: 'checking',
     institution: '',
     currency: 'BRL',
-    current_balance: '',
+    initial_balance: '',
     color: '#3b82f6',
     icon: '🏦',
     has_overdraft: false,
@@ -190,7 +192,7 @@ export default function AccountsPage() {
         type: formData.type,
         institution: formData.institution.trim() || null,
         currency: formData.currency,
-        balance_cents: Math.round(parseFloat(formData.current_balance || '0') * 100),
+        initial_balance_cents: Math.round(parseFloat(formData.initial_balance || '0') * 100),
         color: formData.color,
         icon: formData.icon,
       };
@@ -294,7 +296,7 @@ export default function AccountsPage() {
       type: account.type,
       institution: account.institution || '',
       currency: account.currency,
-      current_balance: account.current_balance.toString(),
+      initial_balance: (account.initial_balance ?? account.current_balance ?? 0).toString(),
       color: account.color || '#3b82f6',
       icon: account.icon || '🏦',
       has_overdraft: (account.overdraft_limit_cents || 0) > 0,
@@ -317,7 +319,7 @@ export default function AccountsPage() {
       type: 'checking',
       institution: '',
       currency: 'BRL',
-      current_balance: '',
+      initial_balance: '',
       color: '#3b82f6',
       icon: '🏦',
       has_overdraft: false,
@@ -532,14 +534,31 @@ export default function AccountsPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium">Saldo Atual</label>
+              <label className="text-sm font-medium">Saldo Inicial</label>
               <Input
                 type="number"
                 step="0.01"
-                value={formData.current_balance}
-                onChange={(e) => setFormData({ ...formData, current_balance: e.target.value })}
+                value={formData.initial_balance}
+                onChange={(e) => setFormData({ ...formData, initial_balance: e.target.value })}
                 placeholder="0,00"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Saldo atual = saldo inicial + transações.
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Saldo Atual</label>
+              <Input
+                type="text"
+                value={formatCurrency(editingAccount?.current_balance || 0)}
+                disabled
+              />
+              {editingAccount?.has_transactions && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Não é possível editar o saldo atual quando há transações.
+                </p>
+              )}
             </div>
 
             {/* Cheque Especial */}

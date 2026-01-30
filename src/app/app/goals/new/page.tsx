@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { useMembers } from '@/hooks/useMembers';
+import { parseDateOnly } from '@/lib/date';
 
 const categoryColors = [
   '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
@@ -351,7 +352,7 @@ export default function NewGoalPage() {
           <div>
             <label className="block text-sm font-medium mb-2">Data Objetivo</label>
             <DatePicker
-              date={formData.target_date ? new Date(formData.target_date) : undefined}
+              date={parseDateOnly(formData.target_date)}
               setDate={(date) => {
                 if (date) {
                   const formattedDate = format(date, 'yyyy-MM-dd');

@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils';
+import { parseDateOnly } from '@/lib/date';
 
 interface Transaction {
   id: string;
@@ -657,7 +658,7 @@ export default function BillDetailModal({
             <div>
               <Label htmlFor="payment_date">Data do Pagamento</Label>
               <DatePicker
-                date={paymentData.payment_date ? new Date(paymentData.payment_date) : undefined}
+                date={parseDateOnly(paymentData.payment_date)}
                 setDate={(date) => {
                   if (date) {
                     const formattedDate = format(date, 'yyyy-MM-dd');

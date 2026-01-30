@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useMembers } from '@/hooks/useMembers';
+import { parseDateOnly } from '@/lib/date';
 
 export default function NewDebtPage() {
   const router = useRouter();
@@ -211,7 +212,7 @@ export default function NewDebtPage() {
           <div>
             <label className="block text-sm font-medium mb-2">Data de Vencimento</label>
             <DatePicker
-              date={formData.due_date ? new Date(formData.due_date) : undefined}
+              date={parseDateOnly(formData.due_date)}
               setDate={(date) => {
                 if (date) {
                   const formattedDate = format(date, 'yyyy-MM-dd');
@@ -506,4 +507,3 @@ export default function NewDebtPage() {
     </div>
   );
 }
-

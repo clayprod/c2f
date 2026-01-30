@@ -112,7 +112,6 @@ export default function CategoriesPage() {
   useRealtimeCashflowUpdates({
     ownerId,
     onRefresh: () => {
-      fetchCategories();
       fetchCategoriesWithTransactions();
     },
     tables: ['categories', 'transactions'],

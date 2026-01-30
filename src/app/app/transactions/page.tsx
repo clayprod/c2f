@@ -20,6 +20,7 @@ import { useMembers } from '@/hooks/useMembers';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import { useAccountContext } from '@/hooks/useAccountContext';
 import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
+import { formatDateOnly } from '@/lib/date';
 
 interface Account {
   id: string;
@@ -95,11 +96,8 @@ export default function TransactionsPage() {
     ownerId,
     onRefresh: () => {
       fetchTransactions();
-      fetchAccounts();
-      fetchCreditCards();
-      fetchCategories();
     },
-    tables: ['transactions', 'accounts', 'categories'],
+    tables: ['transactions'],
     events: ['INSERT', 'UPDATE', 'DELETE'],
   });
 
@@ -234,7 +232,7 @@ export default function TransactionsPage() {
           });
 
           setPagination(prev => ({ ...prev, offset: 0 }));
-          const transactionDate = formDataRef.current?.posted_at || new Date().toISOString().split('T')[0];
+          const transactionDate = formDataRef.current?.posted_at || formatDateOnly(new Date());
           const needsFilterAdjustment =
             (filters.fromDate && transactionDate < filters.fromDate) ||
             (filters.toDate && transactionDate > filters.toDate);
@@ -245,6 +243,8 @@ export default function TransactionsPage() {
               fromDate: filters.fromDate && transactionDate < filters.fromDate ? transactionDate : prev.fromDate,
               toDate: filters.toDate && transactionDate > filters.toDate ? transactionDate : prev.toDate,
             }));
+          } else {
+            fetchTransactions();
           }
 
           setFormOpen(false);
@@ -276,7 +276,7 @@ export default function TransactionsPage() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [createJobId, creatingJob, filters.fromDate, filters.toDate, toast]);
+  }, [createJobId, creatingJob, fetchTransactions, filters.fromDate, filters.toDate, toast]);
 
   const handleUpdateTransaction = async (formData: any) => {
     if (!editingTransaction) return;

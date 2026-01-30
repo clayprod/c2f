@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { useMembers } from '@/hooks/useMembers';
+import { parseDateOnly } from '@/lib/date';
 import { useAccountContext } from '@/hooks/useAccountContext';
 import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
 
@@ -512,7 +513,7 @@ export default function EditGoalPage({ params }: { params: { id: string } }) {
           <div>
             <label className="block text-sm font-medium mb-2">Data Objetivo</label>
             <DatePicker
-              date={formData.target_date ? new Date(formData.target_date) : undefined}
+              date={parseDateOnly(formData.target_date)}
               setDate={(date) => {
                 if (date) {
                   const formattedDate = format(date, 'yyyy-MM-dd');

@@ -424,6 +424,7 @@ export default function ImportModal({
       );
 
       setTransactions(parsedTransactions);
+      setCurrentPage(1);
       setPreviewStats(data.stats || null);
       setStep('preview');
       setProgress({ status: 'idle' });
@@ -511,6 +512,7 @@ export default function ImportModal({
       });
 
       setTransactions(parsedTransactions);
+      setCurrentPage(1);
       setStep('preview');
       setProgress({ status: 'idle' });
 
@@ -1216,9 +1218,9 @@ export default function ImportModal({
               </Button>
             </div>
 
-            <div className="flex-1 overflow-hidden min-h-0 border rounded-md">
+            <div className="flex-1 overflow-hidden min-h-0 border rounded-md flex flex-col">
               {/* Header */}
-              <div className="grid grid-cols-[40px_100px_1fr_100px_180px] gap-2 p-2 text-xs text-muted-foreground border-b bg-background sticky top-0 z-10">
+              <div className="grid grid-cols-[40px_100px_1fr_100px_180px] gap-2 p-2 text-xs text-muted-foreground border-b bg-background">
                 <div></div>
                 <div>Data</div>
                 <div>Descrição</div>
@@ -1227,7 +1229,7 @@ export default function ImportModal({
               </div>
               
               {/* Paginated List */}
-              <div className="max-h-[400px] overflow-y-auto">
+              <div className="flex-1 overflow-y-auto min-h-0">
                 {paginatedTransactions.map((tx) => (
                   <div
                     key={tx.id}
@@ -1308,7 +1310,7 @@ export default function ImportModal({
             </div>
 
             <div className="text-sm text-muted-foreground pt-2 border-t shrink-0">
-              Transações sem categoria serão importadas como "Outros"
+              Transações sem categoria serão categorizadas automaticamente pela IA
             </div>
 
             <DialogFooter className="shrink-0">

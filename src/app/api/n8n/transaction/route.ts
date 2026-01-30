@@ -22,6 +22,8 @@ import {
 } from '@/services/whatsapp/transactions';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { projectionCache } from '@/services/projections/cache';
+import { getJobQueue } from '@/lib/queue/jobQueue';
+import { randomUUID } from 'crypto';
 
 async function validateN8nApiKey(request: NextRequest): Promise<boolean> {
   const apiKey = request.headers.get('x-n8n-api-key');
@@ -75,6 +77,37 @@ export async function POST(request: NextRequest) {
       }, { status: 404 });
     }
 
+    const jobId = randomUUID();
+    const { error: jobError } = await createAdminClient()
+      .from('jobs')
+      .insert({
+        id: jobId,
+        user_id: user.userId,
+        type: 'whatsapp_ingest',
+        status: 'queued',
+        payload: {
+          action,
+          phone_number: normalizedPhone,
+          transaction,
+          user,
+        },
+        progress: { processed: 0, total: 1 },
+      });
+
+    if (jobError) {
+      throw jobError;
+    }
+
+    const queue = getJobQueue();
+    await queue.add('job', { jobId });
+
+    return NextResponse.json({
+      success: true,
+      job_id: jobId,
+    });
+
+    /*
+    /*
     // Handle different actions
     switch (action) {
       case 'create': {
@@ -348,6 +381,7 @@ export async function POST(request: NextRequest) {
           error: `Invalid action: ${action}. Valid actions: create, update, delete, query`,
         }, { status: 400 });
     }
+    */
   } catch (error: any) {
     console.error('[n8n Transaction] Error:', error);
     return NextResponse.json({

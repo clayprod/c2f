@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useMembers } from '@/hooks/useMembers';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import { formatCurrency } from '@/lib/utils';
+import { parseDateOnly } from '@/lib/date';
 import { useAccountContext } from '@/hooks/useAccountContext';
 import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
 
@@ -402,7 +403,7 @@ export default function InvestmentDetailPage() {
             <div>
               <label className="block text-sm font-medium mb-2">Data de Compra</label>
               <DatePicker
-                date={formData.purchase_date ? new Date(formData.purchase_date) : undefined}
+                date={parseDateOnly(formData.purchase_date)}
                 setDate={(date) => {
                   if (date) {
                     const formattedDate = format(date, 'yyyy-MM-dd');

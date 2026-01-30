@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { useMembers } from '@/hooks/useMembers';
+import { parseDateOnly } from '@/lib/date';
 
 export default function NewInvestmentPage() {
   const router = useRouter();
@@ -177,7 +178,7 @@ export default function NewInvestmentPage() {
           <div>
             <label className="block text-sm font-medium mb-2">Data de Compra *</label>
             <DatePicker
-              date={formData.purchase_date ? new Date(formData.purchase_date) : undefined}
+              date={parseDateOnly(formData.purchase_date)}
               setDate={(date) => {
                 if (date) {
                   const formattedDate = format(date, 'yyyy-MM-dd');
