@@ -117,6 +117,8 @@ export default function ImportModal({
       errors: string[];
     };
   }>({ status: 'idle' });
+  const [jobId, setJobId] = useState<string | null>(null);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
   // Cleanup on unmount
@@ -125,6 +127,9 @@ export default function ImportModal({
     return () => {
       isMountedRef.current = false;
       abortControllerRef.current?.abort();
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
     };
   }, []);
 
@@ -133,8 +138,96 @@ export default function ImportModal({
     if (!open) {
       abortControllerRef.current?.abort();
       abortControllerRef.current = null;
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
     }
   }, [open]);
+
+  const pollImportJob = useCallback(async (jobIdToPoll: string) => {
+    try {
+      const res = await fetch(`/api/import/jobs/${jobIdToPoll}`);
+      const data = await res.json();
+
+      if (!res.ok || !data.job) {
+        throw new Error(data.error || 'Erro ao consultar status da importação');
+      }
+
+      const job = data.job;
+      if (job.status === 'processing' || job.status === 'queued') {
+        setProgress({
+          status: 'processing',
+          message: `Processando ${job.processed_rows || 0} de ${job.total_rows || 0} transações...`,
+        });
+        return;
+      }
+
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+
+      if (job.status === 'completed') {
+        setStep('completed');
+        setProgress({
+          status: 'completed',
+          message: 'Importação concluída!',
+          result: {
+            totalRows: job.total_rows || 0,
+            imported: job.imported || 0,
+            skipped: job.skipped || 0,
+            errors: job.error_summary ? job.error_summary.split('; ') : [],
+          },
+        });
+        toast({
+          title: 'Sucesso',
+          description: `${job.imported || 0} transações importadas com sucesso`,
+        });
+        if (onSuccess) {
+          onSuccess();
+        }
+        return;
+      }
+
+      if (job.status === 'failed' || job.status === 'cancelled') {
+        setProgress({
+          status: 'error',
+          message: job.error_summary || 'Falha na importação',
+        });
+        toast({
+          title: 'Falha na importação',
+          description: job.error_summary || 'Falha na importação',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      setProgress({
+        status: 'error',
+        message: error.message || 'Erro ao consultar status da importação',
+      });
+      toast({
+        title: 'Falha na importação',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  }, [onSuccess, toast]);
+
+  const startJobPolling = useCallback((jobIdToPoll: string) => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+    }
+
+    pollImportJob(jobIdToPoll);
+    pollingRef.current = setInterval(() => {
+      pollImportJob(jobIdToPoll);
+    }, 2000);
+  }, [pollImportJob]);
 
   // Fetch categories and check Open Finance availability when modal opens
   useEffect(() => {
@@ -519,7 +612,7 @@ export default function ImportModal({
       // Handle CSV/OFX import
       const fileContent = await file!.text();
 
-      const endpoint = importType === 'csv' ? '/api/import/csv' : '/api/import/ofx';
+      const endpoint = importType === 'csv' ? '/api/import/csv/start' : '/api/import/ofx';
       const bodyKey = importType === 'csv' ? 'csv_content' : 'ofx_content';
 
       // Prepare categories to create from selected transactions (O(n) with Map)
@@ -571,6 +664,7 @@ export default function ImportModal({
         categories: categoryMappings,
         categories_to_create: categoriesToCreate,
         selected_ids: selectedIds,
+        original_filename: file?.name,
       };
 
       const payloadSize = JSON.stringify(requestBody).length;
@@ -592,6 +686,20 @@ export default function ImportModal({
 
       if (!res.ok) {
         throw new Error(data.error || `Erro ao importar ${importType.toUpperCase()}`);
+      }
+
+      if (importType === 'csv') {
+        const newJobId = data.job_id as string | undefined;
+        if (!newJobId) {
+          throw new Error('Importação iniciada sem job_id');
+        }
+        setJobId(newJobId);
+        setProgress({
+          status: 'processing',
+          message: 'Importação enviada. Processando...',
+        });
+        startJobPolling(newJobId);
+        return;
       }
 
       setStep('completed');
@@ -745,6 +853,7 @@ export default function ImportModal({
     setTransactions([]);
     setSelectAll(true);
     setPreviewStats(null);
+    setJobId(null);
     // Reset Open Finance states
     setSelectedLinkId('all');
     setBatchSize(10);

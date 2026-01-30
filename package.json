@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:worker": "tsc -p tsconfig.worker.json",
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit"
@@ -44,6 +45,7 @@
     "@types/react-virtualized-auto-sizer": "^1.0.4",
     "@types/react-window": "^1.8.8",
     "@upstash/redis": "^1.36.0",
+    "bullmq": "^5.58.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
