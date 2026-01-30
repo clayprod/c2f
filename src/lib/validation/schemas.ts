@@ -49,7 +49,20 @@ export const categorySchema = z.object({
   color: z.string().default('#6b7280'),
   source_type: z.enum(['general', 'credit_card', 'investment', 'goal', 'debt', 'asset']).optional(),
   is_active: z.boolean().optional(),
-});
+  expense_type: z.enum(['fixed', 'variable']).optional().nullable(),
+}).refine(
+  (data) => {
+    // expense_type should only be set for expense categories
+    if (data.expense_type && data.type !== 'expense') {
+      return false;
+    }
+    return true;
+  },
+  {
+    message: 'Tipo de despesa (fixa/variável) só pode ser definido para categorias do tipo despesa',
+    path: ['expense_type'],
+  }
+);
 
 export const transactionSchema = z.object({
   account_id: z.string().uuid('ID da conta inválido'),
@@ -74,6 +87,9 @@ export const transactionSchema = z.object({
     z.literal(''),
     z.null()
   ]).optional().transform(val => val === '' || val === null ? undefined : val),
+  // Transfer fields
+  is_transfer: z.boolean().default(false),
+  to_account_id: z.string().uuid('ID da conta de destino inválido').optional(),
 });
 
 export const budgetSchema = z.object({

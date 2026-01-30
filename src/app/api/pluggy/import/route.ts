@@ -12,6 +12,7 @@ interface ImportResults {
   imported: number;
   skipped: number;
   bill_items_created: number;
+  transfers_detected?: number;
   errors: string[];
 }
 
@@ -125,6 +126,29 @@ export async function POST(request: NextRequest) {
     }
 
     projectionCache.invalidateUser(user.id);
+
+    // Auto-detect transfers after import (for regular transactions only, not credit cards)
+    if (!isCreditCard && results.imported > 0) {
+      try {
+        const dates = pluggyTransactions.map(tx => new Date(tx.date));
+        const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+        const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+        
+        const { data: detectResult, error: detectError } = await supabase
+          .rpc('auto_detect_transfers', {
+            p_user_id: user.id,
+            p_start_date: minDate.toISOString().split('T')[0],
+            p_end_date: maxDate.toISOString().split('T')[0],
+          });
+        
+        if (!detectError && detectResult) {
+          results.transfers_detected = detectResult.detected_count || 0;
+        }
+      } catch (detectErr) {
+        console.error('Error auto-detecting transfers:', detectErr);
+        // Don't fail the import if detection fails
+      }
+    }
 
     return NextResponse.json({
       success: true,

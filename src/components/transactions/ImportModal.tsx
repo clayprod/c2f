@@ -537,21 +537,55 @@ export default function ImportModal({
         });
       const categoriesToCreate = Array.from(categoriesMap.values());
 
+      // Log para debug
+      console.log(`[ImportModal] Enviando ${selectedTransactions.length} transações para importação`);
+      console.log(`[ImportModal] Tamanho do arquivo: ${fileContent.length} caracteres`);
+      console.log(`[ImportModal] Primeiras 5 transações:`, selectedTransactions.slice(0, 5).map(tx => ({
+        id: tx.id,
+        date: tx.date,
+        description: tx.description.substring(0, 30),
+        amount: tx.amount,
+        type: tx.type
+      })));
+      console.log(`[ImportModal] Últimas 5 transações:`, selectedTransactions.slice(-5).map(tx => ({
+        id: tx.id,
+        date: tx.date,
+        description: tx.description.substring(0, 30),
+        amount: tx.amount,
+        type: tx.type
+      })));
+
+      // Otimização: enviar apenas IDs selecionados ao invés de todo o objeto
+      // Isso reduz drasticamente o tamanho do payload
+      const selectedIds = selectedTransactions.map(tx => tx.id);
+      const categoryMappings: Record<string, string> = {};
+      selectedTransactions.forEach(tx => {
+        if (tx.category_id) {
+          categoryMappings[tx.id] = tx.category_id;
+        }
+      });
+
+      const requestBody = {
+        [bodyKey]: fileContent,
+        account_id: selectedAccountId || undefined,
+        categories: categoryMappings,
+        categories_to_create: categoriesToCreate,
+        selected_ids: selectedIds,
+      };
+
+      const payloadSize = JSON.stringify(requestBody).length;
+      console.log(`[ImportModal] Tamanho do payload: ${payloadSize} caracteres`);
+      console.log(`[ImportModal] Enviando ${selectedIds.length} IDs selecionados`);
+
+      // Verificar se payload é muito grande
+      if (payloadSize > 1000000) { // 1MB
+        console.warn(`[ImportModal] Payload muito grande (${payloadSize} chars). Pode causar problemas.`);
+      }
+
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          [bodyKey]: fileContent,
-          account_id: selectedAccountId || undefined,
-          categories: selectedTransactions.reduce((acc, tx) => {
-            if (tx.category_id) {
-              acc[tx.id] = tx.category_id;
-            }
-            return acc;
-          }, {} as Record<string, string>),
-          categories_to_create: categoriesToCreate,
-          selected_ids: selectedTransactions.map(tx => tx.id),
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await res.json();

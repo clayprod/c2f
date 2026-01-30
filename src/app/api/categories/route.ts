@@ -84,6 +84,8 @@ export async function POST(request: NextRequest) {
         source_type: validated.source_type || 'general',
         // If is_active is not provided, default to true
         is_active: validated.is_active !== undefined ? validated.is_active : true,
+        // expense_type is only applicable for expense categories
+        expense_type: validated.type === 'expense' ? validated.expense_type : null,
       })
       .select()
       .single();

@@ -224,6 +224,7 @@ async function getOverviewReport(
     .from('transactions')
     .select('amount, posted_at, categories(type, name)')
     .eq('user_id', userId)
+    .eq('is_transfer', false)
     .gte('posted_at', filters.startDate)
     .lte('posted_at', filters.endDate);
 
@@ -309,6 +310,7 @@ async function getCategoriesReport(
     .from('transactions')
     .select('amount, category_id, categories(name, type)')
     .eq('user_id', userId)
+    .eq('is_transfer', false)
     .gte('posted_at', filters.startDate)
     .lte('posted_at', filters.endDate);
 
@@ -416,6 +418,7 @@ async function getBudgetsReport(
     .from('transactions')
     .select('amount, posted_at, category_id, categories(type)')
     .eq('user_id', userId)
+    .eq('is_transfer', false)
     .gte('posted_at', filters.startDate)
     .lte('posted_at', filters.endDate);
 
@@ -728,6 +731,7 @@ async function getCashflowReport(
     .from('transactions')
     .select('amount, posted_at, categories(type)')
     .eq('user_id', userId)
+    .eq('is_transfer', false)
     .gte('posted_at', filters.startDate)
     .lte('posted_at', filters.endDate)
     .order('posted_at', { ascending: true });

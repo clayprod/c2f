@@ -27,6 +27,7 @@ interface Category {
   source_type?: 'general' | 'credit_card' | 'investment' | 'goal' | 'debt' | null;
   is_active?: boolean;
   transaction_count?: number;
+  expense_type?: 'fixed' | 'variable' | null;
 }
 
 const categoryColors = [
@@ -64,6 +65,7 @@ export default function CategoriesPage() {
     type: 'expense' as 'income' | 'expense',
     icon: '📁',
     color: '#3b82f6',
+    expense_type: null as 'fixed' | 'variable' | null,
   });
   const { toast } = useToast();
   const { context: accountContext, activeAccountId } = useAccountContext();
@@ -183,16 +185,27 @@ export default function CategoriesPage() {
         : '/api/categories';
       const method = editingCategory ? 'PATCH' : 'POST';
 
+      const requestBody: any = {
+        name: formData.name.trim(),
+        type: formData.type,
+        icon: formData.icon,
+        color: formData.color,
+      };
+      
+      // Only send expense_type when it's set and category is expense
+      if (formData.type === 'expense' && formData.expense_type !== undefined && formData.expense_type !== null) {
+        requestBody.expense_type = formData.expense_type;
+      }
+      
+      // Only send source_type when creating new categories
+      if (!editingCategory) {
+        requestBody.source_type = 'general';
+      }
+
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.name.trim(),
-          type: formData.type,
-          icon: formData.icon,
-          color: formData.color,
-          source_type: 'general', // Categorias criadas manualmente são sempre 'general'
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!res.ok) {
@@ -266,6 +279,7 @@ export default function CategoriesPage() {
       type: category.type,
       icon: category.icon || '📁',
       color: category.color || '#3b82f6',
+      expense_type: category.expense_type || null,
     });
     setDialogOpen(true);
   };
@@ -277,6 +291,7 @@ export default function CategoriesPage() {
       type: 'expense',
       icon: '📁',
       color: '#3b82f6',
+      expense_type: null,
     });
     setDialogOpen(true);
   };
@@ -779,6 +794,40 @@ export default function CategoriesPage() {
               </div>
             </div>
 
+            {/* Expense Type Selection - Only for expense categories */}
+            {formData.type === 'expense' && (
+              <div>
+                <label className="text-sm font-medium">Tipo de Despesa</label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Classifique se esta despesa é fixa (recorrente, essencial) ou variável (flexível)
+                </p>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, expense_type: 'fixed' })}
+                    className={`flex-1 py-3 px-4 rounded-xl border transition-all ${formData.expense_type === 'fixed'
+                      ? 'border-blue-500 bg-blue-500/10 text-blue-600'
+                      : 'border-border bg-muted/30 text-muted-foreground hover:bg-muted/50'
+                      }`}
+                  >
+                    <i className='bx bx-lock mr-2'></i>
+                    Fixa
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, expense_type: 'variable' })}
+                    className={`flex-1 py-3 px-4 rounded-xl border transition-all ${formData.expense_type === 'variable'
+                      ? 'border-amber-500 bg-amber-500/10 text-amber-600'
+                      : 'border-border bg-muted/30 text-muted-foreground hover:bg-muted/50'
+                      }`}
+                  >
+                    <i className='bx bx-slider mr-2'></i>
+                    Variável
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="text-sm font-medium">Cor</label>
               <div className="flex flex-wrap gap-2 mt-2">
@@ -1019,7 +1068,11 @@ function CategoryCard({
                     ? 'Cartão'
                     : category.source_type === 'investment'
                       ? 'Investimento'
-                      : 'Despesa'}
+                      : category.expense_type === 'fixed'
+                        ? 'Despesa Fixa'
+                        : category.expense_type === 'variable'
+                          ? 'Despesa Variável'
+                          : 'Despesa'}
           </span>
         </div>
 

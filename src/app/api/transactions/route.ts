@@ -587,6 +587,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ data: { ...billItem, is_bill_item: true } }, { status: 201 });
     }
 
+    // Check if this is a transfer (to_account_id provided)
+    const isTransfer = validated.to_account_id && validated.to_account_id !== validated.account_id;
+    
     // Regular transaction (no installments)
     const insertData: any = {
       account_id: validated.account_id,
@@ -604,6 +607,8 @@ export async function POST(request: NextRequest) {
       installment_number: validated.installment_number || null,
       installment_total: validated.installment_total || null,
       assigned_to: validated.assigned_to || null,
+      is_transfer: isTransfer || false,
+      transfer_type: isTransfer ? 'outgoing' : null,
     };
 
     // Only include credit_card_bill_id if it exists and is not null
@@ -620,6 +625,42 @@ export async function POST(request: NextRequest) {
         categories(id, name, type, icon, color)
       `)
       .single();
+
+    // If this is a transfer, create the incoming transaction in the destination account
+    if (!error && isTransfer && data) {
+      const incomingAmount = Math.abs(amount); // Positive for incoming
+      
+      const { data: incomingTx, error: incomingError } = await supabase
+        .from('transactions')
+        .insert({
+          account_id: validated.to_account_id,
+          category_id: validated.category_id || null,
+          posted_at: validated.posted_at,
+          description: `${validated.description} (Transferência recebida)`,
+          amount: incomingAmount,
+          currency: validated.currency,
+          notes: validated.notes || null,
+          user_id: ownerId,
+          source: validated.source || 'manual',
+          provider_tx_id: validated.provider_tx_id ? `${validated.provider_tx_id}_incoming` : null,
+          is_transfer: true,
+          transfer_type: 'incoming',
+          linked_transaction_id: data.id,
+        })
+        .select('id')
+        .single();
+      
+      if (!incomingError && incomingTx) {
+        // Update the outgoing transaction with the linked ID
+        await supabase
+          .from('transactions')
+          .update({ linked_transaction_id: incomingTx.id })
+          .eq('id', data.id);
+        
+        // Add linked transaction to response
+        data.linked_transaction_id = incomingTx.id;
+      }
+    }
 
     if (error) throw error;
 

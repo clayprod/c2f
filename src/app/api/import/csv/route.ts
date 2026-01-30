@@ -33,13 +33,56 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse CSV
+    console.log(`[CSV Import] Starting import for user ${userId}`);
+    console.log(`[CSV Import] CSV content length: ${csv_content.length} characters`);
+    
     const allTransactions = parseCSV(csv_content);
+    console.log(`[CSV Import] Parsed ${allTransactions.length} transactions from CSV`);
+    
+    if (allTransactions.length > 0) {
+      console.log(`[CSV Import] First transaction sample:`, {
+        id: allTransactions[0].id,
+        date: allTransactions[0].date,
+        description: allTransactions[0].description.substring(0, 50),
+        amount: allTransactions[0].amount,
+        type: allTransactions[0].type
+      });
+      console.log(`[CSV Import] Last transaction sample:`, {
+        id: allTransactions[allTransactions.length - 1].id,
+        date: allTransactions[allTransactions.length - 1].date,
+        description: allTransactions[allTransactions.length - 1].description.substring(0, 50),
+        amount: allTransactions[allTransactions.length - 1].amount,
+        type: allTransactions[allTransactions.length - 1].type
+      });
+    }
 
     // Filter by selected_ids if provided
     let transactionsToImport = allTransactions;
     if (selected_ids && selected_ids.length > 0) {
       const selectedSet = new Set(selected_ids);
-      transactionsToImport = allTransactions.filter(tx => selectedSet.has(tx.id));
+      console.log(`[CSV Import] selected_ids received: ${selected_ids.length} IDs`);
+      console.log(`[CSV Import] First 10 selected_ids:`, selected_ids.slice(0, 10));
+      console.log(`[CSV Import] Last 10 selected_ids:`, selected_ids.slice(-10));
+      
+      transactionsToImport = allTransactions.filter(tx => {
+        const isSelected = selectedSet.has(tx.id);
+        if (!isSelected) {
+          console.log(`[CSV Import] Transaction NOT in selected_ids: ${tx.id}`);
+        }
+        return isSelected;
+      });
+      
+      console.log(`[CSV Import] Filtered to ${transactionsToImport.length} transactions by selected_ids`);
+      
+      // Check if there's a mismatch
+      if (transactionsToImport.length !== selected_ids.length) {
+        console.warn(`[CSV Import] MISMATCH: ${selected_ids.length} IDs sent but only ${transactionsToImport.length} matched`);
+        const allIds = new Set(allTransactions.map(tx => tx.id));
+        const missingIds = selected_ids.filter(id => !allIds.has(id));
+        if (missingIds.length > 0) {
+          console.warn(`[CSV Import] Missing IDs (first 10):`, missingIds.slice(0, 10));
+        }
+      }
     }
 
     const supabase = await createClient();
@@ -187,38 +230,72 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 4: Check for existing transactions in batch
-    // Get all provider_tx_ids to check for duplicates
+    console.log(`[CSV Import] Step 4: Checking for duplicates`);
+    
+    // Check duplicates in batches to avoid Supabase limits
+    const CHECK_BATCH_SIZE = 500;
+    const existingIdsSet = new Set<string>();
+    const existingContentSet = new Set<string>();
+    
+    // Get all provider_tx_ids to check for duplicates (in batches)
     const providerTxIds = finalTransactions.map(tx => tx.id);
-    const { data: existingByIds } = await supabase
-      .from('transactions')
-      .select('provider_tx_id')
-      .eq('user_id', userId)
-      .in('provider_tx_id', providerTxIds);
+    console.log(`[CSV Import] Checking ${providerTxIds.length} provider_tx_ids for duplicates in batches of ${CHECK_BATCH_SIZE}`);
+    
+    for (let i = 0; i < providerTxIds.length; i += CHECK_BATCH_SIZE) {
+      const batch = providerTxIds.slice(i, i + CHECK_BATCH_SIZE);
+      console.log(`[CSV Import] Checking IDs batch ${Math.floor(i / CHECK_BATCH_SIZE) + 1}/${Math.ceil(providerTxIds.length / CHECK_BATCH_SIZE)} (${batch.length} items)`);
+      
+      const { data: existingByIds, error: existingIdsError } = await supabase
+        .from('transactions')
+        .select('provider_tx_id')
+        .eq('user_id', userId)
+        .in('provider_tx_id', batch);
+      
+      if (existingIdsError) {
+        console.error(`[CSV Import] Error checking existing by IDs batch ${Math.floor(i / CHECK_BATCH_SIZE) + 1}:`, existingIdsError);
+      } else {
+        existingByIds?.forEach(tx => existingIdsSet.add(tx.provider_tx_id));
+      }
+    }
+    console.log(`[CSV Import] Found ${existingIdsSet.size} duplicates by ID`);
 
-    const existingIdsSet = new Set(existingByIds?.map(tx => tx.provider_tx_id) || []);
-
-    // Get all transaction content hashes to check for duplicates by content
+    // Get all transaction content hashes to check for duplicates by content (in batches)
     const contentHashes = finalTransactions.map(tx => ({
       date: tx.date,
       description: tx.description,
       amount: tx.type === 'expense' ? -Math.abs(tx.amount) : Math.abs(tx.amount),
     }));
-
-    const { data: existingByContent } = await supabase
-      .from('transactions')
-      .select('posted_at, description, amount')
-      .eq('user_id', userId)
-      .in('posted_at', contentHashes.map(h => h.date))
-      .in('description', contentHashes.map(h => h.description));
-
-    const existingContentSet = new Set(
-      existingByContent?.map(tx => 
-        `${tx.posted_at}|${tx.description}|${tx.amount}`
-      ) || []
-    );
+    
+    console.log(`[CSV Import] Checking ${contentHashes.length} content hashes for duplicates in batches of ${CHECK_BATCH_SIZE}`);
+    
+    for (let i = 0; i < contentHashes.length; i += CHECK_BATCH_SIZE) {
+      const batch = contentHashes.slice(i, i + CHECK_BATCH_SIZE);
+      console.log(`[CSV Import] Checking content batch ${Math.floor(i / CHECK_BATCH_SIZE) + 1}/${Math.ceil(contentHashes.length / CHECK_BATCH_SIZE)} (${batch.length} items)`);
+      
+      const { data: existingByContent, error: existingContentError } = await supabase
+        .from('transactions')
+        .select('posted_at, description, amount')
+        .eq('user_id', userId)
+        .in('posted_at', batch.map(h => h.date))
+        .in('description', batch.map(h => h.description));
+      
+      if (existingContentError) {
+        console.error(`[CSV Import] Error checking existing by content batch ${Math.floor(i / CHECK_BATCH_SIZE) + 1}:`, existingContentError);
+      } else {
+        existingByContent?.forEach(tx => {
+          existingContentSet.add(`${tx.posted_at}|${tx.description}|${tx.amount}`);
+        });
+      }
+    }
+    console.log(`[CSV Import] Found ${existingContentSet.size} duplicates by content`);
 
     // Step 5: Prepare transactions for batch insert
+    console.log(`[CSV Import] Step 5: Preparing transactions for insert`);
+    console.log(`[CSV Import] finalTransactions count: ${finalTransactions.length}`);
+    
     const transactionsToInsert = [];
+    let skippedById = 0;
+    let skippedByContent = 0;
     
     for (const tx of finalTransactions) {
       const signedAmount = tx.type === 'expense' ? -Math.abs(tx.amount) : Math.abs(tx.amount);
@@ -226,6 +303,10 @@ export async function POST(request: NextRequest) {
       // Check for duplicates by ID
       if (existingIdsSet.has(tx.id)) {
         skipped++;
+        skippedById++;
+        if (skippedById <= 5) {
+          console.log(`[CSV Import] Skipping duplicate by ID: ${tx.id}`);
+        }
         continue;
       }
 
@@ -233,6 +314,10 @@ export async function POST(request: NextRequest) {
       const contentKey = `${tx.date}|${tx.description}|${signedAmount}`;
       if (existingContentSet.has(contentKey)) {
         skipped++;
+        skippedByContent++;
+        if (skippedByContent <= 5) {
+          console.log(`[CSV Import] Skipping duplicate by content: ${contentKey}`);
+        }
         continue;
       }
 
@@ -250,11 +335,36 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    console.log(`[CSV Import] After filtering: ${transactionsToInsert.length} transactions to insert`);
+    console.log(`[CSV Import] Skipped by ID: ${skippedById}, Skipped by content: ${skippedByContent}`);
+
     // Step 6: Batch insert transactions
     const totalToInsert = transactionsToInsert.length;
+    console.log(`[CSV Import] Total transactions to insert: ${totalToInsert}`);
+    console.log(`[CSV Import] Batch size: ${BATCH_SIZE}`);
+    console.log(`[CSV Import] Number of batches: ${Math.ceil(totalToInsert / BATCH_SIZE)}`);
+    
+    if (transactionsToInsert.length > 0) {
+      console.log(`[CSV Import] First transaction to insert:`, {
+        id: transactionsToInsert[0].provider_tx_id,
+        date: transactionsToInsert[0].posted_at,
+        description: transactionsToInsert[0].description.substring(0, 50),
+        amount: transactionsToInsert[0].amount
+      });
+      console.log(`[CSV Import] Last transaction to insert:`, {
+        id: transactionsToInsert[transactionsToInsert.length - 1].provider_tx_id,
+        date: transactionsToInsert[transactionsToInsert.length - 1].posted_at,
+        description: transactionsToInsert[transactionsToInsert.length - 1].description.substring(0, 50),
+        amount: transactionsToInsert[transactionsToInsert.length - 1].amount
+      });
+    }
     
     for (let i = 0; i < totalToInsert; i += BATCH_SIZE) {
       const batch = transactionsToInsert.slice(i, i + BATCH_SIZE);
+      const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(totalToInsert / BATCH_SIZE);
+      
+      console.log(`[CSV Import] Processing batch ${batchNumber}/${totalBatches} (${batch.length} transactions)`);
       
       try {
         const { error: insertError } = await supabase
@@ -262,17 +372,31 @@ export async function POST(request: NextRequest) {
           .insert(batch);
 
         if (insertError) {
-          console.error('Batch insert error:', insertError);
-          errors.push(`Erro ao inserir lote ${Math.floor(i / BATCH_SIZE) + 1}: ${insertError.message}`);
+          console.error(`[CSV Import] Batch ${batchNumber} insert error:`, insertError);
+          console.error(`[CSV Import] Error details:`, {
+            code: insertError.code,
+            message: insertError.message,
+            details: insertError.details,
+            hint: insertError.hint
+          });
+          errors.push(`Erro ao inserir lote ${batchNumber}: ${insertError.message}`);
           // Continue with next batch
         } else {
           imported += batch.length;
+          console.log(`[CSV Import] Batch ${batchNumber} inserted successfully. Total imported: ${imported}/${totalToInsert}`);
         }
       } catch (error: any) {
-        console.error('Batch insert exception:', error);
-        errors.push(`Erro ao inserir lote ${Math.floor(i / BATCH_SIZE) + 1}: ${error.message}`);
+        console.error(`[CSV Import] Batch ${batchNumber} exception:`, error);
+        console.error(`[CSV Import] Exception details:`, {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+        errors.push(`Erro ao inserir lote ${batchNumber}: ${error.message}`);
       }
     }
+    
+    console.log(`[CSV Import] Import completed. Imported: ${imported}, Skipped: ${skipped}, Errors: ${errors.length}`);
 
     // Update import record
     const status = errors.length > 0 && imported === 0 ? 'failed' : 'completed';

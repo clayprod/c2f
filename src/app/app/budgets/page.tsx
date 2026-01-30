@@ -37,6 +37,7 @@ interface Category {
   type: string;
   color?: string;
   source_type?: 'general' | 'credit_card' | 'investment' | 'goal' | 'debt' | 'asset' | 'receivable' | null;
+  expense_type?: 'fixed' | 'variable' | null;
 }
 
 interface Budget {
@@ -561,11 +562,23 @@ export default function BudgetsPage() {
     return cat?.type === 'income' || budgetCatType === 'income';
   });
 
-  const expenseBudgets = filteredBudgets.filter(b => {
+  // Separate expense budgets into fixed and variable
+  const fixedExpenseBudgets = filteredBudgets.filter(b => {
     const cat = categories.find(c => c.id === b.category_id);
     const budgetCatType = (b.categories as any)?.type;
-    return (!cat?.type && budgetCatType !== 'income') || cat?.type === 'expense' || budgetCatType === 'expense';
+    const isExpense = (!cat?.type && budgetCatType !== 'income') || cat?.type === 'expense' || budgetCatType === 'expense';
+    return isExpense && cat?.expense_type === 'fixed';
   });
+
+  const variableExpenseBudgets = filteredBudgets.filter(b => {
+    const cat = categories.find(c => c.id === b.category_id);
+    const budgetCatType = (b.categories as any)?.type;
+    const isExpense = (!cat?.type && budgetCatType !== 'income') || cat?.type === 'expense' || budgetCatType === 'expense';
+    return isExpense && (cat?.expense_type === 'variable' || !cat?.expense_type);
+  });
+
+  // All expense budgets (for backward compatibility)
+  const expenseBudgets = [...fixedExpenseBudgets, ...variableExpenseBudgets];
 
   // Calculate totals separately for income and expense
   const incomePlanned = incomeBudgets.reduce(
@@ -574,11 +587,22 @@ export default function BudgetsPage() {
   );
   const incomeActual = incomeBudgets.reduce((sum, b) => sum + Math.abs(b.amount_actual || 0), 0);
 
-  const expensePlanned = expenseBudgets.reduce(
+  // Calculate totals for fixed and variable expenses separately
+  const fixedExpensePlanned = fixedExpenseBudgets.reduce(
     (sum, b) => sum + Math.abs((b.limit_cents || b.amount_planned_cents || 0) / 100),
     0
   );
-  const expenseActual = expenseBudgets.reduce((sum, b) => sum + Math.abs(b.amount_actual || 0), 0);
+  const fixedExpenseActual = fixedExpenseBudgets.reduce((sum, b) => sum + Math.abs(b.amount_actual || 0), 0);
+
+  const variableExpensePlanned = variableExpenseBudgets.reduce(
+    (sum, b) => sum + Math.abs((b.limit_cents || b.amount_planned_cents || 0) / 100),
+    0
+  );
+  const variableExpenseActual = variableExpenseBudgets.reduce((sum, b) => sum + Math.abs(b.amount_actual || 0), 0);
+
+  // Total expenses
+  const expensePlanned = fixedExpensePlanned + variableExpensePlanned;
+  const expenseActual = fixedExpenseActual + variableExpenseActual;
 
   // For manual budgets reference (used in replicate functions)
   const manualBudgets = allManualBudgets.filter(b => {
@@ -656,6 +680,28 @@ export default function BudgetsPage() {
       ? (budget.metadata as any).budget_breakdown.items.length
       : 0;
 
+    // Get expense type badge for expense categories
+    const getExpenseTypeBadge = () => {
+      if (isIncome || !category) return null;
+      if (category.expense_type === 'fixed') {
+        return (
+          <span className="text-[10px] text-blue-600 bg-blue-500/10 px-1.5 py-0.5 rounded flex-shrink-0 flex items-center gap-0.5" title="Despesa Fixa - Recorrente e essencial">
+            <i className='bx bx-lock text-[10px]'></i>
+            <span className="hidden sm:inline">Fixa</span>
+          </span>
+        );
+      }
+      if (category.expense_type === 'variable') {
+        return (
+          <span className="text-[10px] text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded flex-shrink-0 flex items-center gap-0.5" title="Despesa Variável - Flexível para ajustes">
+            <i className='bx bx-slider text-[10px]'></i>
+            <span className="hidden sm:inline">Variável</span>
+          </span>
+        );
+      }
+      return null;
+    };
+
     return (
       <div key={budget.id} className={`glass-card p-3 md:p-4 group hover:border-primary/30 transition-colors ${isReadOnly ? 'opacity-80' : ''}`}>
         {/* Header row - compact */}
@@ -665,6 +711,7 @@ export default function BudgetsPage() {
             <h3 className="font-medium text-sm md:text-base truncate">
               {budget.categories?.name || budget.description || 'Categoria'}
             </h3>
+            {getExpenseTypeBadge()}
             {breakdownCount > 0 && (
               <span className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded flex-shrink-0 flex items-center gap-1">
                 <i className="bx bx-list-ul text-[10px]"></i>
@@ -977,21 +1024,76 @@ export default function BudgetsPage() {
           </div>
         )}
 
-        {/* Expense Budgets Section - SIMPLIFIED */}
+        {/* Expense Budgets Section - Separated into Fixed and Variable */}
         {expenseBudgets.length > 0 && (
-          <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <div className="flex items-center gap-2">
-              <h2 className="font-display text-sm md:text-lg font-semibold flex items-center gap-2">
-                <i className='bx bx-trending-down text-negative'></i>
-                Orçamentos de Despesa
-              </h2>
-              <span className="text-xs text-muted-foreground bg-negative/20 px-2 py-0.5 rounded-full">
-                {expenseBudgets.length}
-              </span>
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+            {/* Section Header with totals */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+              <div className="flex items-center gap-2">
+                <h2 className="font-display text-sm md:text-lg font-semibold flex items-center gap-2">
+                  <i className='bx bx-trending-down text-negative'></i>
+                  Orçamentos de Despesa
+                </h2>
+                <span className="text-xs text-muted-foreground bg-negative/20 px-2 py-0.5 rounded-full">
+                  {expenseBudgets.length}
+                </span>
+              </div>
+              
+              {/* Totals summary */}
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                {fixedExpenseBudgets.length > 0 && (
+                  <span className="px-2 py-1 bg-blue-500/10 text-blue-600 rounded-full">
+                    Fixas: {formatCurrencyReais(fixedExpensePlanned)}
+                  </span>
+                )}
+                {variableExpenseBudgets.length > 0 && (
+                  <span className="px-2 py-1 bg-amber-500/10 text-amber-600 rounded-full">
+                    Variáveis: {formatCurrencyReais(variableExpensePlanned)}
+                  </span>
+                )}
+                <span className="px-2 py-1 bg-negative/10 text-negative rounded-full font-medium">
+                  Total: {formatCurrencyReais(expensePlanned)}
+                </span>
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 md:gap-3">
-              {expenseBudgets.map((budget, index) => renderBudgetCard(budget, index))}
-            </div>
+
+            {/* Fixed Expenses */}
+            {fixedExpenseBudgets.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 px-1">
+                  <i className='bx bx-lock text-blue-500'></i>
+                  <h3 className="text-sm font-medium text-blue-600">Despesas Fixas</h3>
+                  <span className="text-xs text-muted-foreground bg-blue-500/10 px-2 py-0.5 rounded-full">
+                    {fixedExpenseBudgets.length}
+                  </span>
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    {formatCurrencyReais(fixedExpensePlanned)}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 md:gap-3">
+                  {fixedExpenseBudgets.map((budget, index) => renderBudgetCard(budget, index))}
+                </div>
+              </div>
+            )}
+
+            {/* Variable Expenses */}
+            {variableExpenseBudgets.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 px-1">
+                  <i className='bx bx-slider text-amber-500'></i>
+                  <h3 className="text-sm font-medium text-amber-600">Despesas Variáveis</h3>
+                  <span className="text-xs text-muted-foreground bg-amber-500/10 px-2 py-0.5 rounded-full">
+                    {variableExpenseBudgets.length}
+                  </span>
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    {formatCurrencyReais(variableExpensePlanned)}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 md:gap-3">
+                  {variableExpenseBudgets.map((budget, index) => renderBudgetCard(budget, index + fixedExpenseBudgets.length))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

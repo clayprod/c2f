@@ -49,8 +49,8 @@ function parseAmount(amountStr: string): number | null {
   } else if (commaCount === 1 && dotCount === 0) {
     // Only comma: could be "288,00" (Brazilian decimal) or "1,234" (US thousand)
     const parts = cleaned.split(',');
-    if (parts[1].length === 2) {
-      // Likely Brazilian decimal: "288,00" -> "288.00"
+    if (parts[1].length >= 1 && parts[1].length <= 2) {
+      // Likely Brazilian decimal: "288,00" or "180,2" -> "288.00" or "180.2"
       normalized = cleaned.replace(',', '.');
     } else {
       // Likely US thousand separator: "1,234" -> "1234"
@@ -125,6 +125,80 @@ function excelDateToISO(excelDate: number): string | null {
 }
 
 /**
+ * Parse date string with multiple format support
+ * Supports: Excel dates (numbers), DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD
+ */
+function parseDate(dateStr: string): string | null {
+  if (!dateStr || dateStr.trim() === '') {
+    return null;
+  }
+
+  const trimmed = dateStr.trim();
+  
+  // Try Excel date number first (e.g., "45878")
+  const excelDate = parseFloat(trimmed);
+  if (!isNaN(excelDate) && excelDate > 1 && excelDate < 50000 && !trimmed.includes('/')) {
+    const result = excelDateToISO(excelDate);
+    if (result) return result;
+  }
+  
+  // Try DD/MM/YYYY format (Brazilian) - e.g., "12/01/2026"
+  const ddmmyyyyMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (ddmmyyyyMatch) {
+    const day = parseInt(ddmmyyyyMatch[1], 10);
+    const month = parseInt(ddmmyyyyMatch[2], 10);
+    const year = parseInt(ddmmyyyyMatch[3], 10);
+    
+    // Validate date components
+    if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900 && year <= 2100) {
+      const date = new Date(year, month - 1, day);
+      if (!isNaN(date.getTime()) && date.getDate() === day && date.getMonth() === month - 1) {
+        return date.toISOString().split('T')[0];
+      }
+    }
+  }
+  
+  // Try MM/DD/YYYY format (US) - e.g., "01/12/2026"
+  const mmddyyyyMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mmddyyyyMatch) {
+    const month = parseInt(mmddyyyyMatch[1], 10);
+    const day = parseInt(mmddyyyyMatch[2], 10);
+    const year = parseInt(mmddyyyyMatch[3], 10);
+    
+    // If day > 12, it's definitely DD/MM/YYYY, so skip this interpretation
+    if (day <= 12 && month >= 1 && month <= 12 && year >= 1900 && year <= 2100) {
+      const date = new Date(year, month - 1, day);
+      if (!isNaN(date.getTime())) {
+        return date.toISOString().split('T')[0];
+      }
+    }
+  }
+  
+  // Try YYYY-MM-DD format (ISO) - e.g., "2026-01-12"
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    const year = parseInt(isoMatch[1], 10);
+    const month = parseInt(isoMatch[2], 10);
+    const day = parseInt(isoMatch[3], 10);
+    
+    if (year >= 1900 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      const date = new Date(year, month - 1, day);
+      if (!isNaN(date.getTime())) {
+        return date.toISOString().split('T')[0];
+      }
+    }
+  }
+  
+  // Try standard Date parsing as last resort
+  const date = new Date(trimmed);
+  if (!isNaN(date.getTime())) {
+    return date.toISOString().split('T')[0];
+  }
+  
+  return null;
+}
+
+/**
  * Parse CSV content
  */
 export function parseCSV(content: string): ParsedCSVTransaction[] {
@@ -143,16 +217,10 @@ export function parseCSV(content: string): ParsedCSVTransaction[] {
 
     const [id, description, dateStr, amountStr, accountName, categoryName, typeStr] = parts;
 
-    // Parse date (Excel date number)
-    const excelDate = parseFloat(dateStr);
-    if (isNaN(excelDate)) {
-      errors.push(`Linha ${lineIndex + 1}: data inválida "${dateStr}"`);
-      continue;
-    }
-    
-    const date = excelDateToISO(excelDate);
+    // Parse date with multiple format support
+    const date = parseDate(dateStr);
     if (!date) {
-      errors.push(`Linha ${lineIndex + 1}: não foi possível converter data "${dateStr}"`);
+      errors.push(`Linha ${lineIndex + 1}: data inválida "${dateStr}"`);
       continue;
     }
 

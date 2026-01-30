@@ -55,6 +55,19 @@ export async function PATCH(
     if (body.type !== undefined) updateData.type = body.type;
     if (body.icon !== undefined) updateData.icon = body.icon;
     if (body.color !== undefined) updateData.color = body.color;
+    // Only include expense_type if it's explicitly provided (including null)
+    // and the category type is 'expense' or not specified
+    if (body.expense_type !== undefined) {
+      // Validate that expense_type is either 'fixed', 'variable', or null
+      if (body.expense_type === null || body.expense_type === 'fixed' || body.expense_type === 'variable') {
+        updateData.expense_type = body.expense_type;
+      } else {
+        return NextResponse.json(
+          { error: 'Tipo de despesa inválido. Use "fixed", "variable" ou null' },
+          { status: 400 }
+        );
+      }
+    }
     if (body.is_active !== undefined) {
       // If trying to deactivate, check if category has active budgets
       if (body.is_active === false) {
@@ -74,6 +87,8 @@ export async function PATCH(
       updateData.is_active = body.is_active;
     }
 
+    console.log('[PATCH /api/categories/:id] Update data:', updateData);
+    
     const { data, error } = await supabase
       .from('categories')
       .update(updateData)
@@ -82,13 +97,17 @@ export async function PATCH(
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('[PATCH /api/categories/:id] Supabase error:', error);
+      throw error;
+    }
 
     return NextResponse.json({ data });
   } catch (error) {
+    console.error('[PATCH /api/categories/:id] Error:', error);
     const errorResponse = createErrorResponse(error);
     return NextResponse.json(
-      { error: errorResponse.error },
+      { error: errorResponse.error, details: error instanceof Error ? error.message : 'Unknown error' },
       { status: errorResponse.statusCode }
     );
   }
