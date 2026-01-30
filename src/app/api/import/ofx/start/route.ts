@@ -6,10 +6,9 @@ import { getAdminClient } from '@/lib/supabase/admin';
 import { getJobQueue } from '@/lib/queue/jobQueue';
 
 interface StartImportBody {
-  csv_content: string;
+  ofx_content: string;
   account_id?: string;
   categories?: Record<string, string>;
-  categories_to_create?: Array<{ name: string; type: 'income' | 'expense' }>;
   selected_ids?: string[];
   original_filename?: string;
 }
@@ -26,41 +25,23 @@ export async function POST(request: NextRequest) {
     }
 
     const body = (await request.json()) as StartImportBody;
-    const { csv_content, account_id, categories, categories_to_create, selected_ids, original_filename } = body;
+    const { ofx_content, account_id, categories, selected_ids, original_filename } = body;
 
-    if (!csv_content) {
-      return NextResponse.json({ error: 'CSV content is required' }, { status: 400 });
+    if (!ofx_content) {
+      return NextResponse.json({ error: 'OFX content is required' }, { status: 400 });
     }
 
     const supabase = getAdminClient();
     const bucket = process.env.SUPABASE_STORAGE_BUCKET || 'imports';
     const jobId = randomUUID();
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const safeFilename = sanitizeFilename(original_filename || 'import.csv');
+    const safeFilename = sanitizeFilename(original_filename || 'import.ofx');
     const storagePath = `${userId}/imports/${jobId}/${timestamp}_${safeFilename}`;
-
-    // Clean up previous completed files with same filename (best-effort)
-    if (original_filename) {
-      const { data: previousJobs } = (await supabase
-        .from('import_jobs')
-        .select('id, storage_path')
-        .eq('user_id', userId)
-        .eq('original_filename', original_filename)
-        .in('status', ['completed', 'failed', 'cancelled'])) as {
-        data: Array<{ id: string; storage_path: string }> | null;
-      };
-
-      if (previousJobs && previousJobs.length > 0) {
-        const oldPaths = previousJobs.map(job => job.storage_path);
-        await supabase.storage.from(bucket).remove(oldPaths);
-        await supabase.from('import_jobs').delete().in('id', previousJobs.map(job => job.id));
-      }
-    }
 
     const uploadResult = await supabase.storage
       .from(bucket)
-      .upload(storagePath, Buffer.from(csv_content, 'utf-8'), {
-        contentType: 'text/csv',
+      .upload(storagePath, Buffer.from(ofx_content, 'utf-8'), {
+        contentType: 'application/x-ofx',
         upsert: false,
       });
 
@@ -75,7 +56,7 @@ export async function POST(request: NextRequest) {
       .insert({
         id: jobId,
         user_id: userId,
-        type: 'csv_import',
+        type: 'ofx_import',
         status: 'queued',
         payload: {
           storage_bucket: bucket,
@@ -84,7 +65,6 @@ export async function POST(request: NextRequest) {
           options: {
             account_id: account_id || null,
             categories: categories || {},
-            categories_to_create: categories_to_create || [],
             selected_ids: selected_ids || [],
           },
         },

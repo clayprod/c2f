@@ -1,10 +1,10 @@
 import { Queue } from 'bullmq';
 import { getRedisConnection } from './redis';
 
-export const importQueueName = 'csv-import';
+export const jobQueueName = 'transactions-jobs';
 
-export function getImportQueue() {
-  return new Queue(importQueueName, {
+export function getJobQueue() {
+  return new Queue(jobQueueName, {
     connection: getRedisConnection(),
     defaultJobOptions: {
       attempts: 3,

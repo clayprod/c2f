@@ -317,13 +317,16 @@ export async function createCategories(
     return createdMap;
   }
 
+  const colorPalette = ['#22c55e', '#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#06b6d4', '#14b8a6', '#f97316'];
+  const getRandomColor = () => colorPalette[Math.floor(Math.random() * colorPalette.length)];
+
   // Prepare insert data
   const insertData = categoriesToCreate.map(cat => ({
     user_id: userId,
     name: cat.name,
     type: cat.type,
     icon: cat.type === 'income' ? '💰' : '💸',
-    color: cat.type === 'income' ? '#22c55e' : '#ef4444',
+    color: getRandomColor(),
   }));
 
   try {

@@ -4,12 +4,11 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getUserId } from '@/lib/auth';
 import { transactionSchema } from '@/lib/validation/schemas';
 import { createErrorResponse } from '@/lib/errors';
-import { isCreditCardExpired } from '@/lib/utils';
 import { getUserPlan } from '@/services/stripe/subscription';
 import { getPlanFeatures } from '@/services/admin/globalSettings';
-import { resolvePlanLimit } from '@/lib/planFeatures';
 import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
-import { projectionCache } from '@/services/projections/cache';
+import { getJobQueue } from '@/lib/queue/jobQueue';
+import { randomUUID } from 'crypto';
 
 export async function GET(request: NextRequest) {
   try {
@@ -179,6 +178,32 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const validated = transactionSchema.parse(body);
+
+    const jobId = randomUUID();
+    const { error: jobError } = (await (supabase as any)
+      .from('jobs')
+      .insert({
+        id: jobId,
+        user_id: ownerId,
+        type: 'transaction_manual_create',
+        status: 'queued',
+        payload: {
+          owner_id: ownerId,
+          user_id: userId,
+          data: validated,
+        },
+        progress: { processed: 0, total: 1 },
+      })) as { error: { message: string } | null };
+
+    if (jobError) {
+      throw new Error(jobError.message);
+    }
+
+    const queue = getJobQueue();
+    await queue.add('job', { jobId });
+
+    return NextResponse.json({ job_id: jobId }, { status: 202 });
+    /*
 
     // Determine amount sign based on type if provided
     let amount = validated.amount_cents / 100;
@@ -748,6 +773,7 @@ export async function POST(request: NextRequest) {
     projectionCache.invalidateUser(ownerId);
 
     return NextResponse.json({ data: transformedData }, { status: 201 });
+  */
   } catch (error) {
     console.error('Transactions POST error:', error);
     if (error instanceof Error && error.name === 'ZodError') {

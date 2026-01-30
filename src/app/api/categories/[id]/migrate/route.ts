@@ -3,6 +3,8 @@ import { createClientFromRequest } from '@/lib/supabase/server';
 import { getUserId } from '@/lib/auth';
 import { createErrorResponse } from '@/lib/errors';
 import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
+import { getJobQueue } from '@/lib/queue/jobQueue';
+import { randomUUID } from 'crypto';
 
 export async function POST(
   request: NextRequest,
@@ -71,38 +73,34 @@ export async function POST(
       );
     }
 
-    // Count transactions to migrate
-    const { count: transactionCount } = await supabase
-      .from('transactions')
-      .select('*', { count: 'exact', head: true })
-      .eq('category_id', params.id)
-      .eq('user_id', ownerId);
+    const jobId = randomUUID();
+    const { error: jobError } = (await (supabase as any)
+      .from('jobs')
+      .insert({
+        id: jobId,
+        user_id: ownerId,
+        type: 'category_migration',
+        status: 'queued',
+        payload: {
+          source_category_id: params.id,
+          target_category_id,
+          user_id: ownerId,
+        },
+        progress: { processed: 0, total: 0 },
+      })) as { error: { message: string } | null };
 
-    if (!transactionCount || transactionCount === 0) {
-      return NextResponse.json(
-        { error: 'A categoria origem não possui transações para migrar' },
-        { status: 400 }
-      );
+    if (jobError) {
+      throw new Error(jobError.message);
     }
 
-    // Migrate all transactions atomically
-    const { data: migratedTransactions, error: migrateError } = await supabase
-      .from('transactions')
-      .update({ category_id: target_category_id })
-      .eq('category_id', params.id)
-      .eq('user_id', ownerId)
-      .select('id');
-
-    if (migrateError) {
-      throw migrateError;
-    }
-
-    const migratedCount = migratedTransactions?.length || 0;
+    const queue = getJobQueue();
+    await queue.add('job', { jobId });
 
     return NextResponse.json({
       success: true,
-      message: `Migração concluída com sucesso`,
+      message: 'Migração iniciada',
       data: {
+        job_id: jobId,
         sourceCategory: {
           id: sourceCategory.id,
           name: sourceCategory.name,
@@ -111,7 +109,6 @@ export async function POST(
           id: targetCategory.id,
           name: targetCategory.name,
         },
-        transactionsMigrated: migratedCount,
       },
     });
   } catch (error) {

@@ -12,6 +12,7 @@ import {
 import TransactionForm from '@/components/transactions/TransactionForm';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { waitForJobCompletion } from '@/lib/jobs/client';
 import { formatCurrency } from '@/lib/utils';
 
 interface Asset {
@@ -110,6 +111,11 @@ export default function AssetCard({ asset }: AssetCardProps) {
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || 'Erro ao criar transação');
+      }
+
+      const responseData = await response.json();
+      if (responseData.job_id) {
+        await waitForJobCompletion(responseData.job_id);
       }
 
       // Update asset status to 'sold'

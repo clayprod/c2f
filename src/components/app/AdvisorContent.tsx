@@ -57,6 +57,8 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastAssistantRef = useRef<HTMLDivElement>(null);
+  const [usage, setUsage] = useState<{ used: number; limit: number; unlimited: boolean } | null>(null);
   const { toast } = useToast();
 
   // Load persisted chat from localStorage on mount
@@ -113,13 +115,39 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
     }
   }, [sessionId, isInitialized]);
 
-  const scrollToBottom = () => {
+  const scrollToLatest = () => {
+    if (loading) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.role === 'assistant') {
+      lastAssistantRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    scrollToLatest();
+  }, [messages, loading]);
+
+  const refreshUsage = async () => {
+    try {
+      const res = await fetch('/api/advisor/usage');
+      if (!res.ok) return;
+      const data = await res.json();
+      setUsage(data);
+    } catch (error) {
+      console.error('Error fetching advisor usage:', error);
+    }
+  };
+
+  useEffect(() => {
+    refreshUsage();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,20 +174,65 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
         throw new Error(error.error || 'Erro ao processar mensagem');
       }
 
-      const data: AdvisorResponse = await res.json();
+      const data = await res.json();
 
       // Store sessionId for subsequent messages
       if (data.sessionId && !sessionId) {
         setSessionId(data.sessionId);
       }
 
+      if (data.job_id) {
+        const waitForJob = async () => {
+          return new Promise<AdvisorResponse>((resolve, reject) => {
+            let interval: NodeJS.Timeout | null = null;
+            const poll = async () => {
+              try {
+                const jobRes = await fetch(`/api/jobs/${data.job_id}`);
+                const jobData = await jobRes.json();
+                if (!jobRes.ok || !jobData.job) {
+                  throw new Error(jobData.error || 'Erro ao consultar resposta do Advisor');
+                }
+                const job = jobData.job;
+                if (job.status === 'completed') {
+                  if (interval) clearInterval(interval);
+                  resolve(job.progress?.result as AdvisorResponse);
+                  return;
+                }
+                if (job.status === 'failed' || job.status === 'cancelled') {
+                  if (interval) clearInterval(interval);
+                  reject(new Error(job.error_summary || 'Erro ao processar mensagem'));
+                }
+              } catch (error) {
+                if (interval) clearInterval(interval);
+                reject(error);
+              }
+            };
+            interval = setInterval(poll, 2000);
+            poll();
+          });
+        };
+
+        const result = await waitForJob();
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: result.summary,
+          insights: result.insights,
+          actions: result.actions,
+          confidence: result.confidence,
+        }]);
+        refreshUsage();
+        return;
+      }
+
+      const responseData = data as AdvisorResponse;
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: data.summary,
-        insights: data.insights,
-        actions: data.actions,
-        confidence: data.confidence,
+        content: responseData.summary,
+        insights: responseData.insights,
+        actions: responseData.actions,
+        confidence: responseData.confidence,
       }]);
+      refreshUsage();
     } catch (error: any) {
       toast({
         title: 'Erro',
@@ -238,6 +311,10 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
     }
   };
 
+  const lastAssistantIndex = messages.reduce((lastIndex, message, index) => {
+    return message.role === 'assistant' ? index : lastIndex;
+  }, -1);
+
   return (
     <div className={`flex flex-col max-w-full overflow-x-hidden ${inDialog ? 'h-full overflow-hidden scrollbar-hide' : 'min-h-[600px] h-[calc(100vh-10rem)]'}`}>
       {!inDialog && (
@@ -255,19 +332,26 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
               <i className='bx bx-sparkles text-xl sm:text-2xl text-secondary flex-shrink-0'></i>
               <h2 className="font-display font-semibold text-base sm:text-lg truncate">Chat com Advisor</h2>
             </div>
-            {messages.length > 1 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleNewConversation}
-                className="text-muted-foreground hover:text-foreground flex-shrink-0 text-xs sm:text-sm"
-                disabled={loading}
-              >
-                <i className='bx bx-repeat mr-1'></i>
-                <span className="hidden sm:inline">Nova conversa</span>
-                <span className="sm:hidden">Nova</span>
-              </Button>
-            )}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {usage && (usage.unlimited || usage.limit > 0) && (
+                <span className="text-xs sm:text-sm text-muted-foreground">
+                  Consultas do mês: {usage.unlimited ? 'Ilimitado' : `${usage.used}/${usage.limit}`}
+                </span>
+              )}
+              {messages.length > 1 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleNewConversation}
+                  className="text-muted-foreground hover:text-foreground flex-shrink-0 text-xs sm:text-sm"
+                  disabled={loading}
+                >
+                  <i className='bx bx-repeat mr-1'></i>
+                  <span className="hidden sm:inline">Nova conversa</span>
+                  <span className="sm:hidden">Nova</span>
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Messages */}
@@ -275,6 +359,7 @@ export default function AdvisorContent({ inDialog = false }: AdvisorContentProps
             {messages.map((msg, index) => (
               <div
                 key={index}
+                ref={msg.role === 'assistant' && index === lastAssistantIndex ? lastAssistantRef : undefined}
                 className={`${msg.role === 'user' ? 'ml-auto max-w-[85%] sm:max-w-[80%]' : 'mr-auto max-w-[95%] sm:max-w-[90%]'}`}
               >
                 <div

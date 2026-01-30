@@ -147,7 +147,7 @@ export default function ImportModal({
 
   const pollImportJob = useCallback(async (jobIdToPoll: string) => {
     try {
-      const res = await fetch(`/api/import/jobs/${jobIdToPoll}`);
+      const res = await fetch(`/api/jobs/${jobIdToPoll}`);
       const data = await res.json();
 
       if (!res.ok || !data.job) {
@@ -156,9 +156,11 @@ export default function ImportModal({
 
       const job = data.job;
       if (job.status === 'processing' || job.status === 'queued') {
+        const processed = job.progress?.processed || 0;
+        const total = job.progress?.total || 0;
         setProgress({
           status: 'processing',
-          message: `Processando ${job.processed_rows || 0} de ${job.total_rows || 0} transações...`,
+          message: `Processando ${processed} de ${total} transações...`,
         });
         return;
       }
@@ -174,15 +176,15 @@ export default function ImportModal({
           status: 'completed',
           message: 'Importação concluída!',
           result: {
-            totalRows: job.total_rows || 0,
-            imported: job.imported || 0,
-            skipped: job.skipped || 0,
+            totalRows: job.progress?.total || 0,
+            imported: job.progress?.imported || 0,
+            skipped: job.progress?.skipped || 0,
             errors: job.error_summary ? job.error_summary.split('; ') : [],
           },
         });
         toast({
           title: 'Sucesso',
-          description: `${job.imported || 0} transações importadas com sucesso`,
+          description: `${job.progress?.imported || 0} transações importadas com sucesso`,
         });
         if (onSuccess) {
           onSuccess();
@@ -217,6 +219,40 @@ export default function ImportModal({
       });
     }
   }, [onSuccess, toast]);
+
+  const waitForJobCompletion = useCallback(async (jobIdToWait: string) => {
+    return new Promise<any>((resolve, reject) => {
+      let interval: NodeJS.Timeout | null = null;
+
+      const poll = async () => {
+        try {
+          const res = await fetch(`/api/jobs/${jobIdToWait}`);
+          const data = await res.json();
+          if (!res.ok || !data.job) {
+            throw new Error(data.error || 'Erro ao consultar status da importação');
+          }
+
+          const job = data.job;
+          if (job.status === 'completed') {
+            if (interval) clearInterval(interval);
+            resolve(job);
+            return;
+          }
+
+          if (job.status === 'failed' || job.status === 'cancelled') {
+            if (interval) clearInterval(interval);
+            reject(new Error(job.error_summary || 'Falha no processamento'));
+          }
+        } catch (error) {
+          if (interval) clearInterval(interval);
+          reject(error);
+        }
+      };
+
+      interval = setInterval(poll, 2000);
+      poll();
+    });
+  }, []);
 
   const startJobPolling = useCallback((jobIdToPoll: string) => {
     if (pollingRef.current) {
@@ -612,7 +648,7 @@ export default function ImportModal({
       // Handle CSV/OFX import
       const fileContent = await file!.text();
 
-      const endpoint = importType === 'csv' ? '/api/import/csv/start' : '/api/import/ofx';
+      const endpoint = importType === 'csv' ? '/api/import/csv/start' : '/api/import/ofx/start';
       const bodyKey = importType === 'csv' ? 'csv_content' : 'ofx_content';
 
       // Prepare categories to create from selected transactions (O(n) with Map)
@@ -688,7 +724,7 @@ export default function ImportModal({
         throw new Error(data.error || `Erro ao importar ${importType.toUpperCase()}`);
       }
 
-      if (importType === 'csv') {
+      if (importType === 'csv' || importType === 'ofx') {
         const newJobId = data.job_id as string | undefined;
         if (!newJobId) {
           throw new Error('Importação iniciada sem job_id');
@@ -768,16 +804,22 @@ export default function ImportModal({
         });
 
         const data = await res.json();
-
         if (!res.ok) {
           allErrors.push(data.error || `Erro ao importar lote`);
           continue;
         }
 
-        totalImported += data.results?.imported || 0;
-        totalSkipped += data.results?.skipped || 0;
-        if (data.results?.errors) {
-          allErrors.push(...data.results.errors);
+        const jobId = data.job_id as string | undefined;
+        if (!jobId) {
+          allErrors.push('Importação iniciada sem job_id');
+          continue;
+        }
+
+        const job = await waitForJobCompletion(jobId);
+        totalImported += job.progress?.imported || 0;
+        totalSkipped += job.progress?.skipped || 0;
+        if (job.error_summary) {
+          allErrors.push(...job.error_summary.split('; '));
         }
       }
 

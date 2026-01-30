@@ -12,6 +12,7 @@ import {
 import TransactionForm from '@/components/transactions/TransactionForm';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { waitForJobCompletion } from '@/lib/jobs/client';
 import { PlanGuard } from '@/components/app/PlanGuard';
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog';
 import { formatCurrency } from '@/lib/utils';
@@ -104,6 +105,11 @@ export default function InvestmentsPage() {
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || 'Erro ao criar transação');
+      }
+
+      const responseData = await response.json();
+      if (responseData.job_id) {
+        await waitForJobCompletion(responseData.job_id);
       }
 
       // Update investment status to 'sold'

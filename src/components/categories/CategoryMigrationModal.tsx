@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { CategoryIcon } from '@/components/categories/CategoryIcon';
+import { Progress } from '@/components/ui/progress';
 
 interface Category {
   id: string;
@@ -51,6 +52,9 @@ export function CategoryMigrationModal({
   const [availableCategories, setAvailableCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingCategories, setLoadingCategories] = useState(true);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ processed: number; total: number } | null>(null);
+  const [polling, setPolling] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -107,14 +111,13 @@ export function CategoryMigrationModal({
         throw new Error(data.error || 'Erro ao migrar transações');
       }
 
-      toast({
-        title: 'Sucesso',
-        description: `${data.data.transactionsMigrated} transação(ões) migrada(s) com sucesso`,
-      });
-
-      onSuccess();
-      onOpenChange(false);
-      setTargetCategoryId('');
+      const newJobId = data.data?.job_id as string | undefined;
+      if (!newJobId) {
+        throw new Error('Migração iniciada sem job_id');
+      }
+      setJobId(newJobId);
+      setPolling(true);
+      setProgress({ processed: 0, total: 0 });
     } catch (error: any) {
       toast({
         title: 'Erro',
@@ -125,6 +128,57 @@ export function CategoryMigrationModal({
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+
+    const poll = async () => {
+      if (!jobId) return;
+      const res = await fetch(`/api/jobs/${jobId}`);
+      const data = await res.json();
+      if (!res.ok || !data.job) {
+        setPolling(false);
+        throw new Error(data.error || 'Erro ao consultar status da migração');
+      }
+
+      const job = data.job;
+      const processed = job.progress?.processed || 0;
+      const total = job.progress?.total || 0;
+      setProgress({ processed, total });
+
+      if (job.status === 'completed') {
+        setPolling(false);
+        toast({
+          title: 'Sucesso',
+          description: 'Migração concluída com sucesso',
+        });
+        onSuccess();
+        onOpenChange(false);
+        setTargetCategoryId('');
+        setJobId(null);
+      }
+
+      if (job.status === 'failed' || job.status === 'cancelled') {
+        setPolling(false);
+        toast({
+          title: 'Erro',
+          description: job.error_summary || 'Erro ao migrar transações',
+          variant: 'destructive',
+        });
+      }
+    };
+
+    if (polling && jobId) {
+      poll();
+      interval = setInterval(poll, 2000);
+    }
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [jobId, polling, onOpenChange, onSuccess, toast]);
 
   const selectedCategory = availableCategories.find(cat => cat.id === targetCategoryId);
 
@@ -188,6 +242,15 @@ export function CategoryMigrationModal({
             )}
           </div>
 
+          {polling && progress && (
+            <div className="space-y-2">
+              <Progress value={progress.total > 0 ? (progress.processed / progress.total) * 100 : 0} />
+              <p className="text-xs text-muted-foreground">
+                {progress.processed} de {progress.total} transações migradas
+              </p>
+            </div>
+          )}
+
           {selectedCategory && (
             <div className="glass-card p-4 bg-primary/5 border-primary/20">
               <div className="flex items-center gap-3">
@@ -211,19 +274,17 @@ export function CategoryMigrationModal({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading || polling}>
             Cancelar
           </Button>
           <Button
             onClick={handleMigrate}
-            disabled={loading || !targetCategoryId || availableCategories.length === 0}
+            disabled={loading || polling || !targetCategoryId || availableCategories.length === 0}
           >
-            {loading ? 'Migrando...' : 'Migrar Transações'}
+            {loading || polling ? 'Migrando...' : 'Migrar Transações'}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-
-

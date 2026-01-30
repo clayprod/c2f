@@ -2,13 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserId } from '@/lib/auth';
 import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { advisorChatSchema } from '@/lib/validation/schemas';
-import { createErrorResponse } from '@/lib/errors';
 import { getUserPlanAdmin } from '@/services/stripe/subscription';
+import { createErrorResponse } from '@/lib/errors';
 import { getPlanFeatures } from '@/services/admin/globalSettings';
 import { resolvePlanLimit } from '@/lib/planFeatures';
-import { getJobQueue } from '@/lib/queue/jobQueue';
-import { randomUUID } from 'crypto';
 
 async function countMonthlyAdvisorChats(
   admin: ReturnType<typeof createAdminClient>,
@@ -48,7 +45,7 @@ async function countMonthlyAdvisorChats(
   return fallback.count ?? 0;
 }
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const userId = await getUserId(request);
     if (!userId) {
@@ -84,85 +81,19 @@ export async function POST(request: NextRequest) {
 
     const now = new Date();
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const count = await countMonthlyAdvisorChats(admin, ownerId, firstDayOfMonth);
-
-    if (!unlimited && count >= monthlyLimit) {
-      return NextResponse.json(
-        { error: `Limite mensal de ${monthlyLimit} consultas ao Advisor atingido no seu plano.` },
-        { status: 403 }
-      );
-    }
-
-    const body = await request.json();
-    const validated = advisorChatSchema.parse(body);
-    const sessionId = (body.sessionId as string | undefined) || randomUUID();
-
-    const jobId = randomUUID();
-    const { error: jobError } = await admin
-      .from('jobs')
-      .insert({
-        id: jobId,
-        user_id: userId,
-        type: 'advisor_task',
-        status: 'queued',
-        payload: {
-          user_id: userId,
-          owner_id: ownerId,
-          message: validated.message,
-          session_id: sessionId,
-        },
-        progress: { processed: 0, total: 1 },
-      });
-
-    if (jobError) {
-      throw jobError;
-    }
-
-    const queue = getJobQueue();
-    await queue.add('job', { jobId });
+    const used = await countMonthlyAdvisorChats(admin, ownerId, firstDayOfMonth);
 
     return NextResponse.json({
-      job_id: jobId,
-      sessionId,
+      used,
+      limit: monthlyLimit,
+      unlimited,
     });
   } catch (error) {
-    if (error instanceof Error && error.name === 'ZodError') {
-      return NextResponse.json(
-        { error: 'Validation error', details: error },
-        { status: 400 }
-      );
-    }
-    console.error('Chat API error:', error);
+    console.error('Advisor usage API error:', error);
     const errorResponse = createErrorResponse(error);
     return NextResponse.json(
       { error: errorResponse.error },
       { status: errorResponse.statusCode }
     );
-  }
-}
-
-/**
- * DELETE /api/advisor/chat
- * Clear the current chat session
- */
-export async function DELETE(request: NextRequest) {
-  try {
-    const userId = await getUserId(request);
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const body = await request.json().catch(() => ({}));
-    const sessionId = body.sessionId as string | undefined;
-
-    if (sessionId) {
-      const { clearSession } = await import('@/services/advisor');
-      await clearSession(userId, sessionId);
-    }
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Clear session error:', error);
-    return NextResponse.json({ error: 'Failed to clear session' }, { status: 500 });
   }
 }

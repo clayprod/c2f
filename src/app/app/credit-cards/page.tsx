@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { waitForJobCompletion } from '@/lib/jobs/client';
 import CreditCardForm from '@/components/credit-cards/CreditCardForm';
 import BillDetailModal from '@/components/credit-cards/BillDetailModal';
 import TransactionForm from '@/components/transactions/TransactionForm';
@@ -570,6 +571,11 @@ export default function CreditCardsPage() {
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Erro ao criar transação');
+      }
+
+      const responseData = await res.json();
+      if (responseData.job_id) {
+        await waitForJobCompletion(responseData.job_id);
       }
 
       toast({

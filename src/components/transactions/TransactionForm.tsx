@@ -17,6 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Progress } from '@/components/ui/progress';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { useMembers } from '@/hooks/useMembers';
@@ -53,6 +54,8 @@ interface TransactionFormProps {
   accounts: Account[];
   creditCards?: Account[];
   categories: Array<{ id: string; name: string; type: string; source_type?: string | null }>;
+  jobProgress?: { processed: number; total: number } | null;
+  jobRunning?: boolean;
 }
 
 const formSchema = z.object({
@@ -76,6 +79,8 @@ export default function TransactionForm({
   accounts,
   creditCards = [],
   categories,
+  jobProgress,
+  jobRunning,
 }: TransactionFormProps) {
   const [loading, setLoading] = useState(false);
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('expense');
@@ -614,6 +619,15 @@ export default function TransactionForm({
               {loading ? 'Salvando...' : transaction ? 'Atualizar' : 'Criar'}
             </Button>
           </DialogFooter>
+
+          {jobRunning && jobProgress && (
+            <div className="mt-4 space-y-2">
+              <Progress value={jobProgress.total > 0 ? (jobProgress.processed / jobProgress.total) * 100 : 0} />
+              <p className="text-xs text-muted-foreground">
+                {jobProgress.processed} de {jobProgress.total} processados
+              </p>
+            </div>
+          )}
         </form>
       </DialogContent>
 

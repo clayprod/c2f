@@ -57,6 +57,9 @@ export default function RootLayout({
     <html lang="pt-BR" className={`${inter.variable} ${sora.variable} overflow-x-hidden`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        {process.env.NODE_ENV !== 'production' ? (
+          <script async crossOrigin="anonymous" src="https://tweakcn.com/live-preview.min.js" />
+        ) : null}
         <link rel="stylesheet" href="/boxicons.min.css" />
         <link rel="stylesheet" href="/boxicons-brands.min.css" />
       </head>

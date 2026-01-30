@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import TransactionFilters, { FilterState } from '@/components/transactions/TransactionFilters';
 import TransactionTable, { Transaction as TransactionTableType } from '@/components/transactions/TransactionTable';
 import TransactionForm, { Transaction as TransactionFormType } from '@/components/transactions/TransactionForm';
@@ -72,6 +72,10 @@ export default function TransactionsPage() {
     dependencies: { table: string; name: string; count: number }[];
   } | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<TransactionFormType | undefined>();
+  const [createJobId, setCreateJobId] = useState<string | null>(null);
+  const [createJobProgress, setCreateJobProgress] = useState<{ processed: number; total: number } | null>(null);
+  const [creatingJob, setCreatingJob] = useState(false);
+  const formDataRef = useRef<any>(null);
   const { toast } = useToast();
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const { context: accountContext, activeAccountId } = useAccountContext();
@@ -185,32 +189,16 @@ export default function TransactionsPage() {
         const error = await res.json();
         throw new Error(error.error || 'Erro ao criar transação');
       }
-
-      toast({
-        title: 'Sucesso',
-        description: 'Transação criada com sucesso',
-      });
-
-      // Reset pagination to first page to show the new transaction
-      setPagination(prev => ({ ...prev, offset: 0 }));
-      
-      // Adjust date filters if the new transaction date is outside the current range
-      const transactionDate = formData.posted_at || new Date().toISOString().split('T')[0];
-      const needsFilterAdjustment = 
-        (filters.fromDate && transactionDate < filters.fromDate) ||
-        (filters.toDate && transactionDate > filters.toDate);
-      
-      if (needsFilterAdjustment) {
-        // Update filters - useEffect will trigger fetchTransactions automatically
-        setFilters(prev => ({
-          ...prev,
-          fromDate: filters.fromDate && transactionDate < filters.fromDate ? transactionDate : prev.fromDate,
-          toDate: filters.toDate && transactionDate > filters.toDate ? transactionDate : prev.toDate,
-        }));
+      const data = await res.json();
+      const jobId = data.job_id as string | undefined;
+      if (!jobId) {
+        throw new Error('Transação criada sem job_id');
       }
-      // If date is within range, useEffect will automatically refetch due to offset change
-      
-      setFormOpen(false);
+
+      formDataRef.current = formData;
+      setCreateJobId(jobId);
+      setCreateJobProgress({ processed: 0, total: 1 });
+      setCreatingJob(true);
     } catch (error: any) {
       toast({
         title: 'Falha ao criar transação',
@@ -219,6 +207,76 @@ export default function TransactionsPage() {
       });
     }
   };
+
+  useEffect(() => {
+    if (!createJobId || !creatingJob) return;
+    let interval: NodeJS.Timeout | null = null;
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/jobs/${createJobId}`);
+        const data = await res.json();
+        if (!res.ok || !data.job) {
+          throw new Error(data.error || 'Erro ao consultar status da transação');
+        }
+
+        const job = data.job;
+        const processed = job.progress?.processed || 0;
+        const total = job.progress?.total || 1;
+        setCreateJobProgress({ processed, total });
+
+        if (job.status === 'completed') {
+          setCreatingJob(false);
+          setCreateJobId(null);
+          toast({
+            title: 'Sucesso',
+            description: 'Transação criada com sucesso',
+          });
+
+          setPagination(prev => ({ ...prev, offset: 0 }));
+          const transactionDate = formDataRef.current?.posted_at || new Date().toISOString().split('T')[0];
+          const needsFilterAdjustment =
+            (filters.fromDate && transactionDate < filters.fromDate) ||
+            (filters.toDate && transactionDate > filters.toDate);
+
+          if (needsFilterAdjustment) {
+            setFilters(prev => ({
+              ...prev,
+              fromDate: filters.fromDate && transactionDate < filters.fromDate ? transactionDate : prev.fromDate,
+              toDate: filters.toDate && transactionDate > filters.toDate ? transactionDate : prev.toDate,
+            }));
+          }
+
+          setFormOpen(false);
+        }
+
+        if (job.status === 'failed' || job.status === 'cancelled') {
+          setCreatingJob(false);
+          setCreateJobId(null);
+          toast({
+            title: 'Falha ao criar transação',
+            description: job.error_summary || 'Erro ao criar transação',
+            variant: 'destructive',
+          });
+        }
+      } catch (error: any) {
+        setCreatingJob(false);
+        setCreateJobId(null);
+        toast({
+          title: 'Falha ao criar transação',
+          description: error.message || 'Erro ao criar transação',
+          variant: 'destructive',
+        });
+      }
+    };
+
+    interval = setInterval(poll, 2000);
+    poll();
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [createJobId, creatingJob, filters.fromDate, filters.toDate, toast]);
 
   const handleUpdateTransaction = async (formData: any) => {
     if (!editingTransaction) return;
@@ -560,6 +618,8 @@ export default function TransactionsPage() {
         accounts={accounts}
         creditCards={creditCards}
         categories={categories}
+        jobProgress={createJobProgress}
+        jobRunning={creatingJob}
       />
 
       <ImportModal
