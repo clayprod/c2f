@@ -3,17 +3,40 @@
  * Builds a consolidated JSON context of user's financial data for the AI Advisor
  */
 
-import { createClient } from '@/lib/supabase/server';
-import { getUserPlan } from '@/services/stripe/subscription';
 import { FinancialContext } from './types';
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+
+async function fetchUserPlan(supabase: any, userId: string) {
+  try {
+    const { data: subscription } = await supabase
+      .from('billing_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    if (!subscription || subscription.status !== 'active') {
+      return { plan: 'free', status: 'active' };
+    }
+
+    let planId = subscription.plan_id;
+    if (planId === 'business') planId = 'premium';
+    return { plan: planId || 'free', status: subscription.status };
+  } catch {
+    return { plan: 'free', status: 'active' };
+  }
+}
 
 /**
  * Build complete financial context for a user
  * Optimized to minimize tokens while providing comprehensive data
  */
 export async function buildFinancialContext(userId: string): Promise<FinancialContext> {
+  const { createClient } = await import('@/lib/supabase/server');
   const supabase = await createClient();
+  return buildFinancialContextWithClient(supabase, userId);
+}
+
+export async function buildFinancialContextWithClient(supabase: any, userId: string): Promise<FinancialContext> {
   const now = new Date();
   const sixMonthsAgo = subMonths(now, 6);
   const currentMonth = format(now, 'yyyy-MM');
@@ -84,23 +107,23 @@ export async function buildFinancialContext(userId: string): Promise<FinancialCo
       .limit(10),
 
     // User plan
-    getUserPlan(userId).catch(() => ({ plan: 'free', status: 'active' })),
+    fetchUserPlan(supabase, userId),
   ]);
 
-  const profile = profileResult.data;
-  const accounts = accountsResult.data || [];
-  const transactions = transactionsResult.data || [];
-  const categories = categoriesResult.data || [];
-  const budgets = budgetsResult.data || [];
-  const goals = goalsResult.data || [];
-  const debts = debtsResult.data || [];
-  const receivables = receivablesResult.data || [];
-  const investments = investmentsResult.data || [];
-  const assets = assetsResult.data || [];
-  const creditCardBills = creditCardBillsResult.data || [];
+  const profile = profileResult.data as any;
+  const accounts = (accountsResult.data || []) as any[];
+  const transactions = (transactionsResult.data || []) as any[];
+  const categories = (categoriesResult.data || []) as any[];
+  const budgets = (budgetsResult.data || []) as any[];
+  const goals = (goalsResult.data || []) as any[];
+  const debts = (debtsResult.data || []) as any[];
+  const receivables = (receivablesResult.data || []) as any[];
+  const investments = (investmentsResult.data || []) as any[];
+  const assets = (assetsResult.data || []) as any[];
+  const creditCardBills = (creditCardBillsResult.data || []) as any[];
 
   // Calculate aggregations
-  const categoryMap = new Map(categories.map(c => [c.id, c]));
+  const categoryMap = new Map<string, any>(categories.map((c: any) => [c.id, c]));
 
   // Aggregate transactions by category and month
   const categoryAggregates = aggregateByCategory(transactions, categoryMap, sixMonthsAgo);

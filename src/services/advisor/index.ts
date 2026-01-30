@@ -19,6 +19,7 @@ export type {
 // Context Builder
 export {
   buildFinancialContext,
+  buildFinancialContextWithClient,
   hashContext,
 } from './contextBuilder';
 

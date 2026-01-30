@@ -1,3 +1,4 @@
+import 'module-alias/register';
 import { Worker } from 'bullmq';
 import { getRedisConnection } from '../lib/queue/redis';
 import { jobQueueName } from '../lib/queue/jobQueue';
@@ -7,7 +8,7 @@ import { parseOFX } from '../services/import/ofxParser';
 import { parseInstallment, formatInstallmentDescription, removeInstallmentPattern } from '../lib/utils/installmentParser';
 import { isCreditCardExpired } from '../lib/utils';
 import {
-  buildFinancialContext,
+  buildFinancialContextWithClient,
   getOrCreateSession,
   addMessage,
   updateSession,
@@ -1080,7 +1081,7 @@ async function runAdvisorTask(jobId: string, payload: AdvisorTaskPayload) {
   const { user_id, owner_id, message, session_id } = payload;
 
   const session = await getOrCreateSession(user_id, session_id);
-  const context = await buildFinancialContext(owner_id);
+  const context = await buildFinancialContextWithClient(supabase, owner_id);
   const contextJson = JSON.stringify(context, null, 2);
   const newContextHash = hashContext(context);
 

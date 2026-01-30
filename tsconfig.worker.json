@@ -9,6 +9,8 @@
     "target": "ES2019",
     "lib": ["es2019"],
     "isolatedModules": false,
+    "strict": false,
+    "noImplicitAny": false,
     "incremental": false,
     "types": ["node"]
   },
