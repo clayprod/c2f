@@ -86,7 +86,7 @@ export function AdvisorTips() {
     return (
       <div className="glass-card p-6">
         <div className="flex items-center gap-2 mb-4">
-          <i className="bx bx-sparkles text-2xl text-purple-600 animate-pulse"></i>
+          <i className="bx bx-sparkles text-2xl text-secondary animate-pulse"></i>
           <h2 className="font-display font-semibold">Dica do Dia</h2>
         </div>
         <p className="text-muted-foreground text-sm mb-4">
@@ -118,7 +118,7 @@ export function AdvisorTips() {
     <div className="glass-card p-4 sm:p-6 animate-slide-in-up delay-300 overflow-hidden w-full min-w-0">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4 min-w-0 w-full overflow-hidden">
         <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
-          <i className="bx bx-sparkles text-2xl text-purple-600 animate-pulse-soft flex-shrink-0"></i>
+          <i className="bx bx-sparkles text-2xl text-secondary animate-pulse-soft flex-shrink-0"></i>
           <h2 className="font-display font-semibold text-sm md:text-base truncate">Dica do Dia</h2>
           {tip.isNew && (
             <span className="px-2 py-0.5 text-[10px] md:text-xs font-medium rounded-full bg-success/10 text-success border border-success/20 flex-shrink-0">

@@ -2,174 +2,227 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================
+   c2Finance Design System - CSS Variables
+   Based on design tokens JSON
+   Dark mode is the default
+   ============================================ */
+
 @layer base {
+  /* Dark Theme (Default) - Baseado nos tokens c2finance */
   :root {
-    /* Nova paleta de cores - c2Finance */
-    --background: 236 38% 9%;           /* #0E0F20 Ink Black */
-    --foreground: 15 38% 97%;           /* #FBF5F3 Snow */
+    /* Background & Surface - Gray scale com viés azul-marinho */
+    --background: 222 47% 4%;          /* gray.950 #070C16 */
+    --foreground: 216 50% 99%;         /* gray.25 #FBFCFE */
 
-    --card: 214 53% 7%;                 /* #08101A Ink Black darker */
-    --card-foreground: 15 38% 97%;      /* #FBF5F3 Snow */
+    --card: 220 43% 9%;                /* gray.850 #0F1624 */
+    --card-foreground: 216 50% 99%;    /* gray.25 #FBFCFE */
 
-    --popover: 214 53% 7%;              /* #08101A Ink Black darker */
-    --popover-foreground: 15 38% 97%;   /* #FBF5F3 Snow */
+    --popover: 221 44% 7%;             /* gray.900 #0B1220 */
+    --popover-foreground: 216 50% 99%; /* gray.25 #FBFCFE */
 
-    --primary: 185 75% 47%;             /* #1FC0D2 Strong Cyan */
-    --primary-foreground: 236 38% 9%;   /* #0E0F20 Ink Black */
+    /* Primary: Teal/Cyan - Estados ativos, destaques */
+    --primary: 187 91% 43%;            /* primary.500 #06B6D4 */
+    --primary-foreground: 222 47% 4%;  /* gray.950 for contrast */
 
-    --secondary: 280 44% 51%;           /* #9448BC Amethyst */
-    --secondary-foreground: 15 38% 97%; /* #FBF5F3 Snow */
+    /* Secondary: Indigo/Violet - Elementos de IA/Advisor */
+    --secondary: 239 84% 67%;          /* secondary.500 #6366F1 */
+    --secondary-foreground: 216 50% 99%; /* gray.25 */
 
-    --muted: 236 30% 15%;               /* Baseado em Ink Black */
-    --muted-foreground: 215 20% 65%;
+    /* Muted surfaces */
+    --muted: 220 38% 11%;              /* gray.800 area */
+    --muted-foreground: 217 19% 55%;   /* gray.400 #7A889E */
 
-    --accent: 160 92% 72%;              /* #73FBD3 Aquamarine */
-    --accent-foreground: 236 38% 9%;    /* #0E0F20 Ink Black */
+    /* Accent - usando primary como accent */
+    --accent: 187 91% 43%;             /* primary.500 */
+    --accent-foreground: 222 47% 4%;   /* gray.950 */
 
-    --destructive: 0 99% 64%;           /* #FE4A49 Tomato */
-    --destructive-foreground: 15 38% 97%; /* #FBF5F3 Snow */
+    /* Destructive */
+    --destructive: 0 84% 60%;          /* danger #EF4444 */
+    --destructive-foreground: 216 50% 99%;
 
-    --warning: 45 99% 70%;              /* #FED766 Mustard */
-    --warning-foreground: 236 38% 9%;   /* #0E0F20 Ink Black */
+    /* Warning */
+    --warning: 38 92% 50%;             /* warning #F59E0B */
+    --warning-foreground: 222 47% 4%;
 
-    /* Cores semânticas para estados */
-    --success: 160 92% 50%;             /* Baseado em Aquamarine */
-    --success-foreground: 236 38% 9%;   /* #0E0F20 Ink Black */
+    /* Success */
+    --success: 142 71% 45%;            /* success #22C55E */
+    --success-foreground: 222 47% 4%;
 
-    --info: 199 98% 67%;                /* #59D2FE Sky Aqua */
-    --info-foreground: 236 38% 9%;      /* #0E0F20 Ink Black */
+    /* Info */
+    --info: 198 93% 60%;               /* info #38BDF8 */
+    --info-foreground: 222 47% 4%;
 
     /* Cores para valores financeiros */
-    --positive: 160 92% 50%;            /* Verde - ganhos/receitas */
-    --negative: 0 99% 64%;              /* Vermelho - perdas/despesas */
-    --neutral: 185 75% 47%;             /* Ciano - saldo/neutro */
+    --positive: 142 71% 45%;           /* success - ganhos/receitas */
+    --negative: 0 84% 60%;             /* danger - perdas/despesas */
+    --neutral: 187 91% 43%;            /* primary - saldo/neutro */
 
-    --border: 236 30% 18%;              /* Baseado em Ink Black */
-    --input: 236 30% 18%;
-    --ring: 185 75% 47%;                /* #1FC0D2 Strong Cyan */
+    /* Borders & Inputs */
+    --border: 220 30% 15%;             /* subtle border */
+    --input: 220 30% 15%;
+    --ring: 187 91% 43%;               /* primary.500 */
 
     --radius: 0.75rem;
 
-    /* Custom tokens - Nova paleta */
-    --gradient-primary: linear-gradient(135deg, #1FC0D2, #59D2FE);  /* Strong Cyan -> Sky Aqua */
-    --gradient-secondary: linear-gradient(135deg, #9448BC, #73FBD3); /* Amethyst -> Aquamarine */
-    --gradient-text: linear-gradient(135deg, #1FC0D2, #44E5E7);      /* Strong Cyan -> Neon Ice */
-    --gradient-hero: linear-gradient(180deg, #08101A 0%, #0E0F20 100%); /* Ink Black variations */
+    /* Gradients - Usando tons de primary e secondary */
+    --gradient-primary: linear-gradient(135deg, #06B6D4, #22D3EE);
+    --gradient-secondary: linear-gradient(135deg, #6366F1, #818CF8);
+    --gradient-text: linear-gradient(135deg, #06B6D4, #22D3EE);
+    --gradient-hero: linear-gradient(180deg, #070C16 0%, #0B1220 100%);
+    --gradient-card: linear-gradient(135deg, #0B1220, #0F1624, #141B2A);
 
-    --glass-bg: hsl(236 38% 10% / 0.6);
-    --glass-border: hsl(185 75% 47% / 0.15);
+    /* Glass effects */
+    --glass-bg: hsl(220 43% 9% / 0.6);
+    --glass-border: hsl(187 91% 43% / 0.15);
     --glass-blur: 20px;
 
-    --glow-primary: 0 0 40px hsl(185 75% 47% / 0.3);   /* Strong Cyan glow */
-    --glow-secondary: 0 0 40px hsl(280 44% 51% / 0.3); /* Amethyst glow */
+    /* Glows */
+    --glow-primary: 0 0 40px hsl(187 91% 43% / 0.3);
+    --glow-secondary: 0 0 40px hsl(239 84% 67% / 0.22);
+    --glow-teal: 0 0 20px hsl(187 91% 43% / 0.20);
+    --glow-ai: 0 0 20px hsl(239 84% 67% / 0.22);
 
-    --shadow-card: 0 8px 32px hsl(0 0% 0% / 0.3);
-    --shadow-elevated: 0 20px 60px hsl(0 0% 0% / 0.4);
+    /* Shadows */
+    --shadow-card: 0 14px 40px rgba(0, 0, 0, 0.35);
+    --shadow-panel: 0 18px 55px rgba(0, 0, 0, 0.45);
+    --shadow-elevated: 0 20px 60px rgba(0, 0, 0, 0.4);
 
-    --sidebar-background: 236 38% 9%;     /* #0E0F20 Ink Black */
-    --sidebar-foreground: 15 38% 97%;     /* #FBF5F3 Snow */
-    --sidebar-primary: 185 75% 47%;       /* #1FC0D2 Strong Cyan */
-    --sidebar-primary-foreground: 236 38% 9%;
-    --sidebar-accent: 236 30% 15%;
-    --sidebar-accent-foreground: 15 38% 97%;
-    --sidebar-border: 236 30% 18%;
-    --sidebar-ring: 185 75% 47%;          /* #1FC0D2 Strong Cyan */
+    /* Sidebar tokens */
+    --sidebar-background: 221 44% 7%;      /* gray.900 */
+    --sidebar-foreground: 216 50% 99%;     /* gray.25 */
+    --sidebar-primary: 187 91% 43%;        /* primary.500 */
+    --sidebar-primary-foreground: 222 47% 4%;
+    --sidebar-accent: 220 38% 11%;         /* muted area */
+    --sidebar-accent-foreground: 216 50% 99%;
+    --sidebar-border: 220 30% 15%;
+    --sidebar-ring: 187 91% 43%;
 
-    /* Chart colors - Nova paleta */
-    --chart-income: 160 92% 50%;          /* Baseado em Aquamarine */
-    --chart-income-projected: 181 76% 59%; /* #44E5E7 Neon Ice */
-    --chart-expense: 0 99% 64%;           /* #FE4A49 Tomato */
+    /* Chart colors */
+    --chart-income: 142 71% 45%;           /* success */
+    --chart-income-projected: 142 50% 55%;
+    --chart-expense: 0 84% 60%;            /* danger */
     --chart-expense-projected: 0 60% 55%;
-    --chart-balance: 185 75% 47%;         /* #1FC0D2 Strong Cyan */
+    --chart-balance: 187 91% 43%;          /* primary */
+
+    /* Interactive states */
+    --hover-surface: rgba(255, 255, 255, 0.05);
+    --active-surface: rgba(6, 182, 212, 0.12);
+    --focus-ring-primary: 0 0 0 3px rgba(6, 182, 212, 0.22);
+    --focus-ring-secondary: 0 0 0 3px rgba(99, 102, 241, 0.22);
   }
 
-  :root[data-theme="light"] {
-    /* Tema claro - Nova paleta c2Finance */
-    --background: 15 38% 97%;           /* #FBF5F3 Snow */
-    --foreground: 236 38% 9%;           /* #0E0F20 Ink Black */
+  /* Light Theme */
+  :root[data-theme="light"],
+  .light {
+    /* Background & Surface */
+    --background: 216 50% 99%;         /* gray.25 #FBFCFE */
+    --foreground: 221 44% 7%;          /* gray.900 #0B1220 */
 
-    --card: 0 0% 100%;                  /* Branco puro */
-    --card-foreground: 236 38% 9%;      /* #0E0F20 Ink Black */
+    --card: 0 0% 100%;                 /* white */
+    --card-foreground: 221 44% 7%;     /* gray.900 */
 
-    --popover: 0 0% 100%;               /* Branco puro */
-    --popover-foreground: 236 38% 9%;   /* #0E0F20 Ink Black */
+    --popover: 0 0% 100%;              /* white */
+    --popover-foreground: 221 44% 7%;  /* gray.900 */
 
-    --primary: 185 75% 40%;             /* Strong Cyan (mais escuro para contraste) */
+    /* Primary: Teal/Cyan - mais escuro para contraste */
+    --primary: 189 94% 37%;            /* primary.600 #0891B2 */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 280 44% 45%;           /* Amethyst (mais escuro para contraste) */
+    /* Secondary: Indigo/Violet - mais escuro para contraste */
+    --secondary: 243 75% 59%;          /* secondary.600 #4F46E5 */
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 15 20% 95%;                /* Baseado em Snow */
-    --muted-foreground: 236 20% 35%;
+    /* Muted surfaces */
+    --muted: 220 14% 96%;              /* gray.50 area */
+    --muted-foreground: 220 23% 40%;   /* gray.600 #3B4658 */
 
-    --accent: 160 80% 45%;              /* Aquamarine (mais escuro para contraste) */
+    /* Accent */
+    --accent: 189 94% 37%;             /* primary.600 */
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 99% 55%;           /* Tomato (mais escuro para contraste) */
+    /* Destructive */
+    --destructive: 0 84% 55%;          /* danger darker */
     --destructive-foreground: 0 0% 100%;
 
-    --warning: 45 99% 50%;              /* Mustard (mais escuro para contraste) */
-    --warning-foreground: 236 38% 9%;
+    /* Warning */
+    --warning: 38 92% 45%;             /* warning darker */
+    --warning-foreground: 221 44% 7%;
 
-    /* Cores semânticas para estados - tema claro */
-    --success: 160 80% 40%;             /* Aquamarine (mais escuro) */
+    /* Success */
+    --success: 142 71% 40%;            /* success darker */
     --success-foreground: 0 0% 100%;
 
-    --info: 199 90% 50%;                /* Sky Aqua (mais escuro) */
+    /* Info */
+    --info: 199 89% 48%;               /* info darker */
     --info-foreground: 0 0% 100%;
 
     /* Cores para valores financeiros - tema claro */
-    --positive: 160 80% 40%;            /* Verde - ganhos/receitas */
-    --negative: 0 99% 55%;              /* Vermelho - perdas/despesas */
-    --neutral: 185 75% 40%;             /* Ciano - saldo/neutro */
+    --positive: 142 71% 40%;           /* success darker */
+    --negative: 0 84% 55%;             /* danger darker */
+    --neutral: 189 94% 37%;            /* primary.600 */
 
-    --border: 15 20% 90%;               /* Baseado em Snow */
-    --input: 15 20% 90%;
-    --ring: 185 75% 40%;                /* Strong Cyan */
+    /* Borders & Inputs */
+    --border: 220 13% 91%;             /* gray.100 */
+    --input: 220 13% 91%;
+    --ring: 189 94% 37%;               /* primary.600 */
 
-    /* Gradientes - Tema claro */
-    --gradient-primary: linear-gradient(135deg, #1FC0D2, #59D2FE);  /* Strong Cyan -> Sky Aqua */
-    --gradient-secondary: linear-gradient(135deg, #9448BC, #73FBD3); /* Amethyst -> Aquamarine */
-    --gradient-text: linear-gradient(135deg, #1FC0D2, #44E5E7);      /* Strong Cyan -> Neon Ice */
-    --gradient-hero: linear-gradient(180deg, #FBF5F3 0%, #F0EBE8 100%); /* Snow variations */
+    /* Gradients - Light theme */
+    --gradient-primary: linear-gradient(135deg, #0891B2, #06B6D4);
+    --gradient-secondary: linear-gradient(135deg, #4F46E5, #6366F1);
+    --gradient-text: linear-gradient(135deg, #0891B2, #06B6D4);
+    --gradient-hero: linear-gradient(180deg, #FBFCFE 0%, #F5F7FA 100%);
+    --gradient-card: linear-gradient(135deg, #FFFFFF, #FBFCFE, #F5F7FA);
 
+    /* Glass effects - Light */
     --glass-bg: hsl(0 0% 100% / 0.6);
-    --glass-border: hsl(185 75% 47% / 0.2);
+    --glass-border: hsl(189 94% 37% / 0.2);
     --glass-blur: 20px;
 
-    --glow-primary: 0 0 40px hsl(185 75% 47% / 0.2);   /* Strong Cyan glow */
-    --glow-secondary: 0 0 40px hsl(280 44% 51% / 0.2); /* Amethyst glow */
+    /* Glows - Light */
+    --glow-primary: 0 0 40px hsl(189 94% 37% / 0.2);
+    --glow-secondary: 0 0 40px hsl(243 75% 59% / 0.2);
+    --glow-teal: 0 0 20px hsl(189 94% 37% / 0.15);
+    --glow-ai: 0 0 20px hsl(243 75% 59% / 0.15);
 
-    --shadow-card: 0 8px 32px hsl(236 38% 9% / 0.08);
-    --shadow-elevated: 0 20px 60px hsl(236 38% 9% / 0.12);
+    /* Shadows - Light */
+    --shadow-card: 0 8px 32px hsl(221 44% 7% / 0.08);
+    --shadow-panel: 0 12px 40px hsl(221 44% 7% / 0.10);
+    --shadow-elevated: 0 20px 60px hsl(221 44% 7% / 0.12);
 
+    /* Sidebar tokens - Light */
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 236 38% 9%;     /* #0E0F20 Ink Black */
-    --sidebar-primary: 185 75% 40%;       /* Strong Cyan */
+    --sidebar-foreground: 221 44% 7%;
+    --sidebar-primary: 189 94% 37%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 15 30% 96%;
-    --sidebar-accent-foreground: 236 38% 9%;
-    --sidebar-border: 15 20% 91%;
-    --sidebar-ring: 185 75% 40%;          /* Strong Cyan */
+    --sidebar-accent: 220 14% 96%;
+    --sidebar-accent-foreground: 221 44% 7%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 189 94% 37%;
 
-    /* Chart colors - Tema claro */
-    --chart-income: 160 80% 40%;          /* Aquamarine (mais escuro) */
-    --chart-income-projected: 181 70% 50%; /* Neon Ice */
-    --chart-expense: 0 99% 55%;           /* Tomato (mais escuro) */
-    --chart-expense-projected: 0 60% 50%;
-    --chart-balance: 185 75% 40%;         /* Strong Cyan */
+    /* Chart colors - Light */
+    --chart-income: 142 71% 40%;
+    --chart-income-projected: 142 60% 50%;
+    --chart-expense: 0 84% 55%;
+    --chart-expense-projected: 0 65% 60%;
+    --chart-balance: 189 94% 37%;
+
+    /* Interactive states - Light */
+    --hover-surface: rgba(15, 23, 42, 0.04);
+    --active-surface: rgba(8, 145, 178, 0.12);
+    --focus-ring-primary: 0 0 0 3px rgba(8, 145, 178, 0.22);
+    --focus-ring-secondary: 0 0 0 3px rgba(79, 70, 229, 0.22);
   }
 }
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
 
   html {
     scroll-behavior: smooth;
-    scroll-padding-top: 5rem; /* Compensar navbar fixa */
+    scroll-padding-top: 5rem;
   }
 
   html,
@@ -180,7 +233,7 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-family: var(--font-inter), sans-serif;
+    font-family: var(--font-inter), 'Inter', system-ui, sans-serif;
     width: 100%;
     position: relative;
   }
@@ -191,11 +244,14 @@
   h4,
   h5,
   h6 {
-    font-family: var(--font-sora), sans-serif;
+    font-family: var(--font-sora), 'Inter', system-ui, sans-serif;
   }
 }
 
 @layer components {
+  /* ============================================
+     Glass Card - Card principal com efeito glass
+     ============================================ */
   .glass-card {
     @apply bg-card/60 backdrop-blur-xl border border-border/50 rounded-2xl;
     box-shadow: var(--shadow-card);
@@ -210,6 +266,9 @@
     box-shadow: var(--glow-primary), var(--shadow-elevated);
   }
 
+  /* ============================================
+     Gradient utilities
+     ============================================ */
   .gradient-text {
     @apply bg-clip-text text-transparent;
     background-image: var(--gradient-text);
@@ -230,8 +289,11 @@
     pointer-events: none;
   }
 
+  /* ============================================
+     Buttons
+     ============================================ */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-semibold text-primary-foreground transition-all duration-300;
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-chip font-semibold text-primary-foreground transition-all duration-300;
     background: var(--gradient-primary);
     box-shadow: var(--glow-primary);
     min-width: fit-content;
@@ -240,19 +302,25 @@
 
   .btn-primary:hover {
     @apply scale-105;
-    box-shadow: 0 0 60px hsl(185 75% 47% / 0.5); /* Strong Cyan glow */
+    box-shadow: 0 0 60px hsl(187 91% 43% / 0.5);
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-semibold border border-border bg-card/50 text-foreground transition-all duration-300 hover:border-primary/50 hover:bg-card;
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-chip font-semibold border border-border bg-card/50 text-foreground transition-all duration-300 hover:border-primary/50 hover:bg-card;
     min-width: fit-content;
     white-space: nowrap;
   }
 
+  /* ============================================
+     Badge / Pill
+     ============================================ */
   .badge-pill {
-    @apply inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium bg-primary/10 text-primary border border-primary/20;
+    @apply inline-flex items-center gap-2 px-4 py-1.5 rounded-chip text-sm font-medium bg-primary/10 text-primary border border-primary/20;
   }
 
+  /* ============================================
+     Layout utilities
+     ============================================ */
   .section-padding {
     @apply py-20 md:py-32;
   }
@@ -261,6 +329,9 @@
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
   }
 
+  /* ============================================
+     Animations
+     ============================================ */
   .fade-in-up {
     animation: fadeInUp 0.6s ease-out forwards;
     opacity: 0;
@@ -271,46 +342,23 @@
       opacity: 0;
       transform: translateY(20px);
     }
-
     to {
       opacity: 1;
       transform: translateY(0);
     }
   }
 
-  .stagger-1 {
-    animation-delay: 0.1s;
-  }
+  /* Stagger delays */
+  .stagger-1 { animation-delay: 0.1s; }
+  .stagger-2 { animation-delay: 0.2s; }
+  .stagger-3 { animation-delay: 0.3s; }
+  .stagger-4 { animation-delay: 0.4s; }
+  .stagger-5 { animation-delay: 0.5s; }
+  .stagger-6 { animation-delay: 0.6s; }
+  .stagger-7 { animation-delay: 0.7s; }
+  .stagger-8 { animation-delay: 0.8s; }
 
-  .stagger-2 {
-    animation-delay: 0.2s;
-  }
-
-  .stagger-3 {
-    animation-delay: 0.3s;
-  }
-
-  .stagger-4 {
-    animation-delay: 0.4s;
-  }
-
-  .stagger-5 {
-    animation-delay: 0.5s;
-  }
-
-  .stagger-6 {
-    animation-delay: 0.6s;
-  }
-
-  .stagger-7 {
-    animation-delay: 0.7s;
-  }
-
-  .stagger-8 {
-    animation-delay: 0.8s;
-  }
-
-  /* Animação de float suave */
+  /* Float animations */
   .animate-float {
     animation: float 6s ease-in-out infinite;
   }
@@ -332,7 +380,7 @@
     }
   }
 
-  /* Animação de pulse suave para ícones */
+  /* Pulse soft animation */
   .animate-pulse-soft {
     animation: pulseSoft 3s ease-in-out infinite;
   }
@@ -348,22 +396,18 @@
     }
   }
 
-  /* Animação de fade in simples */
+  /* Fade in */
   .animate-fade-in {
     animation: fadeIn 0.6s ease-out forwards;
     opacity: 0;
   }
 
   @keyframes fadeIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 
-  /* Animação de entrada com scale */
+  /* Scale in */
   .animate-scale-in {
     animation: scaleIn 0.5s ease-out forwards;
     opacity: 0;
@@ -381,7 +425,7 @@
     }
   }
 
-  /* Animação de slide in da esquerda */
+  /* Slide animations */
   .animate-slide-in-left {
     animation: slideInLeft 0.6s ease-out forwards;
     opacity: 0;
@@ -398,7 +442,6 @@
     }
   }
 
-  /* Animação de slide in da direita */
   .animate-slide-in-right {
     animation: slideInRight 0.6s ease-out forwards;
     opacity: 0;
@@ -415,7 +458,6 @@
     }
   }
 
-  /* Animação de slide in de baixo */
   .animate-slide-in-up {
     animation: slideInUp 0.6s ease-out forwards;
     opacity: 0;
@@ -432,42 +474,38 @@
     }
   }
 
-  /* Animação de brilho suave */
+  /* Glow animation */
   .animate-glow {
     animation: glow 3s ease-in-out infinite;
   }
 
   @keyframes glow {
     0%, 100% {
-      box-shadow: 0 0 5px hsl(185 75% 47% / 0.2);
+      box-shadow: 0 0 5px hsl(187 91% 43% / 0.2);
     }
     50% {
-      box-shadow: 0 0 20px hsl(185 75% 47% / 0.4), 0 0 30px hsl(185 75% 47% / 0.2);
+      box-shadow: 0 0 20px hsl(187 91% 43% / 0.4), 0 0 30px hsl(187 91% 43% / 0.2);
     }
   }
 
-  /* Animação de shimmer para loading states */
+  /* Shimmer for loading states */
   .animate-shimmer {
     background: linear-gradient(
       90deg,
-      hsl(236 30% 15% / 0.5) 25%,
-      hsl(236 30% 20% / 0.8) 50%,
-      hsl(236 30% 15% / 0.5) 75%
+      hsl(220 38% 11% / 0.5) 25%,
+      hsl(220 38% 16% / 0.8) 50%,
+      hsl(220 38% 11% / 0.5) 75%
     );
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite;
   }
 
   @keyframes shimmer {
-    0% {
-      background-position: 200% 0;
-    }
-    100% {
-      background-position: -200% 0;
-    }
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
   }
 
-  /* Card com animação de entrada */
+  /* Card with enter animation */
   .glass-card-animated {
     @apply glass-card;
     animation: cardEnter 0.5s ease-out forwards;
@@ -485,7 +523,7 @@
     }
   }
 
-  /* Hover lift para cards interativos */
+  /* Hover lift for interactive cards */
   .hover-lift {
     transition: transform 0.3s ease, box-shadow 0.3s ease;
   }
@@ -495,68 +533,37 @@
     box-shadow: var(--glow-primary), var(--shadow-elevated);
   }
 
-  /* Animação de rotação suave para ícones */
+  /* Spin slow */
   .animate-spin-slow {
     animation: spinSlow 8s linear infinite;
   }
 
   @keyframes spinSlow {
-    from {
-      transform: rotate(0deg);
-    }
-    to {
-      transform: rotate(360deg);
-    }
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
   }
 
-  /* Animação de bounce suave */
+  /* Bounce soft */
   .animate-bounce-soft {
     animation: bounceSoft 2s ease-in-out infinite;
   }
 
   @keyframes bounceSoft {
-    0%, 100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(-8px);
-    }
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
   }
 
-  /* Delays para animações escalonadas */
-  .delay-100 {
-    animation-delay: 100ms;
-  }
+  /* Animation delays */
+  .delay-100 { animation-delay: 100ms; }
+  .delay-200 { animation-delay: 200ms; }
+  .delay-300 { animation-delay: 300ms; }
+  .delay-400 { animation-delay: 400ms; }
+  .delay-500 { animation-delay: 500ms; }
+  .delay-600 { animation-delay: 600ms; }
+  .delay-700 { animation-delay: 700ms; }
+  .delay-800 { animation-delay: 800ms; }
 
-  .delay-200 {
-    animation-delay: 200ms;
-  }
-
-  .delay-300 {
-    animation-delay: 300ms;
-  }
-
-  .delay-400 {
-    animation-delay: 400ms;
-  }
-
-  .delay-500 {
-    animation-delay: 500ms;
-  }
-
-  .delay-600 {
-    animation-delay: 600ms;
-  }
-
-  .delay-700 {
-    animation-delay: 700ms;
-  }
-
-  .delay-800 {
-    animation-delay: 800ms;
-  }
-
-  /* Container com animações de children */
+  /* Stagger children animation */
   .animate-children-stagger > * {
     animation: fadeInUp 0.5s ease-out forwards;
     opacity: 0;
@@ -579,13 +586,15 @@
     text-wrap: balance;
   }
 
-  /* Reduzir fontes em 5% apenas no conteúdo principal (não nos menus) */
+  /* Reduzir fontes em 5% apenas no conteúdo principal */
   .app-content-scaled {
     font-size: 95%;
   }
 }
 
-/* Blog Content Styles - Ensure proper colors in both themes */
+/* ============================================
+   Blog Content Styles
+   ============================================ */
 .blog-content {
   color: hsl(var(--foreground) / 0.9);
 }
@@ -597,7 +606,7 @@
 .blog-content h5,
 .blog-content h6 {
   color: hsl(var(--foreground));
-  font-family: var(--font-sora), sans-serif;
+  font-family: var(--font-sora), system-ui, sans-serif;
   margin-top: 2em;
   margin-bottom: 0.75em;
 }
@@ -715,13 +724,14 @@
   color: hsl(var(--foreground) / 0.85);
 }
 
-/* Custom Scrollbar Styles - Padronizado para toda a aplicação - Nova paleta */
+/* ============================================
+   Custom Scrollbar Styles - Teal/Cyan theme
+   ============================================ */
 @layer base {
-
   /* Webkit browsers (Chrome, Safari, Edge) */
   * {
     scrollbar-width: thin;
-    scrollbar-color: hsl(185 75% 47% / 0.3) hsl(236 30% 15% / 0.5); /* Strong Cyan / Ink Black */
+    scrollbar-color: hsl(187 91% 43% / 0.3) hsl(220 38% 11% / 0.5);
   }
 
   *::-webkit-scrollbar {
@@ -730,12 +740,12 @@
   }
 
   *::-webkit-scrollbar-track {
-    background: hsl(236 30% 15% / 0.3); /* Ink Black */
+    background: hsl(220 38% 11% / 0.3);
     border-radius: 10px;
   }
 
   *::-webkit-scrollbar-thumb {
-    background: hsl(185 75% 47% / 0.4); /* Strong Cyan */
+    background: hsl(187 91% 43% / 0.4);
     border-radius: 10px;
     border: 2px solid transparent;
     background-clip: padding-box;
@@ -743,29 +753,23 @@
   }
 
   *::-webkit-scrollbar-thumb:hover {
-    background: hsl(185 75% 47% / 0.6); /* Strong Cyan */
+    background: hsl(187 91% 43% / 0.6);
     background-clip: padding-box;
   }
 
   *::-webkit-scrollbar-thumb:active {
-    background: hsl(185 75% 47% / 0.8); /* Strong Cyan */
+    background: hsl(187 91% 43% / 0.8);
     background-clip: padding-box;
   }
 
   *::-webkit-scrollbar-corner {
-    background: hsl(236 30% 15% / 0.3); /* Ink Black */
+    background: hsl(220 38% 11% / 0.3);
   }
 
-  /* Firefox */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: hsl(185 75% 47% / 0.4) hsl(236 30% 15% / 0.3); /* Strong Cyan / Ink Black */
-  }
-
-  /* Scrollbar para elementos com overflow específico */
+  /* Thin scrollbar variant */
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: hsl(185 75% 47% / 0.4) hsl(236 30% 15% / 0.3); /* Strong Cyan / Ink Black */
+    scrollbar-color: hsl(187 91% 43% / 0.4) hsl(220 38% 11% / 0.3);
   }
 
   .scrollbar-thin::-webkit-scrollbar {
@@ -774,25 +778,25 @@
   }
 
   .scrollbar-thin::-webkit-scrollbar-track {
-    background: hsl(236 30% 15% / 0.2); /* Ink Black */
+    background: hsl(220 38% 11% / 0.2);
     border-radius: 10px;
   }
 
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: hsl(185 75% 47% / 0.3); /* Strong Cyan */
+    background: hsl(187 91% 43% / 0.3);
     border-radius: 10px;
     border: 1px solid transparent;
     background-clip: padding-box;
   }
 
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: hsl(185 75% 47% / 0.5); /* Strong Cyan */
+    background: hsl(187 91% 43% / 0.5);
   }
 
-  /* Classe custom-scrollbar para uso específico em componentes */
+  /* Custom scrollbar class */
   .custom-scrollbar {
     scrollbar-width: thin;
-    scrollbar-color: hsl(185 75% 47% / 0.4) hsl(236 30% 15% / 0.3); /* Strong Cyan / Ink Black */
+    scrollbar-color: hsl(187 91% 43% / 0.4) hsl(220 38% 11% / 0.3);
   }
 
   .custom-scrollbar::-webkit-scrollbar {
@@ -801,12 +805,12 @@
   }
 
   .custom-scrollbar::-webkit-scrollbar-track {
-    background: hsl(236 30% 15% / 0.3); /* Ink Black */
+    background: hsl(220 38% 11% / 0.3);
     border-radius: 10px;
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: hsl(185 75% 47% / 0.4); /* Strong Cyan */
+    background: hsl(187 91% 43% / 0.4);
     border-radius: 10px;
     border: 2px solid transparent;
     background-clip: padding-box;
@@ -814,47 +818,41 @@
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: hsl(185 75% 47% / 0.6); /* Strong Cyan */
+    background: hsl(187 91% 43% / 0.6);
     background-clip: padding-box;
   }
 
-  /* Scrollbar para elementos com tema secundário (Amethyst) */
+  /* Secondary (AI/Violet) scrollbar variant */
   .scrollbar-secondary {
     scrollbar-width: thin;
-    scrollbar-color: hsl(280 44% 51% / 0.4) hsl(236 30% 15% / 0.3); /* Amethyst / Ink Black */
+    scrollbar-color: hsl(239 84% 67% / 0.4) hsl(220 38% 11% / 0.3);
   }
 
   .scrollbar-secondary::-webkit-scrollbar-thumb {
-    background: hsl(280 44% 51% / 0.4); /* Amethyst */
+    background: hsl(239 84% 67% / 0.4);
     background-clip: padding-box;
   }
 
   .scrollbar-secondary::-webkit-scrollbar-thumb:hover {
-    background: hsl(280 44% 51% / 0.6); /* Amethyst */
+    background: hsl(239 84% 67% / 0.6);
     background-clip: padding-box;
   }
 
-  /* Classe para esconder completamente a scrollbar */
+  /* Hide scrollbar */
   .scrollbar-hide {
     scrollbar-width: none;
-    /* Firefox */
     -ms-overflow-style: none;
-    /* IE e Edge */
   }
 
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
-    /* Chrome, Safari, Opera */
   }
 
-  /* Estilos para spinners de inputs numéricos - Padronizado com o tema */
-  /* Esconder spinners nativos e aplicar estilo consistente */
+  /* Number input spinners */
   input[type="number"] {
     -moz-appearance: textfield;
-    /* Remove spinners no Firefox */
   }
 
-  /* Webkit browsers (Chrome, Safari, Edge) - esconder spinners nativos */
   input[type="number"]::-webkit-inner-spin-button,
   input[type="number"]::-webkit-outer-spin-button {
     -webkit-appearance: none;
@@ -862,55 +860,55 @@
     margin: 0;
   }
 
-  /* Estilos para inputs numéricos com tema da aplicação */
   input[type="number"]:focus-visible {
-    border-color: hsl(185 75% 47%); /* Strong Cyan */
+    border-color: hsl(187 91% 43%);
   }
 
-  /* Estilos para selects nativos (incluindo dropdowns do calendário) */
+  /* Native select styling */
   select {
-    background-color: hsl(236 30% 15%); /* Ink Black */
-    color: hsl(15 38% 97%); /* Snow */
-    border-color: hsl(236 30% 18% / 0.5);
+    background-color: hsl(220 38% 11%);
+    color: hsl(216 50% 99%);
+    border-color: hsl(220 30% 15% / 0.5);
   }
 
   select:focus {
-    border-color: hsl(185 75% 47% / 0.5); /* Strong Cyan */
+    border-color: hsl(187 91% 43% / 0.5);
     outline: none;
   }
 
   select option {
-    background-color: hsl(236 38% 10%); /* Ink Black */
-    color: hsl(15 38% 97%); /* Snow */
+    background-color: hsl(221 44% 7%);
+    color: hsl(216 50% 99%);
     padding: 8px 12px;
   }
 
   select option:hover,
   select option:focus,
   select option:checked {
-    background-color: hsl(185 75% 47% / 0.2); /* Strong Cyan */
-    color: hsl(15 38% 97%); /* Snow */
+    background-color: hsl(187 91% 43% / 0.2);
+    color: hsl(216 50% 99%);
   }
 
   select optgroup {
-    background-color: hsl(214 53% 7%); /* Ink Black darker */
-    color: hsl(215 20% 65%);
+    background-color: hsl(220 43% 9%);
+    color: hsl(217 19% 55%);
     font-weight: 600;
   }
 }
 
-/* React Day Picker v8 - Estilos completos - Nova paleta */
+/* ============================================
+   React Day Picker v8 - Teal/Cyan theme
+   ============================================ */
 .rdp {
   --rdp-cell-size: 36px;
-  --rdp-accent-color: hsl(185 75% 47%); /* Strong Cyan */
-  --rdp-background-color: hsl(185 75% 47% / 0.2);
-  --rdp-accent-color-dark: hsl(185 75% 47%);
-  --rdp-background-color-dark: hsl(185 75% 47% / 0.2);
-  --rdp-outline: 2px solid hsl(185 75% 47%);
-  --rdp-outline-selected: 2px solid hsl(185 75% 47%);
+  --rdp-accent-color: hsl(187 91% 43%);
+  --rdp-background-color: hsl(187 91% 43% / 0.2);
+  --rdp-accent-color-dark: hsl(187 91% 43%);
+  --rdp-background-color-dark: hsl(187 91% 43% / 0.2);
+  --rdp-outline: 2px solid hsl(187 91% 43%);
+  --rdp-outline-selected: 2px solid hsl(187 91% 43%);
 }
 
-/* Caption (header with month/year and navigation) */
 .rdp-caption {
   display: flex;
   align-items: center;
@@ -922,10 +920,9 @@
 .rdp-caption_label {
   font-size: 0.95rem;
   font-weight: 600;
-  color: hsl(15 38% 97%); /* Snow */
+  color: hsl(216 50% 99%);
 }
 
-/* Navigation buttons */
 .rdp-nav {
   display: flex;
   gap: 0.25rem;
@@ -939,21 +936,21 @@
   height: 28px;
   padding: 0;
   border-radius: 0.375rem;
-  border: 1px solid hsl(236 30% 25%); /* Ink Black */
-  background-color: hsl(236 30% 15%);
-  color: hsl(15 38% 97%); /* Snow */
+  border: 1px solid hsl(220 30% 20%);
+  background-color: hsl(220 38% 11%);
+  color: hsl(216 50% 99%);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .rdp-nav_button:hover {
-  background-color: hsl(236 30% 20%);
-  border-color: hsl(185 75% 47% / 0.5); /* Strong Cyan */
+  background-color: hsl(220 38% 16%);
+  border-color: hsl(187 91% 43% / 0.5);
 }
 
 .rdp-nav_button:focus {
   outline: none;
-  box-shadow: 0 0 0 2px hsl(185 75% 47% / 0.3); /* Strong Cyan */
+  box-shadow: 0 0 0 2px hsl(187 91% 43% / 0.3);
 }
 
 .rdp-nav_button svg {
@@ -961,7 +958,6 @@
   height: 16px;
 }
 
-/* Caption dropdowns (month/year selectors) */
 .rdp-caption_dropdowns {
   display: flex;
   gap: 0.5rem;
@@ -974,9 +970,9 @@
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  background-color: hsl(236 30% 15%); /* Ink Black */
-  color: hsl(15 38% 97%); /* Snow */
-  border: 1px solid hsl(236 30% 25%);
+  background-color: hsl(220 38% 11%);
+  color: hsl(216 50% 99%);
+  border: 1px solid hsl(220 30% 20%);
   border-radius: 0.375rem;
   padding: 0.35rem 1.75rem 0.35rem 0.5rem;
   font-size: 0.875rem;
@@ -992,44 +988,39 @@
 .rdp-dropdown_month:hover,
 .rdp-dropdown_year:hover,
 .rdp-dropdown:hover {
-  background-color: hsl(236 30% 18%);
-  border-color: hsl(185 75% 47% / 0.5); /* Strong Cyan */
+  background-color: hsl(220 38% 14%);
+  border-color: hsl(187 91% 43% / 0.5);
 }
 
 .rdp-dropdown_month:focus,
 .rdp-dropdown_year:focus,
 .rdp-dropdown:focus {
   outline: none;
-  border-color: hsl(185 75% 47%); /* Strong Cyan */
-  box-shadow: 0 0 0 2px hsl(185 75% 47% / 0.2);
+  border-color: hsl(187 91% 43%);
+  box-shadow: 0 0 0 2px hsl(187 91% 43% / 0.2);
 }
 
 .rdp-dropdown_month option,
 .rdp-dropdown_year option,
 .rdp-dropdown option {
-  background-color: hsl(236 38% 10%); /* Ink Black */
-  color: hsl(15 38% 97%); /* Snow */
+  background-color: hsl(221 44% 7%);
+  color: hsl(216 50% 99%);
   padding: 0.5rem;
 }
 
-/* Table (calendar grid) */
 .rdp-table {
   width: 100%;
   border-collapse: collapse;
 }
 
 .rdp-head_cell {
-  color: hsl(215 20% 65%);
+  color: hsl(217 19% 55%);
   font-size: 0.75rem;
   font-weight: 500;
   text-transform: uppercase;
   padding: 0.5rem 0;
   text-align: center;
   width: var(--rdp-cell-size);
-}
-
-.rdp-tbody {
-  /* Gap between rows */
 }
 
 .rdp-row {
@@ -1043,7 +1034,6 @@
   padding: 0;
 }
 
-/* Day buttons */
 .rdp-day {
   display: inline-flex;
   align-items: center;
@@ -1053,55 +1043,50 @@
   border-radius: 0.375rem;
   border: none;
   background: transparent;
-  color: hsl(15 38% 97%); /* Snow */
+  color: hsl(216 50% 99%);
   font-size: 0.875rem;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .rdp-day:hover:not(.rdp-day_selected):not(.rdp-day_disabled) {
-  background-color: hsl(236 30% 20%); /* Ink Black */
+  background-color: hsl(220 38% 16%);
 }
 
 .rdp-day:focus {
   outline: none;
-  box-shadow: 0 0 0 2px hsl(185 75% 47% / 0.3); /* Strong Cyan */
+  box-shadow: 0 0 0 2px hsl(187 91% 43% / 0.3);
 }
 
-/* Selected day */
 .rdp-day_selected {
-  background-color: hsl(185 75% 47%) !important; /* Strong Cyan */
-  color: hsl(236 38% 9%) !important; /* Ink Black */
+  background-color: hsl(187 91% 43%) !important;
+  color: hsl(222 47% 4%) !important;
   font-weight: 600;
 }
 
 .rdp-day_selected:hover {
-  background-color: hsl(185 75% 42%) !important; /* Strong Cyan darker */
+  background-color: hsl(187 91% 38%) !important;
 }
 
-/* Today */
 .rdp-day_today:not(.rdp-day_selected) {
-  background-color: hsl(236 30% 20%); /* Ink Black */
-  border: 1px solid hsl(185 75% 47% / 0.5); /* Strong Cyan */
+  background-color: hsl(220 38% 16%);
+  border: 1px solid hsl(187 91% 43% / 0.5);
   font-weight: 600;
 }
 
-/* Outside days (previous/next month) */
 .rdp-day_outside {
-  color: hsl(215 20% 45%);
+  color: hsl(217 19% 45%);
   opacity: 0.5;
 }
 
-/* Disabled days */
 .rdp-day_disabled {
-  color: hsl(215 20% 35%);
+  color: hsl(217 19% 35%);
   opacity: 0.3;
   cursor: not-allowed;
 }
 
-/* Range selection */
 .rdp-day_range_middle {
-  background-color: hsl(185 75% 47% / 0.15); /* Strong Cyan */
+  background-color: hsl(187 91% 43% / 0.15);
   border-radius: 0;
 }
 

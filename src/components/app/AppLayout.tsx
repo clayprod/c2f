@@ -323,7 +323,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border transform transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        className={`fixed inset-y-0 left-0 z-50 w-[280px] bg-sidebar border-r border-sidebar-border transform transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
           }`}
       >
         <div className="flex flex-col h-full">
@@ -495,7 +495,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col h-full lg:ml-64 overflow-hidden max-w-full min-w-0">
+      <div className="flex-1 flex flex-col h-full lg:ml-[280px] overflow-hidden max-w-full min-w-0">
         <header className="min-h-14 md:min-h-16 border-b border-border flex items-center px-3 md:px-4 lg:px-6 bg-card/50 backdrop-blur-xl sticky top-0 z-40 min-w-0 max-w-full overflow-x-hidden pt-[env(safe-area-inset-top)]">
           <button
             onClick={() => setSidebarOpen(true)}
@@ -508,14 +508,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
             {userProfile && (
               <div className="p-[1px] rounded-md transition-all duration-300 group"
                 style={{
-                  background: 'linear-gradient(to right, #9333ea, #3b82f6)',
-                  boxShadow: '0 0 0 0 rgba(147, 51, 234, 0)',
+                  background: 'linear-gradient(135deg, #6366F1, #818CF8)',
+                  boxShadow: '0 0 0 0 rgba(99, 102, 241, 0)',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = '0 0 10px 2px rgba(147, 51, 234, 0.5)';
+                  e.currentTarget.style.boxShadow = '0 0 10px 2px rgba(99, 102, 241, 0.5)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = '0 0 0 0 rgba(147, 51, 234, 0)';
+                  e.currentTarget.style.boxShadow = '0 0 0 0 rgba(99, 102, 241, 0)';
                 }}>
                 <button
                   onClick={() => setAdvisorOpen(true)}
@@ -524,7 +524,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   <i
                     className='bx bx-sparkles text-sm md:text-base'
                     style={{
-                      background: 'linear-gradient(to right, #9333ea, #3b82f6)',
+                      background: 'linear-gradient(135deg, #6366F1, #818CF8)',
                       WebkitBackgroundClip: 'text',
                       WebkitTextFillColor: 'transparent',
                     }}
@@ -532,7 +532,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   <span
                     className="hidden sm:inline font-medium"
                     style={{
-                      background: 'linear-gradient(to right, #9333ea, #3b82f6)',
+                      background: 'linear-gradient(135deg, #6366F1, #818CF8)',
                       WebkitBackgroundClip: 'text',
                       WebkitTextFillColor: 'transparent',
                     }}

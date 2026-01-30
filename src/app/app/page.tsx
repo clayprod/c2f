@@ -528,8 +528,8 @@ export default function DashboardPage() {
         <p className="text-muted-foreground text-sm md:text-base">Visão geral das suas finanças</p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 max-w-full animate-children-stagger">
-        <div className="glass-card p-3 md:p-5 hover-lift animate-float-slow" style={{ animationDelay: '0s' }}>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 max-w-full">
+        <div className="glass-card p-3 md:p-5 hover-lift animate-fade-in-up" style={{ animationDelay: '0s' }}>
           <div className="flex items-center justify-between mb-2 md:mb-3">
             <div className="flex items-center gap-2 md:gap-3">
               <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-primary/10 flex items-center justify-center animate-pulse-soft">
@@ -555,7 +555,7 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <div className="glass-card p-3 md:p-5 hover-lift animate-float-slow" style={{ animationDelay: '0.5s' }}>
+        <div className="glass-card p-3 md:p-5 hover-lift animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
           <div className="flex items-center justify-between mb-2 md:mb-3">
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2 md:gap-3">
@@ -587,7 +587,7 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <div className="glass-card p-3 md:p-5 hover-lift animate-float-slow" style={{ animationDelay: '1s' }}>
+        <div className="glass-card p-3 md:p-5 hover-lift animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
           <div className="flex items-center justify-between mb-2 md:mb-3">
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2 md:gap-3">
@@ -621,7 +621,7 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <div className="glass-card p-3 md:p-5 hover-lift animate-float-slow" style={{ animationDelay: '1.5s' }}>
+        <div className="glass-card p-3 md:p-5 hover-lift animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
           <div className="flex items-center justify-between mb-2 md:mb-3">
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2 md:gap-3">
@@ -655,7 +655,7 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <div className="glass-card p-3 md:p-5 hover-lift animate-float-slow" style={{ animationDelay: '2s' }}>
+        <div className="glass-card p-3 md:p-5 hover-lift animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
           <div className="flex items-center justify-between mb-2 md:mb-3">
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2 md:gap-3">
