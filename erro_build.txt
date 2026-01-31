@@ -1,0 +1,284 @@
+Run npm run build
+
+> c2finance@0.1.0 build
+> next build
+
+⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+  ▲ Next.js 14.2.35
+
+   Creating an optimized production build ...
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (133kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+
+./src/app/api/budgets/replicate/route.ts
+87:11  Warning: 'current' is never reassigned. Use 'const' instead.  prefer-const
+
+./src/app/api/budgets/replicate-all/route.ts
+141:9  Warning: 'current' is never reassigned. Use 'const' instead.  prefer-const
+
+./src/app/api/budgets/replicate-category/route.ts
+167:9  Warning: 'current' is never reassigned. Use 'const' instead.  prefer-const
+
+./src/app/api/budgets/route.ts
+807:9  Warning: 'query' is never reassigned. Use 'const' instead.  prefer-const
+
+./src/app/api/credit-cards/[id]/bills/route.ts
+59:9  Warning: 'transactionsMap' is never reassigned. Use 'const' instead.  prefer-const
+
+./src/app/api/credit-cards/route.ts
+63:9  Warning: 'billsMap' is never reassigned. Use 'const' instead.  prefer-const
+
+./src/app/api/goals/[id]/route.ts
+237:9  Warning: 'missingFields' is never reassigned. Use 'const' instead.  prefer-const
+
+./src/app/api/goals/route.ts
+224:9  Warning: 'missingFields' is never reassigned. Use 'const' instead.  prefer-const
+
+./src/app/api/pluggy/links/route.ts
+59:9  Warning: 'cardBalances' is never reassigned. Use 'const' instead.  prefer-const
+
+./src/app/api/pluggy/reconcile/route.ts
+74:9  Warning: 'cardBalances' is never reassigned. Use 'const' instead.  prefer-const
+
+./src/app/api/reports/route.ts
+411:7  Warning: 'budgetsQuery' is never reassigned. Use 'const' instead.  prefer-const
+
+./src/app/app/accounts/page.tsx
+296:6  Warning: React Hook useEffect has a missing dependency: 'fetchAccounts'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+336:6  Warning: React Hook useEffect has missing dependencies: 'cdiRate' and 'fetchCdiRate'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+626:31  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/app/admin/page.tsx
+31:6  Warning: React Hook useEffect has a missing dependency: 'checkAdminAccess'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/app/assets/[id]/page.tsx
+79:6  Warning: React Hook useEffect has a missing dependency: 'fetchAsset'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/app/budgets/page.tsx
+126:6  Warning: React Hook useEffect has a missing dependency: 'fetchBudgets'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+165:6  Warning: React Hook useEffect has a missing dependency: 'checkMissingBudgetsAlert'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+185:6  Warning: React Hook useEffect has a missing dependency: 'fetchCategoryMinimums'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/app/categories/page.tsx
+285:6  Warning: React Hook useEffect has a missing dependency: 'fetchCategories'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+289:6  Warning: React Hook useEffect has a missing dependency: 'fetchCategories'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/app/credit-cards/page.tsx
+123:6  Warning: React Hook useEffect has a missing dependency: 'fetchCards'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+468:6  Warning: React Hook useEffect has a missing dependency: 'fetchCategorySpending'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+1230:25  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/app/debts/[id]/page.tsx
+83:6  Warning: React Hook useEffect has a missing dependency: 'fetchDebt'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+611:27  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/app/debts/new/page.tsx
+300:25  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/app/debts/page.tsx
+47:6  Warning: React Hook useEffect has a missing dependency: 'fetchDebts'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+311:29  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/app/goals/[id]/page.tsx
+256:6  Warning: React Hook useEffect has a missing dependency: 'fetchGoal'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+603:19  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+710:25  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/app/goals/new/page.tsx
+449:19  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+556:25  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/app/goals/page.tsx
+214:27  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+235:41  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+312:39  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/app/help/page.tsx
+44:9  Warning: 'formatted' is never reassigned. Use 'const' instead.  prefer-const
+
+./src/app/app/integrations/page.tsx
+78:6  Warning: React Hook useEffect has a missing dependency: 'fetchItems'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+440:29  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/app/investments/[id]/page.tsx
+85:6  Warning: React Hook useEffect has a missing dependency: 'fetchInvestment'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+511:27  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/app/investments/new/page.tsx
+291:25  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/app/investments/page.tsx
+320:29  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/app/page.tsx
+410:9  Warning: 'current' is never reassigned. Use 'const' instead.  prefer-const
+
+./src/app/app/receivables/[id]/page.tsx
+89:6  Warning: React Hook useEffect has a missing dependency: 'fetchReceivable'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+652:27  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/app/receivables/new/page.tsx
+334:25  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/app/receivables/page.tsx
+43:6  Warning: React Hook useEffect has a missing dependency: 'fetchReceivables'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+268:29  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/app/reports/page.tsx
+302:6  Warning: React Hook useEffect has a missing dependency: 'fetchReportData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/app/settings/page.tsx
+638:27  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/app/sharing/accept/page.tsx
+127:17  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/app/transactions/page.tsx
+93:6  Warning: React Hook useEffect has a missing dependency: 'fetchTransactions'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+140:9  Warning: The 'fetchTransactions' function makes the dependencies of useEffect Hook (at line 279) change on every render. To fix this, wrap the definition of 'fetchTransactions' in its own useCallback() Hook.  react-hooks/exhaustive-deps
+
+./src/app/blog/[slug]/page.tsx
+121:23  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+157:17  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/app/layout.tsx
+63:9  Warning: Do not include stylesheets manually. See: https://nextjs.org/docs/messages/no-css-tags  @next/next/no-css-tags
+64:9  Warning: Do not include stylesheets manually. See: https://nextjs.org/docs/messages/no-css-tags  @next/next/no-css-tags
+
+./src/components/admin/BlogManagement.tsx
+570:19  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/admin/BrazilMap.tsx
+63:6  Warning: React Hook useEffect has a missing dependency: 'fetchMapData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/admin/GlobalSettings.tsx
+186:6  Warning: React Hook useEffect has a missing dependency: 'fetchSettings'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/admin/PlanFeaturesSettings.tsx
+158:6  Warning: React Hook useEffect has a missing dependency: 'fetchSettings'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+327:6  Warning: React Hook useEffect has a missing dependency: 'updateEnabledFeatures'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/admin/PriceManagement.tsx
+33:6  Warning: React Hook useEffect has a missing dependency: 'fetchPrices'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/admin/UserManagement.tsx
+55:6  Warning: React Hook useEffect has a missing dependency: 'fetchUsers'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/app/AdvisorContent.tsx
+137:6  Warning: React Hook useEffect has a missing dependency: 'scrollToLatest'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/app/AppLayout.tsx
+167:6  Warning: React Hook useEffect has a missing dependency: 'fetchAccountSummary'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+787:31  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+826:25  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+850:31  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/assets/AssetCard.tsx
+185:19  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/assets/AssetForm.tsx
+579:23  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/blog/BlogCard.tsx
+18:13  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+54:21  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/budgets/ReplicateCategoryModal.tsx
+71:6  Warning: React Hook useEffect has a missing dependency: 'fetchCurrentBudget'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/categories/CategoryMigrationModal.tsx
+64:6  Warning: React Hook useEffect has a missing dependency: 'fetchAvailableCategories'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/credit-cards/BillDetailModal.tsx
+118:6  Warning: React Hook useEffect has a missing dependency: 'fetchBill'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/credit-cards/CreditCardForm.tsx
+460:27  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/dashboard/BudgetsByCategory.tsx
+69:6  Warning: React Hook useEffect has a missing dependency: 'fetchBudgets'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/integrations/AccountLinking.tsx
+341:31  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/notifications/NotificationSettings.tsx
+70:6  Warning: React Hook useEffect has a missing dependency: 'fetchRules'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/sharing/MembersList.tsx
+279:21  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+394:21  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+513:19  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/transactions/ImportModal.tsx
+274:6  Warning: React Hook useEffect has a missing dependency: 'checkOpenFinanceAvailability'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/components/transactions/TransactionFilters.tsx
+66:6  Warning: React Hook useEffect has missing dependencies: 'onFiltersChange' and 'searchDebounce'. Either include them or remove the dependency array. If 'onFiltersChange' changes too often, find the parent component that defines it and wrap that definition in useCallback.  react-hooks/exhaustive-deps
+
+./src/components/transactions/TransactionForm.tsx
+141:6  Warning: React Hook useEffect has a missing dependency: 'transactionType'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+630:27  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/transactions/TransactionTable.tsx
+304:29  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/lib/security/validation.ts
+84:7  Warning: 'checkDigit1' is never reassigned. Use 'const' instead.  prefer-const
+92:7  Warning: 'checkDigit2' is never reassigned. Use 'const' instead.  prefer-const
+230:7  Warning: 'sanitized' is never reassigned. Use 'const' instead.  prefer-const
+
+./src/services/admin/aggregations.ts
+157:7  Warning: 'filteredTransactions' is never reassigned. Use 'const' instead.  prefer-const
+
+./src/services/admin/cityCoordinates.ts
+99:9  Warning: 'foundCity' is never reassigned. Use 'const' instead.  prefer-const
+
+./src/services/budgets/autoGenerator.ts
+132:7  Warning: 'current' is never reassigned. Use 'const' instead.  prefer-const
+355:13  Warning: 'current' is never reassigned. Use 'const' instead.  prefer-const
+389:9  Warning: 'current' is never reassigned. Use 'const' instead.  prefer-const
+605:13  Warning: 'current' is never reassigned. Use 'const' instead.  prefer-const
+639:9  Warning: 'current' is never reassigned. Use 'const' instead.  prefer-const
+844:7  Warning: 'current' is never reassigned. Use 'const' instead.  prefer-const
+
+./src/services/budgets/minimumCalculator.ts
+116:11  Warning: 'monthlyCents' is never reassigned. Use 'const' instead.  prefer-const
+179:11  Warning: 'monthlyCents' is never reassigned. Use 'const' instead.  prefer-const
+235:11  Warning: 'monthlyCents' is never reassigned. Use 'const' instead.  prefer-const
+
+./src/services/projections/generator.ts
+353:13  Warning: 'current' is never reassigned. Use 'const' instead.  prefer-const
+620:11  Warning: 'current' is never reassigned. Use 'const' instead.  prefer-const
+776:13  Warning: 'current' is never reassigned. Use 'const' instead.  prefer-const
+1021:11  Warning: 'monthlyCents' is never reassigned. Use 'const' instead.  prefer-const
+1031:11  Warning: 'current' is never reassigned. Use 'const' instead.  prefer-const
+1187:7  Warning: 'current' is never reassigned. Use 'const' instead.  prefer-const
+1208:11  Warning: 'projectedBalanceCents' is never reassigned. Use 'const' instead.  prefer-const
+1299:7  Warning: 'current' is never reassigned. Use 'const' instead.  prefer-const
+1316:11  Warning: 'projectedBalanceCents' is never reassigned. Use 'const' instead.  prefer-const
+
+./src/services/whatsapp/transactions.ts
+1386:9  Warning: 'nextDue' is never reassigned. Use 'const' instead.  prefer-const
+1428:9  Warning: 'nextContrib' is never reassigned. Use 'const' instead.  prefer-const
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/basic-features/eslint#disabling-rules
+   Collecting page data ...
+Error: supabaseKey is required.
+    at new SupabaseClient (file:///home/runner/work/c2f/c2f/node_modules/@supabase/supabase-js/dist/index.mjs:276:27)
+    at createClient (file:///home/runner/work/c2f/c2f/node_modules/@supabase/supabase-js/dist/index.mjs:466:9)
+    at /home/runner/work/c2f/c2f/.next/server/app/api/n8n/conversation-buffer/route.js:1:1701
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+
+> Build error occurred
+Error: Failed to collect page data for /api/n8n/conversation-buffer
+    at /home/runner/work/c2f/c2f/node_modules/next/dist/build/utils.js:1269:15
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5) {
+  type: 'Error'
+}
+Error: Process completed with exit code 1.
