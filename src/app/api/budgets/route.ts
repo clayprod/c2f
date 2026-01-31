@@ -290,8 +290,9 @@ export async function GET(request: NextRequest) {
     const actualMonthlyTotals: Record<string, { income: number; expenses: number }> = {};
     if (transactions) {
       for (const tx of transactions) {
-        const txDate = new Date(tx.posted_at);
-        const monthKey = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}`;
+        // Parse date parts directly to avoid timezone issues
+        const [yearStr, monthStr] = tx.posted_at.split('-');
+        const monthKey = `${yearStr}-${monthStr}`;
 
         if (!actualMonthlyTotals[monthKey]) {
           actualMonthlyTotals[monthKey] = { income: 0, expenses: 0 };
@@ -300,8 +301,8 @@ export async function GET(request: NextRequest) {
         const amountReais = parseFloat(tx.amount?.toString() || '0');
         const amountCents = Math.round(amountReais * 100); // Convert to cents
         const category = tx.categories as any;
-        // Amount is negative for expenses, positive for income
-        const isIncome = amountReais > 0 || category?.type === 'income';
+        // Use category type as primary source of truth, fallback to amount sign
+        const isIncome = category?.type === 'income' || (category?.type !== 'expense' && amountReais > 0);
 
         if (isIncome) {
           actualMonthlyTotals[monthKey].income += Math.abs(amountCents);
@@ -488,14 +489,8 @@ export async function GET(request: NextRequest) {
       } else {
         allMonthlyTotals[monthKey].planned_expenses += Math.abs(amountCents);
       }
-
-      const actual = budget.amount_actual || 0;
-      // Use category type for actual amounts too
-      if (isIncome) {
-        allMonthlyTotals[monthKey].actual_income += Math.abs(actual) * 100;
-      } else {
-        allMonthlyTotals[monthKey].actual_expenses += Math.abs(actual) * 100;
-      }
+      // NOTE: Actual amounts are added from actualMonthlyTotals below (lines ~528-534)
+      // to avoid double counting - budget.amount_actual would duplicate transaction totals
     }
 
     // Before adding income projections, check if there are income budgets

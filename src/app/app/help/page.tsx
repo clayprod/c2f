@@ -174,6 +174,32 @@ export default function HelpPage() {
         <ContactSupport />
       </div>
 
+      {/* Links Legais */}
+      <div className="max-w-3xl mx-auto">
+        <div className="glass-card p-6">
+          <h2 className="font-semibold mb-4 flex items-center gap-2">
+            <i className="bx bx-file text-primary"></i>
+            Documentação Legal
+          </h2>
+          <div className="flex flex-wrap gap-4">
+            <a
+              href="/app/terms-of-service"
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <i className="bx bx-chevron-right text-primary"></i>
+              Termos de Uso
+            </a>
+            <a
+              href="/app/privacy-policy"
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <i className="bx bx-chevron-right text-primary"></i>
+              Política de Privacidade
+            </a>
+          </div>
+        </div>
+      </div>
+
       {/* Dialog para exibir artigo completo */}
       <Dialog open={!!selectedArticle} onOpenChange={() => setSelectedArticle(null)}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">

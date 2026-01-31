@@ -39,6 +39,7 @@ import {
   extractCoreWords,
 } from '../services/categorization/historySuggester';
 import { projectionCache } from '../services/projections/cache';
+import { recalculateCreditCardBalance } from '../lib/utils/creditCardBalance';
 
 interface CsvImportOptions {
   account_id?: string | null;
@@ -1101,6 +1102,11 @@ async function runOpenFinanceImport(jobId: string, userId: string, payload: Open
     }
   }
 
+  // Recalculate credit card balance after importing transactions
+  if (isCreditCard && results.bill_items_created > 0) {
+    await recalculateCreditCardBalance(supabase, internalAccountId);
+  }
+
   await updateJob(jobId, {
     status: 'completed',
     progress: {
@@ -1221,6 +1227,7 @@ async function runAdvisorTask(jobId: string, payload: AdvisorTaskPayload) {
 }
 
 async function updateCreditCardBillTotals(supabase: any, accountId: string) {
+  // Update totals for all open and closed bills
   const { data: bills } = await supabase
     .from('credit_card_bills')
     .select('id')
@@ -1248,30 +1255,8 @@ async function updateCreditCardBillTotals(supabase: any, accountId: string) {
       .eq('id', bill.id);
   }
 
-  const { data: card } = await supabase
-    .from('accounts')
-    .select('credit_limit')
-    .eq('id', accountId)
-    .single();
-
-  if (card) {
-    const { data: openBills } = await supabase
-      .from('credit_card_bills')
-      .select('total_cents, paid_cents')
-      .eq('account_id', accountId)
-      .neq('status', 'paid');
-
-    const totalUsed = (openBills || [])
-      .reduce((sum: number, b: { total_cents: number; paid_cents: number }) => sum + (b.total_cents - b.paid_cents), 0);
-
-    const creditLimitCents = Math.round((card.credit_limit || 0) * 100);
-    const newAvailableBalance = Math.max(0, creditLimitCents - totalUsed) / 100;
-
-    await supabase
-      .from('accounts')
-      .update({ available_balance: newAvailableBalance })
-      .eq('id', accountId);
-  }
+  // Recalculate credit card balances using the utility function
+  await recalculateCreditCardBalance(supabase, accountId);
 }
 
 async function processCreditCardBillPayment(
@@ -1507,6 +1492,7 @@ async function runManualTransactionCreate(jobId: string, payload: ManualTransact
       }
 
       await updateCreditCardBillTotals(supabase, validated.account_id);
+      await recalculateCreditCardBalance(supabase, validated.account_id);
       projectionCache.invalidateUser(ownerId);
 
       await updateJob(jobId, {

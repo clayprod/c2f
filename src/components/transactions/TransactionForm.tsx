@@ -22,6 +22,17 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { useMembers } from '@/hooks/useMembers';
 import { formatDateOnly, parseDateOnly } from '@/lib/date';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import { Check, ChevronsUpDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export interface Transaction {
   id?: string;
@@ -113,6 +124,8 @@ export default function TransactionForm({
   const selectedAccountId = watch('account_id');
   const selectedCategoryId = watch('category_id');
   const filteredCategories = categories;
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const [categorySearch, setCategorySearch] = useState('');
   
   // Verificar se a categoria selecionada é de cartão de crédito
   const selectedCategory = selectedCategoryId 
@@ -340,81 +353,194 @@ export default function TransactionForm({
 
             <div>
               <Label htmlFor="category_id">Categoria</Label>
-              <Select
-                onValueChange={(value) => {
-                  const actualValue = value === 'no-category' ? '' : value;
-                  const event = { target: { name: 'category_id', value: actualValue } } as any;
-                  register('category_id').onChange(event);
-                }}
-                value={watch('category_id') || 'no-category'}
-              >
-                <SelectTrigger id="category_id" className="w-full">
-                  <SelectValue placeholder="Sem categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="no-category">Sem categoria</SelectItem>
-                  {generalIncome.length > 0 && (
-                    <SelectItem value="group-income" disabled>
-                      ────────────── Receitas ──────────────
-                    </SelectItem>
-                  )}
-                  {generalIncome.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                  {generalExpense.length > 0 && (
-                    <SelectItem value="group-expense" disabled>
-                      ────────────── Despesas ──────────────
-                    </SelectItem>
-                  )}
-                  {generalExpense.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                  {creditCardCategories.length > 0 && (
-                    <SelectItem value="group-credit" disabled>
-                      ────────────── 💳 Cartões de Crédito ──────────────
-                    </SelectItem>
-                  )}
-                  {creditCardCategories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                  {investmentCategories.length > 0 && (
-                    <SelectItem value="group-investment" disabled>
-                      ────────────── 📊 Investimentos ──────────────
-                    </SelectItem>
-                  )}
-                  {investmentCategories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                  {goalCategories.length > 0 && (
-                    <SelectItem value="group-goal" disabled>
-                      ────────────── 🎯 Objetivos ──────────────
-                    </SelectItem>
-                  )}
-                  {goalCategories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                  {debtCategories.length > 0 && (
-                    <SelectItem value="group-debt" disabled>
-                      ────────────── 💳 Dívidas ──────────────
-                    </SelectItem>
-                  )}
-                  {debtCategories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={categoryOpen}
+                    className="w-full justify-between"
+                  >
+                    {selectedCategoryId
+                      ? categories.find((c) => c.id === selectedCategoryId)?.name || 'Sem categoria'
+                      : 'Sem categoria'}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0 max-h-[400px] overflow-hidden" align="start">
+                  <Command>
+                    <CommandInput
+                      placeholder="Buscar categoria..."
+                      value={categorySearch}
+                      onValueChange={setCategorySearch}
+                    />
+                    <CommandList className="max-h-[350px] overflow-y-auto">
+                      <CommandEmpty>Nenhuma categoria encontrada.</CommandEmpty>
+                      <CommandItem
+                        value="no-category"
+                        onSelect={() => {
+                          const event = { target: { name: 'category_id', value: '' } } as any;
+                          register('category_id').onChange(event);
+                          setCategoryOpen(false);
+                          setCategorySearch('');
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            'mr-2 h-4 w-4',
+                            !selectedCategoryId ? 'opacity-100' : 'opacity-0'
+                          )}
+                        />
+                        Sem categoria
+                      </CommandItem>
+                      {generalIncome.length > 0 && (
+                        <CommandGroup heading="Receitas">
+                          {generalIncome.map((category) => (
+                            <CommandItem
+                              key={category.id}
+                              value={category.name}
+                              onSelect={() => {
+                                const event = { target: { name: 'category_id', value: category.id } } as any;
+                                register('category_id').onChange(event);
+                                setCategoryOpen(false);
+                                setCategorySearch('');
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  'mr-2 h-4 w-4',
+                                  selectedCategoryId === category.id ? 'opacity-100' : 'opacity-0'
+                                )}
+                              />
+                              {category.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
+                      {generalExpense.length > 0 && (
+                        <CommandGroup heading="Despesas">
+                          {generalExpense.map((category) => (
+                            <CommandItem
+                              key={category.id}
+                              value={category.name}
+                              onSelect={() => {
+                                const event = { target: { name: 'category_id', value: category.id } } as any;
+                                register('category_id').onChange(event);
+                                setCategoryOpen(false);
+                                setCategorySearch('');
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  'mr-2 h-4 w-4',
+                                  selectedCategoryId === category.id ? 'opacity-100' : 'opacity-0'
+                                )}
+                              />
+                              {category.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
+                      {creditCardCategories.length > 0 && (
+                        <CommandGroup heading="💳 Cartões de Crédito">
+                          {creditCardCategories.map((category) => (
+                            <CommandItem
+                              key={category.id}
+                              value={category.name}
+                              onSelect={() => {
+                                const event = { target: { name: 'category_id', value: category.id } } as any;
+                                register('category_id').onChange(event);
+                                setCategoryOpen(false);
+                                setCategorySearch('');
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  'mr-2 h-4 w-4',
+                                  selectedCategoryId === category.id ? 'opacity-100' : 'opacity-0'
+                                )}
+                              />
+                              {category.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
+                      {investmentCategories.length > 0 && (
+                        <CommandGroup heading="📊 Investimentos">
+                          {investmentCategories.map((category) => (
+                            <CommandItem
+                              key={category.id}
+                              value={category.name}
+                              onSelect={() => {
+                                const event = { target: { name: 'category_id', value: category.id } } as any;
+                                register('category_id').onChange(event);
+                                setCategoryOpen(false);
+                                setCategorySearch('');
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  'mr-2 h-4 w-4',
+                                  selectedCategoryId === category.id ? 'opacity-100' : 'opacity-0'
+                                )}
+                              />
+                              {category.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
+                      {goalCategories.length > 0 && (
+                        <CommandGroup heading="🎯 Objetivos">
+                          {goalCategories.map((category) => (
+                            <CommandItem
+                              key={category.id}
+                              value={category.name}
+                              onSelect={() => {
+                                const event = { target: { name: 'category_id', value: category.id } } as any;
+                                register('category_id').onChange(event);
+                                setCategoryOpen(false);
+                                setCategorySearch('');
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  'mr-2 h-4 w-4',
+                                  selectedCategoryId === category.id ? 'opacity-100' : 'opacity-0'
+                                )}
+                              />
+                              {category.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
+                      {debtCategories.length > 0 && (
+                        <CommandGroup heading="💳 Dívidas">
+                          {debtCategories.map((category) => (
+                            <CommandItem
+                              key={category.id}
+                              value={category.name}
+                              onSelect={() => {
+                                const event = { target: { name: 'category_id', value: category.id } } as any;
+                                register('category_id').onChange(event);
+                                setCategoryOpen(false);
+                                setCategorySearch('');
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  'mr-2 h-4 w-4',
+                                  selectedCategoryId === category.id ? 'opacity-100' : 'opacity-0'
+                                )}
+                              />
+                              {category.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
+                      </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
           </div>
@@ -523,88 +649,74 @@ export default function TransactionForm({
             </div>
           )}
 
-          {/* Installment Section */}
-          <div className="border-t border-border pt-4">
-            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-              <Checkbox
-                id="isInstallment"
-                checked={isInstallment}
-                onCheckedChange={(checked) => setIsInstallment(checked === true)}
-                className="h-5 w-5"
-              />
-              <label htmlFor="isInstallment" className="flex items-center gap-2 text-sm font-medium cursor-pointer flex-1">
-                <i className='bx bx-credit-card text-lg'></i>
-                <span>Compra Parcelada</span>
-              </label>
-            </div>
-
-            {isInstallment && (
-              <div className="space-y-4 pl-4 sm:pl-6 border-l-2 border-primary/30">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {(() => {
-                    const selectedAccount = allAccounts.find(acc => acc.id === selectedAccountId);
-                    const isCreditCard = selectedAccount?.isCreditCard || false;
-                    
-                    return (
-                      <>
-                        {!isCreditCard && (
-                          <div>
-                            <Label>Parcela Atual</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              value={installmentNumber}
-                              onChange={(e) => setInstallmentNumber(e.target.value)}
-                              placeholder="1"
-                            />
-                          </div>
-                        )}
-                        <div className={isCreditCard ? 'col-span-1' : ''}>
-                          <Label>Total de Parcelas</Label>
-                          <div className="flex flex-wrap gap-2">
-                            {[2, 3, 6, 10, 12].map((num) => (
-                              <button
-                                key={num}
-                                type="button"
-                                onClick={() => setInstallmentTotal(String(num))}
-                                className={`px-3 py-1.5 rounded border text-sm transition-all shrink-0 ${
-                                  installmentTotal === String(num)
-                                    ? 'border-primary bg-primary/10 text-primary'
-                                    : 'border-border hover:bg-muted/50'
-                                }`}
-                              >
-                                {num}x
-                              </button>
-                            ))}
-                            <Input
-                              type="number"
-                              min="2"
-                              max="48"
-                              value={installmentTotal}
-                              onChange={(e) => setInstallmentTotal(e.target.value)}
-                              placeholder="Outro"
-                              className="w-20 shrink-0"
-                            />
-                          </div>
-                        </div>
-                        {isCreditCard && parseInt(installmentTotal) > 1 && (
-                          <div className="col-span-2 bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-sm">
-                            <p className="flex items-center gap-2 text-blue-500">
-                              <i className='bx bx-info-circle'></i>
-                              <strong>Parcelamento automático</strong>
-                            </p>
-                            <p className="text-muted-foreground mt-1">
-                              Serão criadas {installmentTotal} parcelas automaticamente nas faturas dos próximos meses.
-                            </p>
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
+          {/* Installment Section - Only show for credit cards */}
+          {(() => {
+            const selectedAccount = allAccounts.find(acc => acc.id === selectedAccountId);
+            const isCreditCard = selectedAccount?.isCreditCard || selectedAccount?.type === 'credit';
+            
+            return isCreditCard ? (
+              <div className="border-t border-border pt-4">
+                <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                  <Checkbox
+                    id="isInstallment"
+                    checked={isInstallment}
+                    onCheckedChange={(checked) => setIsInstallment(checked === true)}
+                    className="h-5 w-5"
+                  />
+                  <label htmlFor="isInstallment" className="flex items-center gap-2 text-sm font-medium cursor-pointer flex-1">
+                    <i className='bx bx-credit-card text-lg'></i>
+                    <span>Compra Parcelada</span>
+                  </label>
                 </div>
+
+                {isInstallment && (
+                  <div className="space-y-4 pl-4 sm:pl-6 border-l-2 border-primary/30">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <Label>Total de Parcelas</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {[2, 3, 6, 10, 12].map((num) => (
+                            <button
+                              key={num}
+                              type="button"
+                              onClick={() => setInstallmentTotal(String(num))}
+                              className={`px-3 py-1.5 rounded border text-sm transition-all shrink-0 ${
+                                installmentTotal === String(num)
+                                  ? 'border-primary bg-primary/10 text-primary'
+                                  : 'border-border hover:bg-muted/50'
+                              }`}
+                            >
+                              {num}x
+                            </button>
+                          ))}
+                          <Input
+                            type="number"
+                            min="2"
+                            max="48"
+                            value={installmentTotal}
+                            onChange={(e) => setInstallmentTotal(e.target.value)}
+                            placeholder="Outro"
+                            className="w-20 shrink-0"
+                          />
+                        </div>
+                      </div>
+                      {parseInt(installmentTotal) > 1 && (
+                        <div className="col-span-2 bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-sm">
+                          <p className="flex items-center gap-2 text-blue-500">
+                            <i className='bx bx-info-circle'></i>
+                            <strong>Parcelamento automático</strong>
+                          </p>
+                          <p className="text-muted-foreground mt-1">
+                            Serão criadas {installmentTotal} parcelas automaticamente nas faturas dos próximos meses.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            ) : null;
+          })()}
 
 
           <DialogFooter>

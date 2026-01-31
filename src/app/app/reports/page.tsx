@@ -45,6 +45,7 @@ interface CategoryData {
   total_cents: number;
   count: number;
   percentage: number;
+  smallCategories?: CategoryData[]; // For "Outros" category grouping
 }
 
 interface BudgetData {
@@ -136,6 +137,76 @@ const TYPE_LABELS: Record<string, string> = {
   crypto: 'Criptomoedas',
   real_estate: 'Imoveis',
   other: 'Outros',
+};
+
+// Helper function to compact small categories into "Outros"
+function compactCategories(categories: CategoryData[], threshold: number = 1): CategoryData[] {
+  const mainCategories: CategoryData[] = [];
+  const smallCategories: CategoryData[] = [];
+
+  categories.forEach((cat) => {
+    if (cat.percentage > threshold) {
+      mainCategories.push(cat);
+    } else {
+      smallCategories.push(cat);
+    }
+  });
+
+  if (smallCategories.length > 0) {
+    const othersTotal = smallCategories.reduce((sum, cat) => sum + cat.total_cents, 0);
+    const othersCount = smallCategories.reduce((sum, cat) => sum + cat.count, 0);
+    const total = categories.reduce((sum, cat) => sum + cat.total_cents, 0);
+    const othersPercentage = total > 0 ? (othersTotal / total) * 100 : 0;
+
+    mainCategories.push({
+      category: 'Outros',
+      categoryId: '__others__',
+      total_cents: othersTotal,
+      count: othersCount,
+      percentage: othersPercentage,
+      smallCategories,
+    });
+  }
+
+  return mainCategories;
+}
+
+// Custom tooltip component for category pie charts
+const CategoryPieTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    const isOthers = data.categoryId === '__others__' && data.smallCategories;
+
+    return (
+      <div className="bg-card/90 backdrop-blur-sm border border-border rounded-lg p-3 shadow-xl max-w-xs z-50">
+        <p className="font-semibold mb-1 text-foreground">{data.category}</p>
+        <p className="text-sm font-medium text-primary">
+          {formatCurrency(data.total_cents)}
+        </p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {data.percentage.toFixed(1)}% do total
+        </p>
+        {isOthers && data.smallCategories.length > 0 && (
+          <div className="mt-2 pt-2 border-t border-border">
+            <p className="text-xs text-muted-foreground mb-1.5">
+              Inclui {data.smallCategories.length} categoria{data.smallCategories.length > 1 ? 's' : ''}:
+            </p>
+            <div className="space-y-1 max-h-32 overflow-y-auto">
+              {data.smallCategories.map((cat: CategoryData, idx: number) => (
+                <div key={cat.categoryId || idx} className="flex items-center justify-between text-xs gap-2">
+                  <span className="text-foreground/80 truncate">{cat.category}</span>
+                  <span className="text-muted-foreground whitespace-nowrap">
+                    {formatCurrency(cat.total_cents)} ({cat.percentage.toFixed(1)}%)
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+  return null;
 };
 
 export default function ReportsPage() {
@@ -366,9 +437,13 @@ export default function ReportsPage() {
       const formatted = typeof monthInfoResult === 'string' ? monthInfoResult : monthInfoResult.formatted;
       return formatted;
     }
-    // Para datas completas (dia/mês), manter formato original
-    const date = new Date(period);
-    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+    // Para datas completas (dia/mês), parsear diretamente para evitar problemas de timezone
+    const datePart = period.split('T')[0];
+    const [yearStr, monthStr, dayStr] = datePart.split('-');
+    const day = dayStr?.padStart(2, '0') || '01';
+    const monthNum = parseInt(monthStr, 10);
+    const monthNames = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    return `${day} ${monthNames[monthNum - 1] || ''}`;
   };
 
   const formatTooltipLabel = (label: any) => {
@@ -737,40 +812,59 @@ export default function ReportsPage() {
                     </Button>
                   </div>
                   {categoriesData.income.categories.length > 0 ? (
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={categoriesData.income.categories}
-                            dataKey="total_cents"
-                            nameKey="category"
-                            cx="50%"
-                            cy="50%"
-                            outerRadius={80}
-                            label={({ category, percentage }) => `${category}: ${percentage.toFixed(1)}%`}
-                            labelLine={false}
-                          >
-                            {categoriesData.income.categories.map((_, index) => (
-                              <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
+                    (() => {
+                      const compactedIncome = compactCategories(categoriesData.income.categories);
+                      return (
+                        <div className="h-64">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={compactedIncome}
+                                dataKey="total_cents"
+                                nameKey="category"
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={80}
+                                label={({ category, percentage }) => `${category}: ${percentage.toFixed(1)}%`}
+                                labelLine={false}
+                              >
+                                {compactedIncome.map((cat, index) => (
+                                  <Cell
+                                    key={index}
+                                    fill={cat.categoryId === '__others__' ? '#6B7280' : COLORS[index % COLORS.length]}
+                                  />
+                                ))}
+                              </Pie>
+                              <Tooltip content={<CategoryPieTooltip />} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                      );
+                    })()
                   ) : (
                     <p className="text-center text-muted-foreground py-8">Nenhuma receita no período</p>
                   )}
                   <div className="space-y-2 mt-4">
-                    {categoriesData.income.categories.slice(0, 5).map((cat, i) => (
-                      <div key={cat.categoryId || i} className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                          <span>{cat.category}</span>
+                    {(() => {
+                      const compactedIncome = compactCategories(categoriesData.income.categories);
+                      return compactedIncome.slice(0, 5).map((cat, i) => (
+                        <div key={cat.categoryId || i} className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: cat.categoryId === '__others__' ? '#6B7280' : COLORS[i % COLORS.length] }}
+                            />
+                            <span>{cat.category}</span>
+                            {cat.smallCategories && (
+                              <span className="text-xs text-muted-foreground">
+                                ({cat.smallCategories.length})
+                              </span>
+                            )}
+                          </div>
+                          <span className="font-medium">{formatCurrency(cat.total_cents)}</span>
                         </div>
-                        <span className="font-medium">{formatCurrency(cat.total_cents)}</span>
-                      </div>
-                    ))}
+                      ));
+                    })()}
                   </div>
                 </div>
 
@@ -800,40 +894,59 @@ export default function ReportsPage() {
                     </div>
                   </div>
                   {categoriesData.expense.categories.length > 0 ? (
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={categoriesData.expense.categories}
-                            dataKey="total_cents"
-                            nameKey="category"
-                            cx="50%"
-                            cy="50%"
-                            outerRadius={80}
-                            label={({ category, percentage }) => `${category}: ${percentage.toFixed(1)}%`}
-                            labelLine={false}
-                          >
-                            {categoriesData.expense.categories.map((_, index) => (
-                              <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
+                    (() => {
+                      const compactedExpense = compactCategories(categoriesData.expense.categories);
+                      return (
+                        <div className="h-64">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={compactedExpense}
+                                dataKey="total_cents"
+                                nameKey="category"
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={80}
+                                label={({ category, percentage }) => `${category}: ${percentage.toFixed(1)}%`}
+                                labelLine={false}
+                              >
+                                {compactedExpense.map((cat, index) => (
+                                  <Cell
+                                    key={index}
+                                    fill={cat.categoryId === '__others__' ? '#6B7280' : COLORS[index % COLORS.length]}
+                                  />
+                                ))}
+                              </Pie>
+                              <Tooltip content={<CategoryPieTooltip />} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                      );
+                    })()
                   ) : (
                     <p className="text-center text-muted-foreground py-8">Nenhuma despesa no período</p>
                   )}
                   <div className="space-y-2 mt-4">
-                    {categoriesData.expense.categories.slice(0, 5).map((cat, i) => (
-                      <div key={cat.categoryId || i} className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                          <span>{cat.category}</span>
+                    {(() => {
+                      const compactedExpense = compactCategories(categoriesData.expense.categories);
+                      return compactedExpense.slice(0, 5).map((cat, i) => (
+                        <div key={cat.categoryId || i} className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: cat.categoryId === '__others__' ? '#6B7280' : COLORS[i % COLORS.length] }}
+                            />
+                            <span>{cat.category}</span>
+                            {cat.smallCategories && (
+                              <span className="text-xs text-muted-foreground">
+                                ({cat.smallCategories.length})
+                              </span>
+                            )}
+                          </div>
+                          <span className="font-medium">{formatCurrency(cat.total_cents)}</span>
                         </div>
-                        <span className="font-medium">{formatCurrency(cat.total_cents)}</span>
-                      </div>
-                    ))}
+                      ));
+                    })()}
                   </div>
                 </div>
               </div>
@@ -1203,7 +1316,10 @@ export default function ReportsPage() {
                               <h4 className="font-medium">{debt.name}</h4>
                               {debt.due_date && (
                                 <p className="text-xs text-muted-foreground">
-                                  Vencimento: {new Date(debt.due_date).toLocaleDateString('pt-BR')}
+                                  Vencimento: {(() => {
+                                    const [y, m, d] = debt.due_date!.split('T')[0].split('-');
+                                    return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+                                  })()}
                                   {debt.days_until_due !== null && (
                                     <span className={debt.days_until_due < 0 ? ' text-negative' : ''}>
                                       {' '}({debt.days_until_due < 0 ? `${Math.abs(debt.days_until_due)} dias atrasado` : `${debt.days_until_due} dias`})

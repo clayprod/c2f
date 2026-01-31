@@ -36,6 +36,7 @@ interface CategoryExpense {
   total: number;
   percentage: number;
   color?: string;
+  smallCategories?: CategoryExpense[]; // For "Outros" category grouping
 }
 
 interface Transaction {
@@ -145,14 +146,12 @@ export function ExpensesByCategoryChart() {
           setTransactions([]);
         } else {
           // For past/current months, fetch actual transactions
-          const startDate = new Date(year, month - 1, 1);
-          const endDate = new Date(year, month, 0); // Last day of the month
-
-          const startDateStr = startDate.toISOString().split('T')[0];
-          const endDateStr = endDate.toISOString().split('T')[0];
+          // Use string format directly to avoid timezone issues
+          const startDateStr = `${year}-${String(month).padStart(2, '0')}-01`;
+          const endDateStr = `${year}-${String(month).padStart(2, '0')}-31`; // Last day of the month (safe upper bound)
 
           const res = await fetch(
-            `/api/transactions?type=expense&from_date=${startDateStr}&to_date=${endDateStr}&limit=1000`
+            `/api/transactions?type=expense&from_date=${startDateStr}&to_date=${endDateStr}&exclude_transfers=true&limit=1000`
           );
 
           if (!res.ok) {
@@ -226,12 +225,41 @@ export function ExpensesByCategoryChart() {
     const expenses = Object.values(grouped);
     const total = expenses.reduce((sum, item) => sum + item.total, 0);
 
-    return expenses
+    const withPercentage = expenses
       .map((item) => ({
         ...item,
         percentage: total > 0 ? (item.total / total) * 100 : 0,
       }))
       .sort((a, b) => b.total - a.total);
+
+    // Compact categories with <= 1% into "Outros"
+    const THRESHOLD = 1;
+    const mainCategories: CategoryExpense[] = [];
+    const smallCategories: CategoryExpense[] = [];
+
+    withPercentage.forEach((item) => {
+      if (item.percentage > THRESHOLD) {
+        mainCategories.push(item);
+      } else {
+        smallCategories.push(item);
+      }
+    });
+
+    // If there are small categories, create an "Outros" entry
+    if (smallCategories.length > 0) {
+      const othersTotal = smallCategories.reduce((sum, item) => sum + item.total, 0);
+      const othersPercentage = total > 0 ? (othersTotal / total) * 100 : 0;
+      mainCategories.push({
+        category: 'Outros',
+        categoryId: '__others__',
+        total: othersTotal,
+        percentage: othersPercentage,
+        color: '#6B7280', // Gray color for "Outros"
+        smallCategories, // Store small categories for tooltip
+      } as CategoryExpense & { smallCategories: CategoryExpense[] });
+    }
+
+    return mainCategories;
   }, [transactions, projections, isFutureMonth]);
 
   // Alias para manter compatibilidade
@@ -242,8 +270,10 @@ export function ExpensesByCategoryChart() {
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
+      const isOthers = data.categoryId === '__others__' && data.smallCategories;
+
       return (
-        <div className="bg-card/90 backdrop-blur-sm border border-border rounded-lg p-3 shadow-xl">
+        <div className="bg-card/90 backdrop-blur-sm border border-border rounded-lg p-3 shadow-xl max-w-xs">
           <p className="font-semibold mb-1 text-foreground">{data.category}</p>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: payload[0].color }} />
@@ -254,6 +284,23 @@ export function ExpensesByCategoryChart() {
           <p className="text-xs text-muted-foreground mt-1">
             {data.percentage.toFixed(1)}% do total
           </p>
+          {isOthers && data.smallCategories.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-border">
+              <p className="text-xs text-muted-foreground mb-1.5">
+                Inclui {data.smallCategories.length} categoria{data.smallCategories.length > 1 ? 's' : ''}:
+              </p>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {data.smallCategories.map((cat: CategoryExpense, idx: number) => (
+                  <div key={cat.categoryId || idx} className="flex items-center justify-between text-xs gap-2">
+                    <span className="text-foreground/80 truncate">{cat.category}</span>
+                    <span className="text-muted-foreground whitespace-nowrap">
+                      {formatCurrency(cat.total)} ({cat.percentage.toFixed(1)}%)
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       );
     }

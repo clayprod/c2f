@@ -6,6 +6,7 @@ import { createErrorResponse } from '@/lib/errors';
 import { z } from 'zod';
 import { getEffectiveOwnerId } from '@/lib/sharing/activeAccount';
 import { projectionCache } from '@/services/projections/cache';
+import { recalculateCreditCardBalance } from '@/lib/utils/creditCardBalance';
 
 export async function GET(
   request: NextRequest,
@@ -99,6 +100,23 @@ export async function PATCH(
       return NextResponse.json({ error: 'Transaction not found' }, { status: 404 });
     }
 
+    // Check if this transaction is a credit card bill item (payment)
+    // Bill items should not have their account_id changed
+    if (validated.account_id !== undefined) {
+      const { data: billItem } = await supabase
+        .from('credit_card_bill_items')
+        .select('id')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (billItem) {
+        return NextResponse.json(
+          { error: 'Não é possível alterar a conta de um item de fatura de cartão de crédito' },
+          { status: 400 }
+        );
+      }
+    }
+
     // Prepare update data
     const updateData: any = {};
     if (validated.account_id !== undefined) updateData.account_id = validated.account_id;
@@ -167,16 +185,75 @@ export async function DELETE(
     const { id } = params;
     const { supabase } = createClientFromRequest(request);
     
-    // Verify ownership
+    // Verify ownership and get transaction details
     const { data: existing } = await supabase
       .from('transactions')
-      .select('id')
+      .select('id, category_id, amount, description')
       .eq('id', id)
       .eq('user_id', ownerId)
       .single();
 
     if (!existing) {
       return NextResponse.json({ error: 'Transaction not found' }, { status: 404 });
+    }
+
+    // Check if this is a credit card bill payment (has category_id matching a credit card)
+    let creditCardId: string | null = null;
+    let paymentAmountCents: number = 0;
+    
+    if (existing.category_id) {
+      const { data: creditCard } = await supabase
+        .from('accounts')
+        .select('id')
+        .eq('user_id', ownerId)
+        .eq('type', 'credit_card')
+        .eq('category_id', existing.category_id)
+        .single();
+
+      if (creditCard) {
+        creditCardId = creditCard.id;
+        paymentAmountCents = Math.abs(Math.round((existing.amount || 0) * 100));
+      }
+    }
+
+    // If it's a credit card payment, reverse the payment
+    if (creditCardId && paymentAmountCents > 0) {
+      // Find bills that were paid by this transaction
+      const { data: bills } = await supabase
+        .from('credit_card_bills')
+        .select('id, paid_cents, status')
+        .eq('account_id', creditCardId)
+        .in('status', ['paid', 'partial'])
+        .order('due_date', { ascending: false });
+
+      if (bills && bills.length > 0) {
+        let remainingToReverse = paymentAmountCents;
+
+        for (const bill of bills) {
+          if (remainingToReverse <= 0) break;
+
+          const paidCents = bill.paid_cents || 0;
+          const reverseAmount = Math.min(remainingToReverse, paidCents);
+          
+          if (reverseAmount > 0) {
+            const newPaidCents = paidCents - reverseAmount;
+            const newStatus = newPaidCents === 0 ? 'open' : 'partial';
+
+            await supabase
+              .from('credit_card_bills')
+              .update({
+                paid_cents: newPaidCents,
+                status: newStatus,
+              })
+              .eq('id', bill.id);
+
+            remainingToReverse -= reverseAmount;
+          }
+        }
+
+        // Recalculate credit card balance
+        await recalculateCreditCardBalance(supabase, creditCardId);
+      }
     }
 
     const { error } = await supabase

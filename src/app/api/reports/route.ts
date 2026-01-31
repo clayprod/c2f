@@ -251,7 +251,8 @@ async function getOverviewReport(
     const periodKey = getPeriodKey(tx.posted_at, filters.groupBy);
     // Convert NUMERIC to cents
     const amountCents = Math.round(Math.abs(tx.amount || 0) * 100);
-    const isIncome = tx.categories?.type === 'income' || tx.amount > 0;
+    // Use category type as primary source of truth, fallback to amount sign
+    const isIncome = tx.categories?.type === 'income' || (tx.categories?.type !== 'expense' && tx.amount > 0);
     const amount = amountCents;
 
     if (isIncome) {
@@ -342,7 +343,8 @@ async function getCategoriesReport(
     const categoryId = tx.category_id;
     // Convert NUMERIC to cents
     const amountCents = Math.round(Math.abs(tx.amount || 0) * 100);
-    const isIncome = tx.categories?.type === 'income' || tx.amount > 0;
+    // Use category type as primary source of truth, fallback to amount sign
+    const isIncome = tx.categories?.type === 'income' || (tx.categories?.type !== 'expense' && tx.amount > 0);
     const amount = amountCents;
 
     const map = isIncome ? incomeByCategory : expenseByCategory;
@@ -761,7 +763,8 @@ async function getCashflowReport(
     const periodKey = getPeriodKey(tx.posted_at, filters.groupBy);
     // Convert NUMERIC to cents
     const amountCents = Math.round(Math.abs(tx.amount || 0) * 100);
-    const isIncome = tx.categories?.type === 'income' || tx.amount > 0;
+    // Use category type as primary source of truth, fallback to amount sign
+    const isIncome = tx.categories?.type === 'income' || (tx.categories?.type !== 'expense' && tx.amount > 0);
     const amount = amountCents;
 
     if (!periodMap.has(periodKey)) {
@@ -810,19 +813,26 @@ async function getCashflowReport(
 }
 
 function getPeriodKey(date: string, groupBy: 'day' | 'week' | 'month' | 'year'): string {
-  const d = new Date(date);
+  // Parse date parts directly to avoid timezone issues
+  const [yearStr, monthStr, dayStr] = date.split('-');
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
+  const day = dayStr ? parseInt(dayStr, 10) : 1;
+  
   switch (groupBy) {
     case 'day':
       return date;
     case 'week': {
+      // Create date at noon to avoid timezone boundary issues
+      const d = new Date(year, month - 1, day, 12, 0, 0);
       const weekStart = new Date(d);
       weekStart.setDate(d.getDate() - d.getDay());
       return weekStart.toISOString().split('T')[0];
     }
     case 'month':
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      return `${year}-${String(month).padStart(2, '0')}`;
     case 'year':
-      return String(d.getFullYear());
+      return String(year);
     default:
       return date;
   }

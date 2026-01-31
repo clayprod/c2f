@@ -83,6 +83,21 @@ const getCurrentMonthName = () => {
   return brazilDate.toLocaleDateString('pt-BR', { month: 'long' });
 };
 
+// Função para formatar data de transação sem problemas de timezone
+// Input: "YYYY-MM-DD" ou "YYYY-MM-DDTHH:mm:ss..."
+const formatTransactionDate = (dateStr: string, options?: { short?: boolean }) => {
+  const datePart = dateStr.split('T')[0];
+  const [yearStr, monthStr, dayStr] = datePart.split('-');
+  const day = dayStr.padStart(2, '0');
+  const month = monthStr.padStart(2, '0');
+  const year = yearStr;
+
+  if (options?.short) {
+    return `${day}/${month}`;
+  }
+  return `${day}/${month}/${year}`;
+};
+
 // Component to wrap features with lock visual when not available
 function LockedFeatureWrapper({
   children,
@@ -200,7 +215,8 @@ export default function DashboardPage() {
       const accounts = accountsData.data || [];
 
       // Fetch recent transactions
-      const transactionsRes = await fetch('/api/transactions?limit=50');
+      // Use exclude_transfers=true and higher limit for accurate monthly totals
+      const transactionsRes = await fetch('/api/transactions?limit=500&exclude_transfers=true');
       if (!transactionsRes.ok) {
         throw new Error('Failed to fetch transactions');
       }
@@ -219,8 +235,11 @@ export default function DashboardPage() {
       const currentYear = brazilDate.getFullYear();
 
       const monthTransactions = transactions.filter((tx: Transaction) => {
-        const txDate = new Date(tx.posted_at);
-        return txDate.getMonth() === currentMonth && txDate.getFullYear() === currentYear;
+        // Parse date parts directly to avoid timezone issues
+        const [yearStr, monthStr] = tx.posted_at.split('-');
+        const txYear = parseInt(yearStr, 10);
+        const txMonth = parseInt(monthStr, 10) - 1; // 0-based month
+        return txMonth === currentMonth && txYear === currentYear;
       });
 
       const totalIncome = monthTransactions
@@ -463,34 +482,49 @@ export default function DashboardPage() {
       }
 
       const existing = groupedData.get(groupKey);
+      const includePlanned = item.isProjected || item.isCurrentMonth;
+      const plannedIncome = includePlanned ? item.income_planned : 0;
+      const plannedExpenses = includePlanned ? item.expenses_planned : 0;
 
-      if (existing) {
-        // Somar valores
-        existing.income += item.income;
-        existing.expenses += item.expenses;
-        existing.balance += item.balance;
-        existing.income_actual += item.income_actual;
-        existing.income_planned += item.income_planned;
-        existing.expenses_actual += item.expenses_actual;
-        existing.expenses_planned += item.expenses_planned;
-        // isCurrentMonth/isProjected: se qualquer mês no grupo for atual, o grupo é atual
-        if (item.isCurrentMonth) existing.isCurrentMonth = true;
-        // isProjected: só se TODOS os meses forem projetados
-        if (!item.isProjected && !item.isCurrentMonth) existing.isProjected = false;
-      } else {
+      // Determinar se este grupo é atual ou projetado baseado no ano/trimestre
+      const isGroupCurrentPeriod = groupBy === 'quarter'
+        ? (item.year === currentYear && item.quarter === currentQuarter)
+        : (item.year === currentYear);
+      const isGroupProjected = groupBy === 'quarter'
+        ? (item.year > currentYear || (item.year === currentYear && item.quarter > currentQuarter))
+        : (item.year > currentYear);
+
+      if (!existing) {
         groupedData.set(groupKey, {
-          ...item,
           month: groupKey,
           monthLabel: groupLabel,
-          // Para trimestre/ano atual
-          isCurrentMonth: groupBy === 'quarter'
-            ? (item.year === currentYear && item.quarter === currentQuarter)
-            : (item.year === currentYear),
-          isProjected: groupBy === 'quarter'
-            ? (item.year > currentYear || (item.year === currentYear && item.quarter > currentQuarter))
-            : (item.year > currentYear),
+          income: 0,
+          expenses: 0,
+          balance: 0,
+          isCurrentMonth: isGroupCurrentPeriod,
+          isProjected: isGroupProjected,
+          income_actual: 0,
+          income_planned: 0,
+          expenses_actual: 0,
+          expenses_planned: 0,
+          year: item.year,
+          monthNum: item.monthNum,
+          quarter: item.quarter,
         });
       }
+
+      const group = groupedData.get(groupKey);
+      if (!group) continue;
+
+      // Somar valores
+      group.income += item.income;
+      group.expenses += item.expenses;
+      group.income_actual += item.income_actual;
+      group.income_planned += plannedIncome;
+      group.expenses_actual += item.expenses_actual;
+      group.expenses_planned += plannedExpenses;
+      // Recalcular balance após somar income e expenses
+      group.balance = group.income - group.expenses;
     }
 
     return Array.from(groupedData.values());
@@ -506,11 +540,15 @@ export default function DashboardPage() {
 
     if (!totals) return data.totalBalance;
 
-    const plannedNet = (totals.planned_income || 0) - (totals.planned_expenses || 0);
-    const actualNet = (totals.actual_income || 0) - (totals.actual_expenses || 0);
-    const remainingNet = plannedNet - actualNet;
+    const plannedIncome = totals.planned_income || 0;
+    const plannedExpenses = totals.planned_expenses || 0;
+    const actualIncome = totals.actual_income || 0;
+    const actualExpenses = totals.actual_expenses || 0;
 
-    return data.totalBalance + remainingNet / 100;
+    const incomeRemaining = Math.max(plannedIncome, actualIncome) - actualIncome;
+    const expensesRemaining = Math.max(plannedExpenses, actualExpenses) - actualExpenses;
+
+    return data.totalBalance + (incomeRemaining - expensesRemaining) / 100;
   }, [cashFlowData, data]);
 
   if (loading || profileLoading) {
@@ -760,6 +798,7 @@ export default function DashboardPage() {
               data={chartData}
               periodCount={isFree ? 0 : selectedPeriod}
               groupBy={groupBy}
+              currentBalance={data?.totalBalance ?? 0}
             />
           ) : (
             <div className="h-64 flex items-center justify-center">
@@ -834,7 +873,7 @@ export default function DashboardPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{tx.description}</p>
                         <p className="text-[11px] text-muted-foreground truncate">
-                          {tx.categories?.name || 'Sem categoria'} • {new Date(tx.posted_at).toLocaleDateString('pt-BR')}
+                          {tx.categories?.name || 'Sem categoria'} • {formatTransactionDate(tx.posted_at)}
                         </p>
                       </div>
                       <p className={`text-xs font-semibold whitespace-nowrap flex-shrink-0 ${isIncome ? 'text-positive' : 'text-negative'}`}>
@@ -866,7 +905,7 @@ export default function DashboardPage() {
                           </div>
                         </td>
                         <td className="py-2 px-2 text-xs text-muted-foreground">
-                          {new Date(tx.posted_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                          {formatTransactionDate(tx.posted_at, { short: true })}
                         </td>
                         <td
                           className={`py-2 px-2 text-xs text-right font-medium ${(() => {
@@ -911,7 +950,7 @@ export default function DashboardPage() {
                           </span>
                         </td>
                         <td className="py-3 px-2 text-sm text-muted-foreground">
-                          {new Date(tx.posted_at).toLocaleDateString('pt-BR')}
+                          {formatTransactionDate(tx.posted_at)}
                         </td>
                         <td
                           className={`py-3 px-2 text-sm text-right font-medium ${(() => {

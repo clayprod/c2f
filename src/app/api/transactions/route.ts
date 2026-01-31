@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
     const fromDate = searchParams.get('from_date');
     const toDate = searchParams.get('to_date');
     const isInstallment = searchParams.get('is_installment'); // 'true' or 'false'
+    const excludeTransfers = searchParams.get('exclude_transfers'); // 'true' to exclude transfers
     const assignedTo = searchParams.get('assigned_to');
     const limit = parseInt(searchParams.get('limit') || '10');
     const offset = parseInt(searchParams.get('offset') || '0');
@@ -96,6 +97,9 @@ export async function GET(request: NextRequest) {
     }
     if (assignedTo) {
       query = query.eq('assigned_to', assignedTo);
+    }
+    if (excludeTransfers === 'true') {
+      query = query.eq('is_transfer', false);
     }
 
     const { data, error, count } = await query;

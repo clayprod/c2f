@@ -38,6 +38,37 @@ interface UserProfile {
   role?: string;
 }
 
+interface BankAccount {
+  id: string;
+  name: string;
+  current_balance: number;
+  type: string;
+  icon?: string | null;
+  color?: string | null;
+  institution?: string | null;
+}
+
+interface CreditCard {
+  id: string;
+  name: string;
+  current_balance: number;
+  credit_limit: number;
+  icon?: string | null;
+  color?: string | null;
+}
+
+interface CreditCardBill {
+  account_id: string;
+  total_cents: number;
+  paid_cents: number;
+}
+
+interface AccountSummary {
+  bankAccounts: BankAccount[];
+  creditCards: CreditCard[];
+  creditCardBills: CreditCardBill[];
+}
+
 const planLabels: Record<string, { label: string; color: string }> = {
   free: { label: 'Free', color: 'bg-muted text-muted-foreground' },
   pro: { label: 'Pro', color: 'bg-primary/20 text-primary' },
@@ -75,7 +106,16 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [advisorOpen, setAdvisorOpen] = useState(false);
   const [showCompleteProfile, setShowCompleteProfile] = useState(false);
+  const [accountSummary, setAccountSummary] = useState<AccountSummary>({
+    bankAccounts: [],
+    creditCards: [],
+    creditCardBills: [],
+  });
+  const [accountSummaryLoading, setAccountSummaryLoading] = useState(false);
+  const [showSummaryScrollUp, setShowSummaryScrollUp] = useState(false);
+  const [showSummaryScrollDown, setShowSummaryScrollDown] = useState(false);
   const menuListRef = useRef<HTMLUListElement>(null);
+  const summaryListRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
@@ -113,6 +153,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   useEffect(() => {
     fetchUserProfile();
+    fetchAccountSummary();
 
     // Listen for profile updates from other components
     const handleProfileUpdate = () => {
@@ -237,6 +278,37 @@ export default function AppLayout({ children }: AppLayoutProps) {
     }
   }, [visibleMenuItems, sidebarOpen]);
 
+  useEffect(() => {
+    const checkScroll = () => {
+      const list = summaryListRef.current;
+      if (!list) return;
+
+      const { scrollTop, scrollHeight, clientHeight } = list;
+      const hasOverflow = scrollHeight > clientHeight;
+
+      setShowSummaryScrollUp(hasOverflow && scrollTop > 10);
+      setShowSummaryScrollDown(hasOverflow && scrollTop < scrollHeight - clientHeight - 10);
+    };
+
+    const timeoutId = setTimeout(() => {
+      checkScroll();
+    }, 100);
+
+    const list = summaryListRef.current;
+    if (list) {
+      list.addEventListener('scroll', checkScroll);
+      window.addEventListener('resize', checkScroll);
+
+      return () => {
+        clearTimeout(timeoutId);
+        list.removeEventListener('scroll', checkScroll);
+        window.removeEventListener('resize', checkScroll);
+      };
+    }
+
+    return () => clearTimeout(timeoutId);
+  }, [accountSummary, accountSummaryLoading, sidebarOpen]);
+
   const fetchUserProfile = async () => {
     try {
       const supabase = createClient();
@@ -297,11 +369,90 @@ export default function AppLayout({ children }: AppLayoutProps) {
     window.location.href = '/login';
   };
 
+  const fetchAccountSummary = async () => {
+    setAccountSummaryLoading(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setAccountSummary({
+          bankAccounts: [],
+          creditCards: [],
+          creditCardBills: [],
+        });
+        setAccountSummaryLoading(false);
+        return;
+      }
+
+      let ownerId = user.id;
+      if (activeAccountId && activeAccountId !== user.id) {
+        ownerId = activeAccountId;
+      }
+
+      const { data: bankAccounts } = await supabase
+        .from('accounts')
+        .select('id, name, current_balance, type, icon, color, institution')
+        .eq('user_id', ownerId)
+        .neq('type', 'credit_card')
+        .order('name');
+
+      const { data: creditCards } = await supabase
+        .from('accounts')
+        .select('id, name, current_balance, credit_limit, icon, color')
+        .eq('user_id', ownerId)
+        .eq('type', 'credit_card')
+        .order('name');
+
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString();
+
+      const { data: bills } = await supabase
+        .from('credit_card_bills')
+        .select('account_id, total_cents, paid_cents')
+        .eq('user_id', ownerId)
+        .gte('closing_date', startOfMonth)
+        .lte('closing_date', endOfMonth)
+        .not('status', 'eq', 'paid');
+
+      setAccountSummary({
+        bankAccounts: bankAccounts || [],
+        creditCards: creditCards || [],
+        creditCardBills: bills || [],
+      });
+    } catch (error) {
+      console.error('Error fetching account summary:', error);
+      setAccountSummary({
+        bankAccounts: [],
+        creditCards: [],
+        creditCardBills: [],
+      });
+    } finally {
+      setAccountSummaryLoading(false);
+    }
+  };
+
   const scrollMenu = (direction: 'up' | 'down') => {
     const list = menuListRef.current;
     if (!list) return;
 
     const scrollAmount = 100; // pixels por clique
+    const currentScroll = list.scrollTop;
+    const newScroll = direction === 'up'
+      ? currentScroll - scrollAmount
+      : currentScroll + scrollAmount;
+
+    list.scrollTo({
+      top: newScroll,
+      behavior: 'smooth'
+    });
+  };
+
+  const scrollSummary = (direction: 'up' | 'down') => {
+    const list = summaryListRef.current;
+    if (!list) return;
+
+    const scrollAmount = 100;
     const currentScroll = list.scrollTop;
     const newScroll = direction === 'up'
       ? currentScroll - scrollAmount
@@ -366,7 +517,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
             <ul
               ref={menuListRef}
-              className="space-y-2 h-full overflow-y-auto max-h-[calc(100vh-200px)] scrollbar-hide"
+              className="space-y-2 h-full overflow-y-auto scrollbar-hide"
             >
               {visibleMenuItems.map((item) => {
                 const isActive = pathname === item.path;
@@ -438,58 +589,123 @@ export default function AppLayout({ children }: AppLayoutProps) {
             </ul>
           </nav>
 
-          <div className="p-4 border-t border-border mt-auto">
-            <div className="flex items-center gap-3 px-4 py-3">
-              <Link
-                href="/app/settings"
-                onClick={() => setSidebarOpen(false)}
-                className="flex items-center gap-3 flex-1 min-w-0 rounded-xl hover:bg-muted transition-colors cursor-pointer group"
-              >
-                <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                  {userProfile?.avatar_url ? (
-                    <img
-                      src={userProfile.avatar_url}
-                      alt={userProfile.full_name || 'Usuário'}
-                      className="w-10 h-10 rounded-full object-cover border border-border"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                      <i className='bx bx-user text-primary text-xl'></i>
-                    </div>
-                  )}
-                  {userProfile?.plan && (
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${planLabels[userProfile.plan].color}`}>
-                      {planLabels[userProfile.plan].label}
-                    </span>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">
-                    {userProfile?.full_name || 'Usuário'}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate group-hover:text-foreground transition-colors">
-                    {userProfile?.email || 'Carregando...'}
-                  </p>
-                </div>
-              </Link>
+          {/* Account Summary Section */}
+          <div className="border-t border-border mt-auto h-[50vh] overflow-hidden relative">
+            {showSummaryScrollUp && (
               <button
-                onClick={handleLogout}
-                className="text-muted-foreground hover:text-foreground flex-shrink-0 p-2 rounded-lg hover:bg-muted transition-colors"
-                title="Sair"
-                aria-label="Sair"
+                onClick={() => scrollSummary('up')}
+                className="absolute top-2 right-3 z-10 w-7 h-7 rounded-full bg-card border border-border/50 flex items-center justify-center text-primary hover:bg-primary/10 hover:border-primary/50 transition-all shadow-lg"
+                aria-label="Rolar para cima"
               >
-                <i className='bx bx-door-open text-xl'></i>
+                <i className="bx bx-chevron-up text-base"></i>
               </button>
-            </div>
+            )}
+            {showSummaryScrollDown && (
+              <button
+                onClick={() => scrollSummary('down')}
+                className="absolute bottom-2 right-3 z-10 w-7 h-7 rounded-full bg-card border border-border/50 flex items-center justify-center text-primary hover:bg-primary/10 hover:border-primary/50 transition-all shadow-lg"
+                aria-label="Rolar para baixo"
+              >
+                <i className="bx bx-chevron-down text-base"></i>
+              </button>
+            )}
+            <div ref={summaryListRef} className="h-full overflow-y-auto scrollbar-hide">
+              {accountSummaryLoading && (
+                <div className="px-4 py-4 text-center text-xs text-muted-foreground">
+                  Carregando saldos...
+                </div>
+              )}
+              {/* Bank Accounts */}
+              {accountSummary.bankAccounts.length > 0 && (
+                <div className="border-b border-border/50">
+                  <div className="px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Contas
+                  </div>
+                  {accountSummary.bankAccounts.map((account) => (
+                    <Link
+                      key={account.id}
+                      href="/app/accounts"
+                      onClick={() => setSidebarOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2 hover:bg-muted/50 transition-colors"
+                    >
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: (account.color || '#10b981') + '20' }}
+                      >
+                        <span className="text-sm">{account.icon || '🏦'}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{account.name}</p>
+                        {account.institution && (
+                          <p className="text-[11px] text-muted-foreground truncate">
+                            {account.institution}
+                          </p>
+                        )}
+                        <p className={`text-xs ${account.current_balance < 0 ? 'text-negative' : 'text-positive'}`}>
+                          {new Intl.NumberFormat('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL'
+                          }).format(account.current_balance || 0)}
+                        </p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
 
-            {/* Links to legal pages */}
-            <div className="flex flex-col gap-1 mt-3 px-4 text-xs text-muted-foreground">
-              <Link href="/app/terms-of-service" onClick={() => setSidebarOpen(false)} className="hover:text-foreground transition-colors">
-                Termos de Uso
-              </Link>
-              <Link href="/app/privacy-policy" onClick={() => setSidebarOpen(false)} className="hover:text-foreground transition-colors">
-                Política de Privacidade
-              </Link>
+              {/* Credit Cards */}
+              {accountSummary.creditCards.length > 0 && (
+                <div>
+                  <div className="px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Cartões
+                  </div>
+                  {accountSummary.creditCards.map((card) => {
+                    const bill = accountSummary.creditCardBills.find(b => b.account_id === card.id);
+                    const billAmount = bill ? (bill.total_cents - bill.paid_cents) / 100 : 0;
+
+                    return (
+                      <Link
+                        key={card.id}
+                        href="/app/credit-cards"
+                        onClick={() => setSidebarOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2 hover:bg-muted/50 transition-colors"
+                      >
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: (card.color || '#ef4444') + '20' }}
+                        >
+                          <span className="text-sm">{card.icon || '💳'}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{card.name}</p>
+                          <p className={`text-xs ${billAmount > 0 ? 'text-rose-500' : 'text-muted-foreground'}`}>
+                            {billAmount > 0
+                              ? new Intl.NumberFormat('pt-BR', {
+                                  style: 'currency',
+                                  currency: 'BRL'
+                                }).format(billAmount)
+                              : 'Fatura paga'}
+                          </p>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Empty State */}
+              {!accountSummaryLoading && accountSummary.bankAccounts.length === 0 && accountSummary.creditCards.length === 0 && (
+                <div className="px-4 py-6 text-center">
+                  <p className="text-sm text-muted-foreground">Nenhuma conta cadastrada</p>
+                  <Link
+                    href="/app/accounts"
+                    onClick={() => setSidebarOpen(false)}
+                    className="text-xs text-primary hover:underline mt-1 inline-block"
+                  >
+                    Cadastrar conta
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -580,22 +796,24 @@ export default function AppLayout({ children }: AppLayoutProps) {
                                 />
                               </div>
                             )}
+                            <span className="hidden sm:inline-flex items-center gap-1.5 text-xs md:text-sm font-medium max-w-[220px]">
+                              <span className="truncate max-w-[160px]">{label}</span>
+                              {isOwn && userProfile?.plan && (
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${planLabels[userProfile.plan].color}`}>
+                                  {planLabels[userProfile.plan].label}
+                                </span>
+                              )}
+                            </span>
                           </>
                         );
                       })()}
-                      <span className="hidden sm:inline text-xs md:text-sm font-medium max-w-[180px] truncate">
-                        {(() => {
-                          if (!activeAccountId) return 'Minha conta';
-                          if (activeAccountId === accountContext.currentUserId) return 'Minha conta';
-                          const shared = accountContext.sharedAccounts.find((sa) => sa.ownerId === activeAccountId);
-                          return shared?.ownerName || shared?.ownerEmail || 'Conta compartilhada';
-                        })()}
-                      </span>
                       <i className="bx bx-chevron-down text-muted-foreground text-sm" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-72">
-                    <DropdownMenuLabel>Conta ativa</DropdownMenuLabel>
+                    <DropdownMenuLabel>
+                      <span>Conta ativa</span>
+                    </DropdownMenuLabel>
                     <DropdownMenuItem
                       onClick={() => {
                         const id = accountContext.currentUserId;
@@ -668,15 +886,22 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <i className='bx bx-help-circle text-lg md:text-xl'></i>
               </Link>
               <NotificationDropdown />
+              <Link
+                href="/app/settings"
+                className="flex items-center justify-center p-1.5 md:p-2 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                title="Configurações"
+              >
+                <i className='bx bx-cog text-lg md:text-xl'></i>
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="flex items-center justify-center p-1.5 md:p-2 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                title="Sair"
+                aria-label="Sair"
+              >
+                <i className='bx bx-door-open text-lg md:text-xl'></i>
+              </button>
             </div>
-
-            <Link
-              href="/app/settings"
-              className="flex items-center justify-center p-1.5 md:p-2 text-muted-foreground hover:text-foreground transition-colors"
-              title="Configurações"
-            >
-              <i className='bx bx-cog text-lg md:text-xl'></i>
-            </Link>
           </div>
         </header>
 

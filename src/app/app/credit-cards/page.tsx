@@ -1071,135 +1071,196 @@ export default function CreditCardsPage() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredCards.map((card) => {
             const isExpired = card.is_expired || false;
             return (
             <div
               key={card.id}
-              className={`glass-card overflow-hidden hover:shadow-lg transition-shadow ${isExpired ? 'opacity-60' : ''}`}
+              className={`glass-card p-3 hover:shadow-lg transition-shadow ${isExpired ? 'opacity-60' : ''}`}
             >
-              {/* Card Header (Visual Credit Card) */}
+              {/* Visual Credit Card - Realistic Design */}
               <div
-                className={`p-4 text-white relative overflow-hidden ${isExpired ? 'opacity-75' : ''}`}
-                style={{ backgroundColor: card.color || '#1a1a2e' }}
+                className={`relative overflow-hidden rounded-xl ${isExpired ? 'opacity-75' : ''}`}
+                style={{
+                  background: `linear-gradient(135deg, ${card.color || '#1a1a2e'} 0%, ${card.color ? card.color + 'cc' : '#0f3460'} 50%, ${card.color || '#1a1a2e'} 100%)`,
+                  aspectRatio: '1.586/1',
+                }}
               >
-                {/* Background Pattern */}
-                <div className="absolute inset-0 opacity-10">
-                  <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-white -translate-y-1/2 translate-x-1/2" />
-                  <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full bg-white translate-y-1/2 -translate-x-1/2" />
-                </div>
+                {/* Glossy overlay effect */}
+                <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent pointer-events-none rounded-xl" />
 
-                <div className="relative z-10">
-                  <div className="flex justify-between items-start mb-3">
+                {/* Abstract decorative circles */}
+                <div className="absolute -right-8 -top-8 w-24 h-24 rounded-full bg-white/5" />
+                <div className="absolute -right-4 top-6 w-16 h-16 rounded-full bg-white/5" />
+                <div className="absolute -left-6 -bottom-6 w-20 h-20 rounded-full bg-black/10" />
+
+                <div className="relative z-10 h-full p-3 flex flex-col justify-between text-white">
+                  {/* Top Row: Institution, Name & Actions */}
+                  <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="text-white/70 text-xs">{card.institution || 'Cartão'}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-white/80 text-[10px] font-medium tracking-wide uppercase">
+                          {card.institution || 'Cartão'}
+                        </p>
                         {isExpired && (
-                          <span className="px-1.5 py-0.5 bg-red-500/80 text-white text-[10px] font-medium rounded">
+                          <span className="px-1 py-0.5 bg-red-500/90 text-white text-[8px] font-bold rounded uppercase">
                             Expirado
                           </span>
                         )}
                       </div>
-                      <h3 className="text-base font-bold">{card.name}</h3>
-                      {card.assigned_to_profile && (
-                        <div className="flex items-center gap-1.5 mt-1">
-                          {card.assigned_to_profile.avatar_url ? (
-                            <img
-                              src={card.assigned_to_profile.avatar_url}
-                              alt={card.assigned_to_profile.full_name || 'Avatar'}
-                              className="w-4 h-4 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center text-white text-[10px]">
-                              {(card.assigned_to_profile.full_name || card.assigned_to_profile.email)[0].toUpperCase()}
-                            </div>
-                          )}
-                          <span className="text-[10px] text-white/80">
-                            {card.assigned_to_profile.full_name || card.assigned_to_profile.email}
-                          </span>
-                        </div>
-                      )}
+                      <h3 className="text-xs font-bold tracking-wide">{card.name}</h3>
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex gap-0.5">
                       <button
                         onClick={() => openEditForm(card)}
-                        className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
+                        className="p-1 hover:bg-white/20 rounded transition-colors"
                         disabled={isExpired}
                         title={isExpired ? 'Cartão expirado' : 'Editar cartão'}
                       >
-                        <i className='bx bx-edit text-sm'></i>
+                        <i className='bx bx-edit text-xs'></i>
                       </button>
                       <button
                         onClick={() => {
                           setCardToDelete(card);
                           setDeleteDialogOpen(true);
                         }}
-                        className="p-1.5 hover:bg-red-500/30 rounded-lg transition-colors"
+                        className="p-1 hover:bg-red-500/40 rounded transition-colors"
                         title="Excluir cartão"
                       >
-                        <i className='bx bx-trash text-sm'></i>
+                        <i className='bx bx-trash text-xs'></i>
                       </button>
                     </div>
                   </div>
 
-                  <div className="mb-3">
-                    <p className="text-base tracking-widest font-medium">
-                      {card.last_four_digits ? `**** **** **** ${card.last_four_digits}` : '**** **** **** 0000'}
+                  {/* Middle: Chip & Card Number */}
+                  <div className="flex items-center gap-3">
+                    {/* EMV Chip */}
+                    <div
+                      className="w-8 h-5 rounded flex-shrink-0"
+                      style={{
+                        background: 'linear-gradient(135deg, #d4af37 0%, #f2d06b 25%, #d4af37 50%, #b8860b 75%, #d4af37 100%)',
+                        boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.3), inset 0 -1px 1px rgba(0,0,0,0.2)'
+                      }}
+                    >
+                      <div className="w-full h-full grid grid-cols-3 gap-[1px] p-[2px]">
+                        <div className="bg-black/10 rounded-[1px]" />
+                        <div className="bg-black/10 rounded-[1px]" />
+                        <div className="bg-black/10 rounded-[1px]" />
+                        <div className="bg-black/10 rounded-[1px]" />
+                        <div className="bg-black/10 rounded-[1px]" />
+                        <div className="bg-black/10 rounded-[1px]" />
+                      </div>
+                    </div>
+
+                    {/* Card Number */}
+                    <p className="text-sm font-mono tracking-[0.15em] font-medium text-white drop-shadow-sm">
+                      {card.last_four_digits
+                        ? `•••• •••• •••• ${card.last_four_digits}`
+                        : '•••• •••• •••• ••••'}
                     </p>
                   </div>
 
-                  <div className="flex justify-between items-end gap-1.5">
-                    <div>
-                      <p className="text-white/70 text-[10px]">Venc. Fatura</p>
-                      <p className="font-medium text-xs">Dia {card.due_day}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-white/70 text-[10px]">Fechamento</p>
-                      <p className="font-medium text-xs">Dia {card.closing_day}</p>
-                    </div>
-                    {card.expiration_date && (
-                      <div className="text-center">
-                        <p className="text-white/70 text-[10px]">Expira</p>
-                        <p className="font-medium text-xs">
-                          {new Date(card.expiration_date).toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit' })}
-                        </p>
+                  {/* Bottom Row: Info & Brand */}
+                  <div className="flex justify-between items-end">
+                    <div className="flex gap-3">
+                      <div>
+                        <p className="text-white/60 text-[8px] uppercase tracking-wider">Venc. Fatura</p>
+                        <p className="font-semibold text-[10px]">Dia {card.due_day}</p>
                       </div>
-                    )}
-                    <div className="text-right flex items-end gap-1.5">
-                      {cardBrands.find(b => b.value === card.card_brand)?.label && (
-                        <p className="text-white/90 text-[10px] font-medium uppercase tracking-wider">
-                          {cardBrands.find(b => b.value === card.card_brand)?.label}
-                        </p>
+                      <div>
+                        <p className="text-white/60 text-[8px] uppercase tracking-wider">Fechamento</p>
+                        <p className="font-semibold text-[10px]">Dia {card.closing_day}</p>
+                      </div>
+                      {card.expiration_date && (
+                        <div>
+                          <p className="text-white/60 text-[8px] uppercase tracking-wider">Expira</p>
+                          <p className="font-semibold text-[10px]">
+                            {new Date(card.expiration_date).toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit' })}
+                          </p>
+                        </div>
                       )}
-                      <span className="text-lg">{card.icon}</span>
+                    </div>
+
+                    {/* Card Brand Logo */}
+                    <div className="flex items-center">
+                      {card.card_brand === 'visa' && (
+                        <div className="text-white font-bold text-base italic tracking-tight" style={{ fontFamily: 'Arial, sans-serif' }}>
+                          VISA
+                        </div>
+                      )}
+                      {card.card_brand === 'mastercard' && (
+                        <div className="flex items-center">
+                          <div className="w-4 h-4 rounded-full bg-red-500 -mr-1.5" />
+                          <div className="w-4 h-4 rounded-full bg-yellow-500 opacity-90" />
+                        </div>
+                      )}
+                      {card.card_brand === 'elo' && (
+                        <div className="flex items-center">
+                          <div className="w-3 h-3 rounded-full bg-yellow-400 -mr-1" />
+                          <div className="w-3 h-3 rounded-full bg-red-500 -mr-1" />
+                          <div className="w-3 h-3 rounded-full bg-blue-500" />
+                        </div>
+                      )}
+                      {card.card_brand === 'amex' && (
+                        <div className="text-white font-bold text-[10px] tracking-wider">
+                          AMEX
+                        </div>
+                      )}
+                      {card.card_brand === 'hipercard' && (
+                        <div className="text-white font-bold text-[10px] tracking-wider text-red-400">
+                          HIPER
+                        </div>
+                      )}
+                      {card.card_brand === 'diners' && (
+                        <div className="text-white font-bold text-[10px] tracking-wider">
+                          DINERS
+                        </div>
+                      )}
+                      {(!card.card_brand || card.card_brand === 'other') && (
+                        <span className="text-lg">{card.icon || '💳'}</span>
+                      )}
                     </div>
                   </div>
+
+                  {/* Assigned user badge */}
+                  {card.assigned_to_profile && (
+                    <div className="absolute top-8 left-3 flex items-center gap-1 bg-black/20 backdrop-blur-sm rounded-full px-1.5 py-0.5">
+                      {card.assigned_to_profile.avatar_url ? (
+                        <img
+                          src={card.assigned_to_profile.avatar_url}
+                          alt={card.assigned_to_profile.full_name || 'Avatar'}
+                          className="w-3 h-3 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-3 h-3 rounded-full bg-white/30 flex items-center justify-center text-white text-[8px] font-bold">
+                          {(card.assigned_to_profile.full_name || card.assigned_to_profile.email)[0].toUpperCase()}
+                        </div>
+                      )}
+                      <span className="text-[8px] text-white/90 font-medium max-w-[80px] truncate">
+                        {card.assigned_to_profile.full_name || card.assigned_to_profile.email}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Card Body */}
-              <div className="p-3 space-y-3">
-                {/* Limit Usage Bar */}
-                <div>
-                  <div className="flex justify-between text-xs mb-1.5">
-                    <span className="text-muted-foreground">Limite Utilizado</span>
-                    <span className="font-medium">
-                      {card.usage_percentage}% ({formatCurrency(card.used_limit_cents)})
-                    </span>
-                  </div>
-                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className={`h-full transition-all duration-500 ${getUsageBarColor(card.usage_percentage)}`}
-                      style={{ width: `${Math.min(100, card.usage_percentage)}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
-                    <span>Disponivel: {formatCurrency(card.available_limit_cents)}</span>
-                    <span>Limite: {formatCurrency(card.credit_limit_cents)}</span>
-                  </div>
+              {/* Limit Usage - Compact */}
+              <div className="mt-2 pt-2 border-t border-border/50">
+                <div className="flex justify-between items-center text-xs mb-1">
+                  <span className="text-muted-foreground">Limite Utilizado</span>
+                  <span className={`font-medium ${card.usage_percentage >= 70 ? 'text-orange-500' : 'text-primary'}`}>
+                    {card.usage_percentage}% ({formatCurrency(card.used_limit_cents)})
+                  </span>
                 </div>
+                <div className="flex justify-between text-[10px] text-muted-foreground">
+                  <span>Disponível: {formatCurrency(card.available_limit_cents)}</span>
+                  <span>Limite: {formatCurrency(card.credit_limit_cents)}</span>
+                </div>
+              </div>
 
+              {/* Additional Card Info */}
+              <div className="space-y-2">
                 {/* Card Bills Consolidation */}
                 {(() => {
                   const cardBills = cardBillsMap.get(card.id) || [];
@@ -1226,142 +1287,85 @@ export default function CreditCardsPage() {
                   const cardRemaining = cardTotalToPay - cardTotalPaid;
 
                   return (
-                    <div className="border-t border-border pt-3">
+                    <div className="border-t border-border/50 pt-2 mt-2">
                       {selectedBill && (
-                        <>
-                          <div className="flex items-center justify-between mb-2">
-                            <h5 className="text-xs font-medium flex items-center gap-1.5">
-                              <i className='bx bx-file text-xs'></i>
-                              Fatura {selectedMonthStr}
-                            </h5>
-                            {getStatusBadge(selectedBill.status)}
-                          </div>
-                          <div className="mb-2">
-                            <p className="text-[10px] text-muted-foreground mb-0.5">Total</p>
-                            <p className="font-semibold text-sm">{formatCurrency(selectedBill.total_cents || 0)}</p>
-                          </div>
-                        </>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <h5 className="text-[10px] font-medium flex items-center gap-1">
+                            <i className='bx bx-file text-[10px]'></i>
+                            Fatura {selectedMonthStr}
+                          </h5>
+                          {getStatusBadge(selectedBill.status)}
+                        </div>
                       )}
-                      <div className="grid grid-cols-2 gap-2 mb-2">
-                        <div>
-                          <p className="text-[10px] text-muted-foreground">Total Pago</p>
-                          <p className="font-semibold text-xs text-positive">{formatCurrency(cardTotalPaid)}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-muted-foreground">Restante</p>
-                          <p className={`font-semibold text-xs ${cardRemaining > 0 ? 'text-orange-500' : 'text-positive'}`}>
-                            {formatCurrency(cardRemaining)}
-                          </p>
-                        </div>
+                      <div className="flex justify-between items-center text-xs mb-1.5">
+                        <span className="font-semibold">{formatCurrency(selectedBill?.total_cents || 0)}</span>
+                        <span className={`text-[10px] ${cardRemaining > 0 ? 'text-orange-500' : 'text-positive'}`}>
+                          Restante: {formatCurrency(cardRemaining)}
+                        </span>
                       </div>
                       {cardTotalToPay > 0 && (
-                        <div className="mb-2">
-                          <div className="flex justify-between text-[10px] mb-0.5">
-                            <span className="text-muted-foreground">Progresso</span>
-                            <span className="font-medium">
-                              {Math.round((cardTotalPaid / cardTotalToPay) * 100)}%
-                            </span>
-                          </div>
-                          <div className="h-1 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-green-500 transition-all"
-                              style={{ width: `${Math.min(100, (cardTotalPaid / cardTotalToPay) * 100)}%` }}
-                            />
-                          </div>
+                        <div className="h-1 bg-muted rounded-full overflow-hidden mb-1.5">
+                          <div
+                            className="h-full bg-green-500 transition-all"
+                            style={{ width: `${Math.min(100, (cardTotalPaid / cardTotalToPay) * 100)}%` }}
+                          />
                         </div>
                       )}
                       {selectedBill && (
-                        <>
-                          <div className="mb-2">
-                            <p className="text-[10px] text-muted-foreground mb-0.5">Vencimento</p>
-                            <p className="font-medium text-xs">{formatDate(selectedBill.due_date)}</p>
-                          </div>
-                          <div className="flex gap-2">
+                        <div className="flex gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 text-[10px] h-6 px-2"
+                            onClick={() => openBillDetail(card.id, selectedBill.id)}
+                            disabled={isExpired}
+                          >
+                            <i className='bx bx-show mr-1 text-[10px]'></i>
+                            Detalhes
+                          </Button>
+                          {selectedBill.status !== 'paid' && !isExpired && (
                             <Button
-                              variant="outline"
+                              variant="default"
                               size="sm"
-                              className="flex-1 text-xs h-7"
-                              onClick={() => openBillDetail(card.id, selectedBill.id)}
-                              disabled={isExpired}
-                              title={isExpired ? 'Cartão expirado - não é possível visualizar faturas' : 'Ver detalhes da fatura'}
+                              className="flex-1 text-[10px] h-6 px-2"
+                              onClick={() => handlePayBill(card.id, selectedBill)}
                             >
-                              <i className='bx bx-show mr-1.5 text-xs'></i>
-                              Ver Detalhes da Fatura
+                              <i className='bx bx-money mr-1 text-[10px]'></i>
+                              Pagar
                             </Button>
-                            {(() => {
-                              const totalCents = selectedBill.total_cents || 0;
-                              const paidCents = selectedBill.paid_cents || 0;
-                              const billRemaining = totalCents - paidCents;
-                              
-                              // Mostrar botão sempre que há fatura, mesmo se restante for zero (para permitir pagamento parcial)
-                              // Mas só se não estiver totalmente paga
-                              const canPay = selectedBill.status !== 'paid' && !isExpired;
-                              
-                              return canPay ? (
-                                <Button
-                                  variant="default"
-                                  size="sm"
-                                  className="flex-1 text-xs h-7"
-                                  onClick={() => handlePayBill(card.id, selectedBill)}
-                                  title={billRemaining > 0 ? `Pagar fatura - Restante: ${formatCurrency(billRemaining)}` : 'Pagar fatura'}
-                                >
-                                  <i className='bx bx-money mr-1.5 text-xs'></i>
-                                  Pagar Fatura
-                                </Button>
-                              ) : null;
-                            })()}
-                          </div>
-                        </>
+                          )}
+                        </div>
                       )}
                     </div>
                   );
                 })()}
 
-                {/* Card Transactions */}
+                {/* Card Transactions - Compact */}
                 {(() => {
                   const cardTransactions = cardTransactionsMap.get(card.id) || [];
                   if (cardTransactions.length === 0) return null;
 
                   return (
-                    <div className="border-t border-border pt-3">
-                      <h4 className="font-medium mb-2 flex items-center gap-1.5 text-xs">
-                        <i className='bx bx-list-ul text-xs'></i>
-                        Transações do Mês ({cardTransactions.length})
+                    <div className="border-t border-border/50 pt-2 mt-2">
+                      <h4 className="font-medium mb-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <i className='bx bx-list-ul text-[10px]'></i>
+                        Últimas transações ({cardTransactions.length})
                       </h4>
-                      <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                      <div className="space-y-1 max-h-24 overflow-y-auto">
                         {cardTransactions
                           .sort((a, b) => new Date(b.posted_at).getTime() - new Date(a.posted_at).getTime())
-                          .slice(0, 10)
+                          .slice(0, 3)
                           .map((tx: any) => (
                             <div
                               key={tx.id}
-                              className="flex items-center gap-2 p-1.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                              className="flex items-center gap-1.5 text-[10px]"
                             >
-                              <div
-                                className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 text-xs"
-                                style={{
-                                  backgroundColor: (tx.category?.color || '#6b7280') + '20'
-                                }}
-                              >
-                                {tx.category?.icon || '📝'}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-xs truncate">{tx.description}</p>
-                                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                                  <span>{formatDate(tx.posted_at)}</span>
-                                  {tx.category && <span>• {tx.category.name}</span>}
-                                </div>
-                              </div>
-                              <p className={`font-semibold text-xs flex-shrink-0 ${tx.amount_cents >= 0 ? 'text-negative' : 'text-positive'}`}>
+                              <span className="flex-1 truncate text-muted-foreground">{tx.description}</span>
+                              <span className={`font-medium flex-shrink-0 ${tx.amount_cents >= 0 ? 'text-negative' : 'text-positive'}`}>
                                 {formatCurrency(Math.abs(tx.amount_cents))}
-                              </p>
+                              </span>
                             </div>
                           ))}
-                        {cardTransactions.length > 10 && (
-                          <p className="text-[10px] text-muted-foreground text-center pt-1.5">
-                            Mostrando 10 de {cardTransactions.length} transações
-                          </p>
-                        )}
                       </div>
                     </div>
                   );
@@ -1369,7 +1373,7 @@ export default function CreditCardsPage() {
 
                 {/* Interest Rates */}
                 {(card.interest_rate_monthly > 0 || card.interest_rate_annual > 0) && (
-                  <div className="flex gap-4 text-xs text-muted-foreground border-t border-border pt-3">
+                  <div className="flex gap-3 text-[10px] text-muted-foreground border-t border-border/50 pt-2 mt-2">
                     {card.interest_rate_monthly > 0 && (
                       <span>Juros: {card.interest_rate_monthly.toFixed(2)}% a.m.</span>
                     )}
@@ -1381,11 +1385,11 @@ export default function CreditCardsPage() {
 
                 {/* Expired Warning */}
                 {isExpired && (
-                  <div className="border-t border-border pt-3">
-                    <div className="flex items-center gap-2 p-2 bg-negative/10 border border-red-500/20 rounded-lg">
-                      <i className='bx bx-error-circle text-negative text-sm'></i>
-                      <p className="text-xs text-negative font-medium">
-                        Este cartão expirou e não pode ser mais utilizado
+                  <div className="border-t border-border/50 pt-2 mt-2">
+                    <div className="flex items-center gap-1.5 p-1.5 bg-negative/10 border border-red-500/20 rounded">
+                      <i className='bx bx-error-circle text-negative text-[10px]'></i>
+                      <p className="text-[10px] text-negative font-medium">
+                        Cartão expirado
                       </p>
                     </div>
                   </div>

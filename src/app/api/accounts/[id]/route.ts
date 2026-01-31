@@ -65,14 +65,31 @@ export async function PATCH(
 
     // Build update object with only provided fields
     const updateData: Record<string, any> = {};
-    const hasInitialBalanceUpdate = body.initial_balance_cents !== undefined;
-    const hasBalanceUpdate = body.balance_cents !== undefined;
+    const initialBalanceCents = Number.isFinite(body.initial_balance_cents)
+      ? body.initial_balance_cents
+      : undefined;
+    const balanceCents = Number.isFinite(body.balance_cents) ? body.balance_cents : undefined;
+    let hasInitialBalanceUpdate = initialBalanceCents !== undefined;
+    const hasBalanceUpdate = balanceCents !== undefined;
     if (body.name !== undefined) updateData.name = body.name;
     if (body.type !== undefined) updateData.type = body.type;
     if (body.institution !== undefined) updateData.institution = body.institution;
     if (body.currency !== undefined) updateData.currency = body.currency;
     if (hasInitialBalanceUpdate) {
-      updateData.initial_balance = body.initial_balance_cents / 100;
+      const { data: accountData, error: accountError } = await supabase
+        .from('accounts')
+        .select('initial_balance')
+        .eq('id', params.id)
+        .eq('user_id', ownerId)
+        .single();
+      if (accountError) throw accountError;
+
+      const currentInitialBalanceCents = Math.round((accountData?.initial_balance || 0) * 100);
+      if (currentInitialBalanceCents === initialBalanceCents) {
+        hasInitialBalanceUpdate = false;
+      } else {
+        updateData.initial_balance = initialBalanceCents / 100;
+      }
     }
     if (body.color !== undefined) updateData.color = body.color;
     if (body.icon !== undefined) updateData.icon = body.icon;
@@ -116,8 +133,8 @@ export async function PATCH(
 
       updateData.current_balance = updateData.initial_balance + totalTransactionsAmount;
     } else if (hasBalanceUpdate) {
-      updateData.current_balance = body.balance_cents / 100;
-      updateData.initial_balance = body.balance_cents / 100;
+      updateData.current_balance = balanceCents / 100;
+      updateData.initial_balance = balanceCents / 100;
     }
 
     const { data, error } = await supabase

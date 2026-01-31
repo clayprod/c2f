@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Bar,
   Line,
   XAxis,
   YAxis,
@@ -53,9 +52,10 @@ interface CashFlowChartProps {
   data: PeriodData[];
   periodCount?: number;
   groupBy?: GroupByType;
+  currentBalance?: number;
 }
 
-export function CashFlowChart({ data, periodCount = 12, groupBy = 'month' }: CashFlowChartProps) {
+export function CashFlowChart({ data, periodCount = 12, groupBy = 'month', currentBalance }: CashFlowChartProps) {
   const isMobile = useIsMobile();
 
   // Estado para navegação por arraste
@@ -170,11 +170,9 @@ export function CashFlowChart({ data, periodCount = 12, groupBy = 'month' }: Cas
     setViewOffset(0);
   }, [periodCount, groupBy]);
 
-  const { chartData, currentMonthIndex } = useMemo(() => {
+  const { chartData, currentMonthIndex, hasProjections } = useMemo(() => {
     // Primeiro, processar e formatar os dados
-    let runningBalance = 0;
-    const processedData = data.map((item, index) => {
-      runningBalance += item.income - item.expenses;
+    const processedData = data.map((item) => {
       // Usar o monthLabel já formatado (vem da página)
       // Só formatar com formatMonthYear se for formato de mês (YYYY-MM) e groupBy === 'month'
       let formattedMonthLabel = item.monthLabel;
@@ -191,7 +189,6 @@ export function CashFlowChart({ data, periodCount = 12, groupBy = 'month' }: Cas
         ...item,
         monthLabel: formattedMonthLabel,
         isCurrentMonth,
-        cumulativeBalance: runningBalance,
         balanceDashArray: item.isProjected ? '5 5' : '0',
       };
     });
@@ -202,19 +199,26 @@ export function CashFlowChart({ data, periodCount = 12, groupBy = 'month' }: Cas
     // Se não encontrou mês corrente, usar o último mês histórico
     const finalCurrentMonthIndex = currentMonthIdx >= 0 ? currentMonthIdx : processedData.findIndex(d => !d.isProjected);
 
+    const baseBalance = typeof currentBalance === 'number' ? currentBalance : 0;
+
     if (finalCurrentMonthIndex < 0) {
       // Se não encontrou nenhum mês, retornar dados originais
+      let cumulative = baseBalance;
       return {
-        chartData: processedData.map((item, index) => {
-          const incomeActual = item.income_actual !== undefined ? item.income_actual : (!item.isProjected ? item.income : null);
+        chartData: processedData.map((item) => {
+          const incomeActual = item.income_actual !== undefined ? item.income_actual : (!item.isProjected ? item.income : 0);
+          const expensesActual = item.expenses_actual !== undefined ? item.expenses_actual : (!item.isProjected ? item.expenses : 0);
+          if (!item.isProjected) {
+            cumulative += (incomeActual || 0) - (expensesActual || 0);
+          }
+
           const incomePlanned = item.income_planned !== undefined ? item.income_planned : (item.isProjected ? item.income : null);
-          const expensesActual = item.expenses_actual !== undefined ? item.expenses_actual : (!item.isProjected ? item.expenses : null);
           const expensesPlanned = item.expenses_planned !== undefined ? item.expenses_planned : (item.isProjected ? item.expenses : null);
 
           return {
             ...item,
-            cumulativeBalanceHistorical: !item.isProjected ? item.cumulativeBalance : null,
-            cumulativeBalanceProjected: item.isProjected ? item.cumulativeBalance : null,
+            cumulativeBalanceHistorical: !item.isProjected ? cumulative : null,
+            cumulativeBalanceProjected: null,
             income_real: (!item.isProjected && incomeActual !== null) ? incomeActual : null,
             income_proj: (item.isProjected && incomePlanned !== null) ? incomePlanned : null,
             expenses_real: (!item.isProjected && expensesActual !== null) ? expensesActual : null,
@@ -222,14 +226,45 @@ export function CashFlowChart({ data, periodCount = 12, groupBy = 'month' }: Cas
           };
         }),
         currentMonthIndex: 0,
+        hasProjections: false,
       };
     }
 
+    const actualDeltas = processedData.map((item) => {
+      const incomeActual = item.income_actual !== undefined ? item.income_actual : (!item.isProjected ? item.income : 0);
+      const expensesActual = item.expenses_actual !== undefined ? item.expenses_actual : (!item.isProjected ? item.expenses : 0);
+      return (incomeActual || 0) - (expensesActual || 0);
+    });
+
+    const totalActualToCurrent = actualDeltas
+      .slice(0, finalCurrentMonthIndex + 1)
+      .reduce((sum, delta) => sum + delta, 0);
+    const startBalance = baseBalance - totalActualToCurrent;
+
+    let cumulativeActual = startBalance;
+    const dataWithBalances = processedData.map((item, index) => {
+      if (index <= finalCurrentMonthIndex) {
+        cumulativeActual += actualDeltas[index];
+        return {
+          ...item,
+          cumulativeBalanceHistorical: cumulativeActual,
+        };
+      }
+      return {
+        ...item,
+        cumulativeBalanceHistorical: null,
+      };
+    });
+
+    const hasProjectionValues = dataWithBalances
+      .slice(finalCurrentMonthIndex)
+      .some((item) => (item.income_planned || 0) > 0 || (item.expenses_planned || 0) > 0);
+
     // Reorganizar dados para centralizar mês corrente (com offset de navegação)
     // Dividir em histórico (antes do mês corrente) e projeção (depois)
-    const historicalData = processedData.slice(0, finalCurrentMonthIndex);
-    const currentMonthData = processedData[finalCurrentMonthIndex] ? [processedData[finalCurrentMonthIndex]] : [];
-    const projectedData = processedData.slice(finalCurrentMonthIndex + 1);
+    const historicalData = dataWithBalances.slice(0, finalCurrentMonthIndex);
+    const currentMonthData = dataWithBalances[finalCurrentMonthIndex] ? [dataWithBalances[finalCurrentMonthIndex]] : [];
+    const projectedData = dataWithBalances.slice(finalCurrentMonthIndex + 1);
 
     // Calcular quantos meses mostrar antes e depois do mês corrente
     // viewOffset desloca a janela de visualização (positivo = mais futuro, negativo = mais passado)
@@ -251,78 +286,38 @@ export function CashFlowChart({ data, periodCount = 12, groupBy = 'month' }: Cas
       ...selectedProjected,
     ];
 
-    // Recalcular saldo acumulado para manter continuidade
-    // A linha projetada deve partir do saldo real do mês anterior
-    // somando o delta projetado do mês corrente
-    let cumulativeBalanceHistorical = 0;
-
-    if (selectedHistorical.length > 0) {
-      // Começar do saldo acumulado do último mês histórico (antes do início do gráfico visível)
-      const startBalance = selectedHistorical[0].cumulativeBalance - (selectedHistorical[0].income - selectedHistorical[0].expenses);
-      cumulativeBalanceHistorical = startBalance;
-    }
-
-    // Primeira passada: calcular apenas o saldo histórico até o mês corrente
-    let lastHistoricalBalance = cumulativeBalanceHistorical;
-    let balanceBeforeCurrentMonth = cumulativeBalanceHistorical;
+    // Definir mês corrente e projeções
     const tempData = reorganizedData.map((item, index) => {
       const isCurrentMonth = index === selectedHistorical.length;
       const isProjected = index > selectedHistorical.length;
-
-      if (!isProjected) {
-        // Para meses históricos ou mês corrente, calcular saldo real
-        const incomeActual = item.income_actual !== undefined ? item.income_actual : item.income;
-        const expensesActual = item.expenses_actual !== undefined ? item.expenses_actual : item.expenses;
-        if (isCurrentMonth) {
-          balanceBeforeCurrentMonth = cumulativeBalanceHistorical;
-        }
-        cumulativeBalanceHistorical += incomeActual - expensesActual;
-        lastHistoricalBalance = cumulativeBalanceHistorical;
-      }
 
       return {
         ...item,
         isCurrentMonth,
         isProjectedMonth: isProjected,
-        cumulativeBalanceHistorical: !isProjected ? cumulativeBalanceHistorical : null,
       };
     });
 
-    // Segunda passada: calcular o saldo projetado a partir do saldo real do mês anterior
-    // somando o delta projetado do mês corrente
     const currentMonthItem = tempData[selectedHistorical.length];
-    const currentIncomePlanned = currentMonthItem?.income_planned !== undefined
-      ? currentMonthItem.income_planned
-      : currentMonthItem?.income;
-    const currentExpensesPlanned = currentMonthItem?.expenses_planned !== undefined
-      ? currentMonthItem.expenses_planned
-      : currentMonthItem?.expenses;
-    const currentProjectedDelta = (currentIncomePlanned ?? 0) - (currentExpensesPlanned ?? 0);
-    const projectedStartBalance = currentMonthItem
-      ? balanceBeforeCurrentMonth + currentProjectedDelta
-      : lastHistoricalBalance;
+    const projectedStartBalance = currentMonthItem?.cumulativeBalanceHistorical ?? baseBalance;
 
     let cumulativeBalanceProjected = projectedStartBalance;
-    const finalData = tempData.map((item, index) => {
+    const finalData = tempData.map((item) => {
       const isCurrentMonth = item.isCurrentMonth;
       const isProjected = item.isProjectedMonth;
 
-      if (isProjected) {
-        // Para meses futuros, somar projeção ao saldo real atual
-        cumulativeBalanceProjected += item.income - item.expenses;
+      if (isProjected && hasProjectionValues) {
+        const incomePlanned = item.income_planned ?? 0;
+        const expensesPlanned = item.expenses_planned ?? 0;
+        cumulativeBalanceProjected += incomePlanned - expensesPlanned;
       }
 
       // Linha sólida (histórica) deve parar no mês corrente
       const shouldIncludeInHistorical = !isProjected;
 
-      // A linha projetada começa no mês corrente (mesmo valor do histórico) 
+      // A linha projetada começa no mês corrente (mesmo valor do histórico)
       // e continua nos meses futuros
-      const shouldIncludeInProjected = isCurrentMonth || isProjected;
-
-      // Para períodos agrupados (trimestre/ano) ou mês atual:
-      // Sempre mostrar valores consolidados de realizados E projetados
-      // Para meses passados: só mostrar realizados
-      // Para meses futuros: só mostrar projetados
+      const shouldIncludeInProjected = hasProjectionValues && (isCurrentMonth || isProjected);
 
       // Valores realizados (actual)
       const incomeActual = item.income_actual !== undefined ? item.income_actual : 0;
@@ -336,36 +331,27 @@ export function CashFlowChart({ data, periodCount = 12, groupBy = 'month' }: Cas
       // - Meses passados (não projetados, não atual): só realizados
       // - Mês/período atual: ambos (realizados e projetados)
       // - Meses futuros (projetados): só projetados
-      // - Para groupBy !== 'month': sempre mostrar ambos se tiverem valor > 0
+      // - Para groupBy !== 'month': mostrar consolidado baseado no período
 
       let income_real: number | null = null;
       let income_proj: number | null = null;
       let expenses_real: number | null = null;
       let expenses_proj: number | null = null;
 
-      if (groupBy !== 'month') {
-        // Para trimestre/ano: sempre mostrar o consolidado de ambos
+      if (isProjected) {
+        // Período futuro: só projetados
+        income_proj = incomePlanned > 0 ? incomePlanned : (item.income > 0 ? item.income : null);
+        expenses_proj = expensesPlanned > 0 ? expensesPlanned : (item.expenses > 0 ? item.expenses : null);
+      } else if (isCurrentMonth) {
+        // Período atual: ambos
         income_real = incomeActual > 0 ? incomeActual : null;
         income_proj = incomePlanned > 0 ? incomePlanned : null;
         expenses_real = expensesActual > 0 ? expensesActual : null;
         expenses_proj = expensesPlanned > 0 ? expensesPlanned : null;
       } else {
-        // Para mês: lógica original
-        if (isProjected) {
-          // Mês futuro: só projetados
-          income_proj = incomePlanned > 0 ? incomePlanned : (item.income > 0 ? item.income : null);
-          expenses_proj = expensesPlanned > 0 ? expensesPlanned : (item.expenses > 0 ? item.expenses : null);
-        } else if (isCurrentMonth) {
-          // Mês atual: ambos
-          income_real = incomeActual > 0 ? incomeActual : null;
-          income_proj = incomePlanned > 0 ? incomePlanned : null;
-          expenses_real = expensesActual > 0 ? expensesActual : null;
-          expenses_proj = expensesPlanned > 0 ? expensesPlanned : null;
-        } else {
-          // Mês passado: só realizados
-          income_real = incomeActual > 0 ? incomeActual : (item.income > 0 ? item.income : null);
-          expenses_real = expensesActual > 0 ? expensesActual : (item.expenses > 0 ? item.expenses : null);
-        }
+        // Período passado: só realizados
+        income_real = incomeActual > 0 ? incomeActual : (item.income > 0 ? item.income : null);
+        expenses_real = expensesActual > 0 ? expensesActual : (item.expenses > 0 ? item.expenses : null);
       }
 
       // Flags para indicar quando há sobreposição (valores reais e projetados no mesmo período)
@@ -373,17 +359,16 @@ export function CashFlowChart({ data, periodCount = 12, groupBy = 'month' }: Cas
       const hasExpensesOverlap = expenses_real !== null && expenses_proj !== null;
 
       // Valores ajustados (mantidos iguais para simplicidade)
-      const income_proj_adjusted = income_proj;
-      const expenses_proj_adjusted = expenses_proj;
+      const income_proj_adjusted = hasProjectionValues ? income_proj : null;
+      const expenses_proj_adjusted = hasProjectionValues ? expenses_proj : null;
 
       return {
         ...item,
         isProjected: isProjected && !isCurrentMonth,
         isCurrentMonth, // Garantir que isCurrentMonth está disponível
-        cumulativeBalance: item.cumulativeBalanceHistorical || cumulativeBalanceProjected,
+        cumulativeBalance: item.cumulativeBalanceHistorical ?? cumulativeBalanceProjected,
         cumulativeBalanceHistorical: shouldIncludeInHistorical ? item.cumulativeBalanceHistorical : null,
-        // No mês corrente, a linha projetada começa no saldo do mês anterior
-        // somado ao delta projetado do mês
+        // No mês corrente, a linha projetada começa no saldo real do mês corrente
         // Nos meses futuros, continua com as projeções somadas
         cumulativeBalanceProjected: shouldIncludeInProjected
           ? (isCurrentMonth ? projectedStartBalance : cumulativeBalanceProjected)
@@ -402,8 +387,9 @@ export function CashFlowChart({ data, periodCount = 12, groupBy = 'month' }: Cas
     return {
       chartData: finalData,
       currentMonthIndex: selectedHistorical.length,
+      hasProjections: hasProjectionValues,
     };
-  }, [data, periodCount, viewOffset, groupBy]);
+  }, [data, periodCount, viewOffset, groupBy, currentBalance]);
 
   // Formatação compacta para gráficos (sem centavos)
   const formatCurrency = (value: number) => {
@@ -552,42 +538,56 @@ export function CashFlowChart({ data, periodCount = 12, groupBy = 'month' }: Cas
               );
             })()}
 
-            {/* Barras de Receitas Projetadas (background - translúcidas) */}
-            <Bar
-              dataKey="income_proj"
-              name="Receitas Proj."
-              fill={chartIncomeColor}
-              radius={[4, 4, 0, 0]}
-              maxBarSize={28}
-              fillOpacity={0.35}
-            />
-
-            {/* Barras de Receitas Realizadas (foreground - sólidas, sobrepostas) */}
-            <Bar
+            {/* Linha de Receitas Realizadas */}
+            <Line
+              type="monotone"
               dataKey="income_real"
               name="Receitas"
-              fill={chartIncomeColor}
-              radius={[4, 4, 0, 0]}
-              maxBarSize={28}
+              stroke={chartIncomeColor}
+              strokeWidth={2}
+              dot={{ r: 5, fill: chartIncomeColor, strokeWidth: 0 }}
+              activeDot={{ r: 7 }}
+              connectNulls={false}
             />
 
-            {/* Barras de Despesas Projetadas (background - translúcidas) */}
-            <Bar
-              dataKey="expenses_proj"
-              name="Despesas Proj."
-              fill={chartExpenseColor}
-              radius={[4, 4, 0, 0]}
-              maxBarSize={28}
-              fillOpacity={0.35}
+            {/* Linha de Receitas Projetadas */}
+            <Line
+              type="monotone"
+              dataKey="income_proj"
+              name="Receitas Proj."
+              stroke={chartIncomeColor}
+              strokeWidth={2}
+              strokeDasharray="6 4"
+              strokeOpacity={0.5}
+              dot={{ r: 5, fill: chartIncomeColor, strokeWidth: 0, fillOpacity: 0.5 }}
+              activeDot={{ r: 7 }}
+              connectNulls={false}
             />
 
-            {/* Barras de Despesas Realizadas (foreground - sólidas) */}
-            <Bar
+            {/* Linha de Despesas Realizadas */}
+            <Line
+              type="monotone"
               dataKey="expenses_real"
               name="Despesas"
-              fill={chartExpenseColor}
-              radius={[4, 4, 0, 0]}
-              maxBarSize={28}
+              stroke={chartExpenseColor}
+              strokeWidth={2}
+              dot={{ r: 5, fill: chartExpenseColor, strokeWidth: 0 }}
+              activeDot={{ r: 7 }}
+              connectNulls={false}
+            />
+
+            {/* Linha de Despesas Projetadas */}
+            <Line
+              type="monotone"
+              dataKey="expenses_proj"
+              name="Despesas Proj."
+              stroke={chartExpenseColor}
+              strokeWidth={2}
+              strokeDasharray="6 4"
+              strokeOpacity={0.5}
+              dot={{ r: 5, fill: chartExpenseColor, strokeWidth: 0, fillOpacity: 0.5 }}
+              activeDot={{ r: 7 }}
+              connectNulls={false}
             />
 
             {/* Linha de Saldo Realizado (sólida) */}
@@ -599,38 +599,42 @@ export function CashFlowChart({ data, periodCount = 12, groupBy = 'month' }: Cas
               strokeWidth={3}
               dot={{
                 fill: chartBalanceColor,
-                strokeWidth: 2,
-                r: 4,
+                strokeWidth: 0,
+                r: 5,
               }}
               activeDot={{
                 fill: chartBalanceColor,
-                strokeWidth: 2,
-                r: 6,
+                strokeWidth: 0,
+                r: 7,
               }}
               connectNulls={false}
             />
 
             {/* Linha de Saldo Projetado (tracejada) */}
-            <Line
-              type="monotone"
-              dataKey="cumulativeBalanceProjected"
-              name="Saldo Projetado"
-              stroke={chartBalanceColor}
-              strokeWidth={3}
-              strokeDasharray="8 4"
-              dot={{
-                fill: 'hsl(var(--background))',
-                stroke: chartBalanceColor,
-                strokeWidth: 2,
-                r: 4,
-              }}
-              activeDot={{
-                fill: chartBalanceColor,
-                strokeWidth: 2,
-                r: 6,
-              }}
-              connectNulls={false}
-            />
+            {hasProjections && (
+              <Line
+                type="monotone"
+                dataKey="cumulativeBalanceProjected"
+                name="Saldo Projetado"
+                stroke={chartBalanceColor}
+                strokeWidth={3}
+                strokeDasharray="8 4"
+                strokeOpacity={0.5}
+                dot={{
+                  fill: 'hsl(var(--background))',
+                  stroke: chartBalanceColor,
+                  strokeWidth: 1,
+                  r: 5,
+                  fillOpacity: 0.5,
+                }}
+                activeDot={{
+                  fill: chartBalanceColor,
+                  strokeWidth: 0,
+                  r: 7,
+                }}
+                connectNulls={false}
+              />
+            )}
 
             {/* Legenda customizada */}
             <Legend

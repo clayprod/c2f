@@ -201,8 +201,9 @@ export async function getAggregatedTransactions(
         groupKey = category?.name || 'Sem categoria';
         break;
       case 'month':
-        const date = new Date(tx.posted_at);
-        groupKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        // Parse date parts directly to avoid timezone issues
+        const [yearStr, monthStr] = tx.posted_at.split('-');
+        groupKey = `${yearStr}-${monthStr}`;
         break;
       default:
         groupKey = profile?.state || 'Não informado';

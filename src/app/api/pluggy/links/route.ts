@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
         .select('account_id, total_cents, paid_cents')
         .eq('user_id', user.id)
         .in('account_id', creditCardIds)
-        .in('status', ['open', 'closed']);
+        .in('status', ['open', 'closed', 'partial', 'overdue']);
 
       if (!billsError && bills) {
         // Calculate total unpaid amount per card

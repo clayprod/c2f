@@ -237,8 +237,16 @@ function formatCurrencyForCSV(cents: number): string {
 }
 
 function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('pt-BR');
+  // Parse date parts directly to avoid timezone issues
+  // Input format: "YYYY-MM-DD" or "YYYY-MM-DDTHH:mm:ss..."
+  const datePart = dateStr.split('T')[0];
+  const [yearStr, monthStr, dayStr] = datePart.split('-');
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
+  const day = parseInt(dayStr, 10);
+
+  // Format as DD/MM/YYYY for pt-BR locale
+  return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
 }
 
 function escapeCSV(value: string | number | null | undefined): string {
@@ -265,6 +273,7 @@ async function exportTransactions(
     .from('transactions')
     .select('id, posted_at, description, amount, currency, notes, accounts(name), categories(name, type)')
     .eq('user_id', userId)
+    .eq('is_transfer', false) // Exclude transfers from export (consistent with reports)
     .gte('posted_at', params.startDate)
     .lte('posted_at', params.endDate)
     .order('posted_at', { ascending: false });
@@ -355,7 +364,8 @@ async function exportCategories(
     const cat = totals.get(catId)!;
     // Convert NUMERIC to cents
     const amountCents = Math.round(Math.abs(tx.amount || 0) * 100);
-    const isIncome = tx.categories?.type === 'income' || tx.amount > 0;
+    // Use category type as primary source of truth, fallback to amount sign
+    const isIncome = tx.categories?.type === 'income' || (tx.categories?.type !== 'expense' && tx.amount > 0);
     if (isIncome) {
       cat.income += amountCents;
     } else {
@@ -655,7 +665,8 @@ async function exportSummary(
   for (const tx of transactions) {
     // Convert NUMERIC to cents
     const amountCents = Math.round(Math.abs(tx.amount || 0) * 100);
-    const isIncome = tx.categories?.type === 'income' || tx.amount > 0;
+    // Use category type as primary source of truth, fallback to amount sign
+    const isIncome = tx.categories?.type === 'income' || (tx.categories?.type !== 'expense' && tx.amount > 0);
     if (isIncome) {
       totalIncome += amountCents;
     } else {

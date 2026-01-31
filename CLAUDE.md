@@ -116,6 +116,12 @@ O arquivo `.mcp.json` na raiz do projeto configura os servidores MCP. O formato 
 - Toda lógica de dinheiro deve usar tipos/precisão correta (não usar float para valores monetários)
 - Observabilidade mínima: logs estruturados + rastreio de eventos críticos
 
+### Build e Testes
+
+- **NUNCA executar build (npm run build) ou dev (npm run dev) para testes**. Se o usuário precisar testar, ele mesmo executará.
+- Após fazer alterações no código, apenas informar que as mudanças foram aplicadas.
+- Pode executar lint e typecheck quando apropriado para verificar a qualidade do código.
+
 ---
 
 ## Orçamentos Automáticos
