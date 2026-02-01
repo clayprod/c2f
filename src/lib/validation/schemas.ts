@@ -7,6 +7,11 @@ export const accountSchema = z.object({
   initial_balance_cents: z.number().int().optional(),
   currency: z.string().default('BRL'),
   institution: z.string().optional(),
+  institution_domain: z.string().optional(),
+  institution_brand_id: z.string().optional(),
+  institution_primary_color: z.string().optional(),
+  color: z.string().optional(),
+  icon: z.string().optional(),
   overdraft_limit_cents: z.number().int().min(0).optional(),
   overdraft_interest_rate_monthly: z.number().min(0).max(100).optional(),
   // Yield configuration
@@ -318,6 +323,9 @@ export const investmentSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
   type: z.enum(['stocks', 'bonds', 'funds', 'crypto', 'real_estate', 'other']),
   institution: z.string().optional(),
+  institution_domain: z.string().optional(),
+  institution_brand_id: z.string().optional(),
+  institution_primary_color: z.string().optional(),
   account_id: z.string().uuid('ID da conta inválido').optional(),
   initial_investment_cents: z.number().int().positive('Investimento inicial deve ser positivo'),
   current_value_cents: z.number().int().min(0).optional(),
@@ -465,6 +473,9 @@ export const exportReportSchema = z.object({
 export const creditCardSchema = z.object({
   name: z.string().min(1, 'Nome do cartão é obrigatório'),
   institution: z.string().nullable().optional(),
+  institution_domain: z.string().nullable().optional(),
+  institution_brand_id: z.string().nullable().optional(),
+  institution_primary_color: z.string().nullable().optional(),
   last_four_digits: z.union([
     z.string().regex(/^\d{4}$/, 'Ultimos 4 digitos invalidos'),
     z.literal(''),

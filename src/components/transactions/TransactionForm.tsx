@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/command';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { buildBrandfetchLogoProxyUrl } from '@/lib/brandfetch';
 
 export interface Transaction {
   id?: string;
@@ -54,6 +55,8 @@ interface Account {
   type?: string;
   icon?: string;
   color?: string;
+  institution_domain?: string | null;
+  institution_primary_color?: string | null;
   last_four_digits?: string;
   is_expired?: boolean;
 }

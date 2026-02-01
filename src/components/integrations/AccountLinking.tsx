@@ -272,6 +272,7 @@ export default function AccountLinking({ onLinkChange }: Props) {
                             <span>
                               {isCreditCard ? 'Cartão de crédito: ' : ''}
                               {acc.name}
+                              {acc.institution ? ` - ${acc.institution}` : ''}
                             </span>
                             <span className="text-muted-foreground text-xs">
                               ({formatCurrencyValue(acc.current_balance)})

@@ -41,6 +41,9 @@ const applyMissingColumnFallback = (payload: Record<string, any>, column: string
     'contribution_day',
     'start_date',
     'assigned_to',
+    'institution_domain',
+    'institution_brand_id',
+    'institution_primary_color',
   ];
 
   if (optionalColumns.includes(column)) {
@@ -136,6 +139,9 @@ export async function PATCH(
       name: z.string().min(1, 'Nome é obrigatório').optional(),
       type: z.enum(['stocks', 'bonds', 'funds', 'crypto', 'real_estate', 'other']).optional(),
       institution: z.string().optional(),
+      institution_domain: z.string().optional(),
+      institution_brand_id: z.string().optional(),
+      institution_primary_color: z.string().optional(),
       account_id: z.string().uuid('ID da conta inválido').optional(),
       initial_investment_cents: z.number().int().positive('Investimento inicial deve ser positivo').optional(),
       current_value_cents: z.number().int().min(0).optional(),

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getInstitutionLogoUrl } from '@/services/pluggy/bankMapping';
+import { getAccountLogoUrl } from '@/services/pluggy/accounts';
 import { pluggyClient } from '@/services/pluggy/client';
 
 export const dynamic = 'force-dynamic';
@@ -8,7 +9,7 @@ export const dynamic = 'force-dynamic';
 /**
  * Get Pluggy links with institution logos for accounts
  * Returns a map of account_id -> institution_logo
- * ALWAYS recalculates logos from account names to ensure correctness
+ * Recalculates logos using Pluggy account connector data
  */
 export async function GET(request: NextRequest) {
   try {
@@ -72,9 +73,10 @@ export async function GET(request: NextRequest) {
             continue;
           }
           
-          // Calculate logo from account name (this is the KEY change - always recalculate)
           const transferNumber = apiAccount.bankData?.transferNumber;
-          const logoUrl = getInstitutionLogoUrl(apiAccount.name, transferNumber);
+          const logoUrl =
+            getAccountLogoUrl(apiAccount) ||
+            getInstitutionLogoUrl(apiAccount.name, transferNumber);
           
           console.log(`[Pluggy Links] Account "${apiAccount.name}": calculated logo = ${logoUrl}`);
           

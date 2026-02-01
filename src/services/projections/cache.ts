@@ -12,12 +12,14 @@ interface CacheEntry<T> {
 class ProjectionCache {
   private cache: Map<string, CacheEntry<any>> = new Map();
   private readonly DEFAULT_TTL = 5 * 60 * 1000; // 5 minutes
+  // Increment this version to invalidate all existing caches after code changes
+  private readonly CACHE_VERSION = 2; // v2: Fixed double counting of actual amounts
 
   /**
    * Generate cache key
    */
   private getKey(userId: string, startMonth: string, endMonth: string): string {
-    return `projections:${userId}:${startMonth}:${endMonth}`;
+    return `projections:v${this.CACHE_VERSION}:${userId}:${startMonth}:${endMonth}`;
   }
 
   /**

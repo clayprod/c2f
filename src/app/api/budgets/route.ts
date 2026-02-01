@@ -240,14 +240,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const forceRefresh = searchParams.get('refresh') === 'true' || searchParams.get('refresh') === '1';
+
     // Check cache
     const startMonthKey = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`;
     const endMonthKey = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}`;
-    const cached = projectionCache.get(ownerId, startMonthKey, endMonthKey);
+    const cached = forceRefresh ? null : projectionCache.get(ownerId, startMonthKey, endMonthKey);
 
     if (cached) {
+      console.log('[BUDGETS API] Returning cached data for', ownerId, startMonthKey, endMonthKey);
       return NextResponse.json({ data: cached });
     }
+    console.log('[BUDGETS API] Calculating fresh data for', ownerId, startMonthKey, endMonthKey);
 
     // Get manual budgets for the period
     const startYear = startDate.getFullYear();
@@ -286,8 +290,9 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching transactions:', transactionsError);
     }
 
-    // Group transactions by month
+    // Group transactions by month AND by month+category (for budget actual amounts)
     const actualMonthlyTotals: Record<string, { income: number; expenses: number }> = {};
+    const actualByCategoryMonth: Record<string, number> = {}; // key: "YYYY-MM:category_id"
     if (transactions) {
       for (const tx of transactions) {
         // Parse date parts directly to avoid timezone issues
@@ -308,6 +313,12 @@ export async function GET(request: NextRequest) {
           actualMonthlyTotals[monthKey].income += Math.abs(amountCents);
         } else {
           actualMonthlyTotals[monthKey].expenses += Math.abs(amountCents);
+        }
+
+        // Also group by category for budget actual amounts
+        if (tx.category_id) {
+          const catMonthKey = `${monthKey}:${tx.category_id}`;
+          actualByCategoryMonth[catMonthKey] = (actualByCategoryMonth[catMonthKey] || 0) + amountReais;
         }
       }
     }
@@ -332,57 +343,36 @@ export async function GET(request: NextRequest) {
       projectionErrors = [error.message || 'Erro ao gerar projeções'];
     }
 
-    // Calculate actual amounts from transactions for each budget
-    const transformedBudgets = await Promise.all(
-      filteredBudgets.map(async (budget: any) => {
-        // Calculate start and end dates for the budget month
-        const budgetStartDate = new Date(budget.year, budget.month - 1, 1);
-        const budgetEndDate = new Date(budget.year, budget.month, 0); // Last day of the month
+    // Calculate actual amounts from pre-loaded transactions (no individual queries!)
+    const transformedBudgets = filteredBudgets.map((budget: any) => {
+      const monthKey = `${budget.year}-${String(budget.month).padStart(2, '0')}`;
+      const catMonthKey = `${monthKey}:${budget.category_id}`;
 
-        const budgetStartStr = budgetStartDate.toISOString().split('T')[0];
-        const budgetEndStr = budgetEndDate.toISOString().split('T')[0];
+      // Get actual amount from pre-grouped transactions
+      const actualAmount = actualByCategoryMonth[catMonthKey] || budget.amount_actual || 0;
 
-        // Fetch transactions for this category and month
-        const { data: transactions, error: txError } = await supabase
-          .from('transactions')
-          .select('amount')
-          .eq('user_id', ownerId)
-          .eq('category_id', budget.category_id)
-          .gte('posted_at', budgetStartStr)
-          .lte('posted_at', budgetEndStr);
+      // Update budget in database if amount changed significantly (async, don't wait)
+      if (Math.abs(actualAmount - (budget.amount_actual || 0)) > 0.01) {
+        supabase
+          .from('budgets')
+          .update({ amount_actual: actualAmount })
+          .eq('id', budget.id)
+          .then(({ error: updateError }) => {
+            if (updateError) {
+              console.error('Error updating budget actual amount:', updateError);
+            }
+          });
+      }
 
-        let actualAmount = budget.amount_actual || 0;
-
-        if (!txError && transactions) {
-          // Sum up transaction amounts (negative for expenses, positive for income)
-          actualAmount = transactions.reduce((sum, tx) => {
-            return sum + Number(tx.amount || 0);
-          }, 0);
-
-          // Update budget in database if amount changed (async, don't wait)
-          if (Math.abs(actualAmount - (budget.amount_actual || 0)) > 0.01) {
-            supabase
-              .from('budgets')
-              .update({ amount_actual: actualAmount })
-              .eq('id', budget.id)
-              .then(({ error: updateError }) => {
-                if (updateError) {
-                  console.error('Error updating budget actual amount:', updateError);
-                }
-              });
-          }
-        }
-
-        return {
-          ...budget,
-          limit_cents: budget.amount_planned_cents || 0,
-          amount_actual_cents: Math.round(actualAmount * 100),
-          amount_actual: actualAmount, // Include in reais for consistency
-          source_type: budget.source_type || 'manual',
-          is_projected: budget.is_projected || false,
-        };
-      })
-    );
+      return {
+        ...budget,
+        limit_cents: budget.amount_planned_cents || 0,
+        amount_actual_cents: Math.round(actualAmount * 100),
+        amount_actual: actualAmount, // Include in reais for consistency
+        source_type: budget.source_type || 'manual',
+        is_projected: budget.is_projected || false,
+      };
+    });
 
     // Convert projections to budget-like format for consistency
     const projectionBudgets = projections.map((proj) => {
@@ -526,6 +516,13 @@ export async function GET(request: NextRequest) {
         allMonthlyTotals[monthKey].actual_expenses += totals.expenses;
       }
     }
+
+    // Debug: log sample of monthly totals
+    const sampleKeys = Object.keys(allMonthlyTotals).slice(0, 3);
+    console.log('[BUDGETS API] Sample monthly totals:', sampleKeys.map(k => ({
+      month: k,
+      ...allMonthlyTotals[k]
+    })));
 
     const result = {
       budgets: allBudgets,
@@ -742,6 +739,13 @@ export async function POST(request: NextRequest) {
         { error: error.message || 'Erro ao criar orçamento', code: error.code },
         { status: 500 }
       );
+    }
+
+    // Invalidate cache for this user
+    try {
+      projectionCache.invalidateUser(ownerId);
+    } catch (cacheError) {
+      console.error('Cache invalidation error:', cacheError);
     }
 
     // Convert planned amount to limit_cents for API response

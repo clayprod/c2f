@@ -14,12 +14,16 @@ import { formatCurrency } from '@/lib/utils';
 import { parseDateOnly } from '@/lib/date';
 import { useAccountContext } from '@/hooks/useAccountContext';
 import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
+import InstitutionSelect, { type InstitutionSelection } from '@/components/brandfetch/InstitutionSelect';
 
 interface Investment {
   id: string;
   name: string;
   type: string;
   institution?: string;
+  institution_domain?: string | null;
+  institution_brand_id?: string | null;
+  institution_primary_color?: string | null;
   initial_investment_cents: number;
   current_value_cents: number;
   purchase_date: string;
@@ -60,6 +64,9 @@ export default function InvestmentDetailPage() {
     name: '',
     type: 'stocks',
     institution: '',
+    institution_domain: '',
+    institution_brand_id: '',
+    institution_primary_color: '',
     initial_investment_cents: '',
     current_value_cents: '',
     purchase_date: '',
@@ -112,6 +119,9 @@ export default function InvestmentDetailPage() {
         name: investmentData.name || '',
         type: investmentData.type || 'stocks',
         institution: investmentData.institution || '',
+        institution_domain: investmentData.institution_domain || '',
+        institution_brand_id: investmentData.institution_brand_id || '',
+        institution_primary_color: investmentData.institution_primary_color || '',
         initial_investment_cents: (investmentData.initial_investment_cents / 100).toFixed(2),
         current_value_cents: investmentData.current_value_cents 
           ? (investmentData.current_value_cents / 100).toFixed(2) 
@@ -153,6 +163,16 @@ export default function InvestmentDetailPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleInstitutionChange = (selection: InstitutionSelection) => {
+    setFormData((prev) => ({
+      ...prev,
+      institution: selection.name,
+      institution_domain: selection.domain || '',
+      institution_brand_id: selection.brandId || '',
+      institution_primary_color: selection.primaryColor || '',
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -200,6 +220,9 @@ export default function InvestmentDetailPage() {
         name: data.name,
         type: data.type,
         institution: data.institution || undefined,
+        institution_domain: data.institution_domain || undefined,
+        institution_brand_id: data.institution_brand_id || undefined,
+        institution_primary_color: data.institution_primary_color || undefined,
         initial_investment_cents: Math.round(parseFloat(data.initial_investment_cents) * 100),
         current_value_cents: data.current_value_cents 
           ? Math.round(parseFloat(data.current_value_cents) * 100) 
@@ -391,12 +414,17 @@ export default function InvestmentDetailPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">Instituição</label>
-              <input
-                type="text"
-                value={formData.institution}
-                onChange={(e) => setFormData({ ...formData, institution: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              <InstitutionSelect
+                label="Instituição"
+                placeholder="Busque a instituição"
+                value={{
+                  name: formData.institution,
+                  domain: formData.institution_domain || undefined,
+                  brandId: formData.institution_brand_id || undefined,
+                  primaryColor: formData.institution_primary_color || undefined,
+                  isManual: !formData.institution_domain && !!formData.institution,
+                }}
+                onChange={handleInstitutionChange}
               />
             </div>
 

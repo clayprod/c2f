@@ -11,6 +11,7 @@ import { pt } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { useMembers } from '@/hooks/useMembers';
 import { parseDateOnly } from '@/lib/date';
+import InstitutionSelect, { type InstitutionSelection } from '@/components/brandfetch/InstitutionSelect';
 
 export default function NewInvestmentPage() {
   const router = useRouter();
@@ -22,6 +23,9 @@ export default function NewInvestmentPage() {
     name: '',
     type: 'stocks',
     institution: '',
+    institution_domain: '',
+    institution_brand_id: '',
+    institution_primary_color: '',
     initial_investment_cents: '',
     current_value_cents: '',
     purchase_date: new Date().toISOString().split('T')[0],
@@ -40,6 +44,16 @@ export default function NewInvestmentPage() {
   const [planEntries, setPlanEntries] = useState<Array<{ month: string; amount: string }>>([
     { month: '', amount: '' },
   ]);
+
+  const handleInstitutionChange = (selection: InstitutionSelection) => {
+    setFormData((prev) => ({
+      ...prev,
+      institution: selection.name,
+      institution_domain: selection.domain || '',
+      institution_brand_id: selection.brandId || '',
+      institution_primary_color: selection.primaryColor || '',
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,13 +179,17 @@ export default function NewInvestmentPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Instituição</label>
-            <input
-              type="text"
-              value={formData.institution}
-              onChange={(e) => setFormData({ ...formData, institution: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder="Ex: XP Investimentos"
+            <InstitutionSelect
+              label="Instituição"
+              placeholder="Busque a instituição"
+              value={{
+                name: formData.institution,
+                domain: formData.institution_domain || undefined,
+                brandId: formData.institution_brand_id || undefined,
+                primaryColor: formData.institution_primary_color || undefined,
+                isManual: !formData.institution_domain && !!formData.institution,
+              }}
+              onChange={handleInstitutionChange}
             />
           </div>
 

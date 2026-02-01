@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { pluggyClient } from '@/services/pluggy/client';
+import { getAccountLogoUrl } from '@/services/pluggy/accounts';
+import { getInstitutionLogoUrl } from '@/services/pluggy/bankMapping';
 
 export async function GET(request: NextRequest) {
   try {
@@ -51,6 +54,46 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch links' }, { status: 500 });
     }
 
+    // Refresh logos using Pluggy API (Brandfetch when available)
+    const linkAccounts = links || [];
+    const accountByExternalId = new Map(
+      linkAccounts.map((link: any) => [link.pluggy_accounts.pluggy_account_id, link.pluggy_accounts])
+    );
+    const logoByAccountId = new Map<string, string>();
+    const itemIds = [
+      ...new Set(linkAccounts.map((link: any) => link.pluggy_accounts.item_id).filter(Boolean)),
+    ];
+
+    for (const itemId of itemIds) {
+      try {
+        const response = await pluggyClient.get<{ results: any[] }>(`/accounts?itemId=${itemId}`);
+        for (const apiAccount of response.results || []) {
+          const dbAccount = accountByExternalId.get(apiAccount.id);
+          if (!dbAccount) continue;
+
+          const transferNumber = apiAccount.bankData?.transferNumber;
+          const logoUrl =
+            getAccountLogoUrl(apiAccount) ||
+            getInstitutionLogoUrl(apiAccount.name, transferNumber);
+
+          if (!logoUrl) continue;
+
+          logoByAccountId.set(dbAccount.id, logoUrl);
+
+          const { error: updateError } = await supabase
+            .from('pluggy_accounts')
+            .update({ institution_logo: logoUrl })
+            .eq('id', dbAccount.id);
+
+          if (updateError) {
+            console.error('[Pluggy Links] Error updating logo:', updateError);
+          }
+        }
+      } catch (err) {
+        console.error(`[Pluggy Links] Error fetching accounts for item ${itemId}:`, err);
+      }
+    }
+
     // For credit cards, calculate balance as sum of unpaid bills (open/closed)
     const creditCardIds = (links || [])
       .filter((link: any) => link.accounts.type === 'credit_card')
@@ -98,7 +141,7 @@ export async function GET(request: NextRequest) {
           currency: link.pluggy_accounts.currency,
           number: link.pluggy_accounts.number,
           institution_name: link.pluggy_accounts.pluggy_items?.connector_name || 'Open Finance',
-          institution_logo: link.pluggy_accounts.institution_logo || null,
+          institution_logo: logoByAccountId.get(link.pluggy_accounts.id) || link.pluggy_accounts.institution_logo || null,
         },
         internal_account: {
           id: link.accounts.id,
@@ -137,7 +180,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify internal account belongs to user and is not a credit card
+    // Verify internal account belongs to user
     const { data: internalAccount, error: internalError } = await supabase
       .from('accounts')
       .select('id, type')
@@ -149,14 +192,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Internal account not found' }, { status: 404 });
     }
 
-    // Block linking credit card accounts - they are managed via bills/invoices
-    if (internalAccount.type === 'credit_card' || internalAccount.type === 'credit') {
-      return NextResponse.json({
-        error: 'Contas de cartão de crédito não podem ser vinculadas para importação de transações. Cartões são gerenciados via faturas.',
-      }, { status: 400 });
-    }
+    const internalIsCreditCard = internalAccount.type === 'credit_card' || internalAccount.type === 'credit';
 
-    // Also verify Pluggy account is not a credit card
+    // Also verify Pluggy account
     const { data: pluggyAccountData, error: pluggyTypeError } = await supabase
       .from('pluggy_accounts')
       .select('id, type, subtype')
@@ -168,10 +206,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Pluggy account not found' }, { status: 404 });
     }
 
-    if (pluggyAccountData.type === 'CREDIT' || pluggyAccountData.subtype === 'credit_card') {
-      return NextResponse.json({
-        error: 'Contas de cartão de crédito do Open Finance não podem ser vinculadas para importação de transações.',
-      }, { status: 400 });
+    const pluggyIsCreditCard =
+      pluggyAccountData.type === 'CREDIT' || pluggyAccountData.subtype === 'credit_card';
+
+    if (internalIsCreditCard !== pluggyIsCreditCard) {
+      return NextResponse.json(
+        {
+          error:
+            'Tipo incompatível: vincule cartão de crédito apenas com cartão de crédito, e conta bancária apenas com conta bancária.',
+        },
+        { status: 400 }
+      );
     }
 
     // Create the link

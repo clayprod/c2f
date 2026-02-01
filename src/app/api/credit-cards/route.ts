@@ -197,6 +197,9 @@ export async function POST(request: NextRequest) {
         name: validated.name,
         type: 'credit_card',
         institution: validated.institution || null,
+        institution_domain: validated.institution_domain || null,
+        institution_brand_id: validated.institution_brand_id || null,
+        institution_primary_color: validated.institution_primary_color || null,
         last_four_digits: validated.last_four_digits && validated.last_four_digits.trim() !== '' ? validated.last_four_digits : null,
         card_brand: validated.card_brand || null,
         currency: 'BRL',
@@ -211,7 +214,7 @@ export async function POST(request: NextRequest) {
         is_default: isDefault,
         assigned_to: validated.assigned_to || null,
       })
-      .select('id, user_id, name, type, institution, last_four_digits, card_brand, currency, current_balance, available_balance, credit_limit, closing_day, due_day, expiration_date, color, icon, is_default, created_at, updated_at')
+      .select('id, user_id, name, type, institution, institution_domain, institution_brand_id, institution_primary_color, last_four_digits, card_brand, currency, current_balance, available_balance, credit_limit, closing_day, due_day, expiration_date, color, icon, is_default, created_at, updated_at')
       .single();
 
     if (error) {

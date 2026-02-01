@@ -147,13 +147,15 @@ export async function POST(request: NextRequest) {
     const categoryName = validated.name.toUpperCase();
     const { data: category, error: categoryError } = await supabase
       .from('categories')
-      .insert({
+      .upsert({
         user_id: ownerId,
         name: categoryName,
         type: 'expense',
         icon: '💳',
         color: '#DC143C',
         source_type: 'debt',
+      }, {
+        onConflict: 'user_id,name,type',
       })
       .select()
       .single();
@@ -222,13 +224,36 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { data, error } = await supabase
-      .from('debts')
-      .insert(debtData)
-      .select('*, accounts(*), categories(*)')
-      .single();
+    const insertDebtWithFallback = async () => {
+      let payload: Record<string, any> = { ...debtData };
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const { data, error } = await supabase
+          .from('debts')
+          .insert(payload)
+          .select('*, accounts(*), categories(*)')
+          .single();
 
-    if (error) throw error;
+        if (!error) {
+          return data;
+        }
+
+        const errorMessage = (error as { message?: string; code?: string })?.message || '';
+        const errorCode = (error as { message?: string; code?: string })?.code || '';
+        const missingColumnMatch = errorMessage.match(/'([^']+)'/);
+        const missingColumn = missingColumnMatch?.[1];
+
+        if (errorCode === 'PGRST204' && missingColumn && missingColumn in payload) {
+          delete payload[missingColumn];
+          continue;
+        }
+
+        throw error;
+      }
+
+      throw new Error('Failed to insert debt after removing unsupported fields');
+    };
+
+    const data = await insertDebtWithFallback();
 
     if (data && validated.plan_entries && validated.plan_entries.length > 0) {
       const planEntries = validated.plan_entries.map((entry) => ({
@@ -375,6 +400,7 @@ export async function POST(request: NextRequest) {
       }
     }, { status: 201 });
   } catch (error) {
+    console.error('Error creating debt:', error);
     if (error instanceof Error && error.name === 'ZodError') {
       return NextResponse.json(
         { error: 'Validation error', details: error },

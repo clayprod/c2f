@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useMembers } from '@/hooks/useMembers';
 import { parseDateOnly } from '@/lib/date';
+import { parseCurrencyToCents, processCurrencyInput } from '@/lib/utils';
 
 export default function NewDebtPage() {
   const router = useRouter();
@@ -47,9 +48,9 @@ export default function NewDebtPage() {
       const cleanedPlanEntries = planEntries
         .map((entry) => ({
           month: entry.month,
-          amount: parseFloat(entry.amount),
+          amount_cents: parseCurrencyToCents(entry.amount),
         }))
-        .filter((entry) => entry.month && !Number.isNaN(entry.amount) && entry.amount > 0);
+        .filter((entry) => entry.month && entry.amount_cents > 0);
 
       if (useCustomPlan && cleanedPlanEntries.length === 0) {
         toast({
@@ -63,10 +64,10 @@ export default function NewDebtPage() {
 
       // Validate custom plan total if using custom plan
       if (useCustomPlan && cleanedPlanEntries.length > 0) {
-        const totalAmount = parseFloat(formData.total_amount_cents) * 100;
-        const paidAmount = parseFloat(formData.paid_amount_cents || '0') * 100;
+        const totalAmount = parseCurrencyToCents(formData.total_amount_cents);
+        const paidAmount = parseCurrencyToCents(formData.paid_amount_cents || '0');
         const remainingAmount = totalAmount - paidAmount;
-        const planTotal = cleanedPlanEntries.reduce((sum, entry) => sum + (entry.amount * 100), 0);
+        const planTotal = cleanedPlanEntries.reduce((sum, entry) => sum + entry.amount_cents, 0);
 
         if (planTotal < remainingAmount) {
           toast({
@@ -84,8 +85,9 @@ export default function NewDebtPage() {
           name: formData.name,
           description: formData.description || undefined,
           creditor_name: formData.creditor_name || undefined,
-          total_amount_cents: Math.round(parseFloat(formData.total_amount_cents) * 100),
-          paid_amount_cents: Math.round(parseFloat(formData.paid_amount_cents || '0') * 100),
+          principal_amount_cents: parseCurrencyToCents(formData.total_amount_cents),
+          total_amount_cents: parseCurrencyToCents(formData.total_amount_cents),
+          paid_amount_cents: parseCurrencyToCents(formData.paid_amount_cents || '0'),
           interest_rate_monthly: parseFloat(formData.interest_rate || '0'),
           due_date: formData.due_date || undefined,
           status: formData.status,
@@ -96,7 +98,7 @@ export default function NewDebtPage() {
             ? formData.contribution_frequency
             : undefined,
           monthly_payment_cents: !useCustomPlan && formData.include_in_plan && formData.monthly_payment_cents
-            ? Math.round(parseFloat(formData.monthly_payment_cents) * 100)
+            ? parseCurrencyToCents(formData.monthly_payment_cents)
             : undefined,
           contribution_count: !useCustomPlan && formData.include_in_plan && formData.contribution_count
             ? parseInt(formData.contribution_count)
@@ -107,7 +109,7 @@ export default function NewDebtPage() {
           plan_entries: useCustomPlan
             ? cleanedPlanEntries.map((entry) => ({
                 month: entry.month,
-                amount_cents: Math.round(entry.amount * 100),
+                amount_cents: entry.amount_cents,
               }))
             : undefined,
           assigned_to: assignedTo || undefined,
@@ -171,13 +173,12 @@ export default function NewDebtPage() {
           <div>
             <label className="block text-sm font-medium mb-2">Valor Total (R$) *</label>
             <input
-              type="number"
-              step="0.01"
-              min="0"
+              type="text"
+              inputMode="decimal"
               value={formData.total_amount_cents}
-              onChange={(e) => setFormData({ ...formData, total_amount_cents: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, total_amount_cents: processCurrencyInput(e.target.value) })}
               className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder="0.00"
+              placeholder="0,00"
               required
             />
           </div>
@@ -185,13 +186,12 @@ export default function NewDebtPage() {
           <div>
             <label className="block text-sm font-medium mb-2">Valor Já Pago (R$)</label>
             <input
-              type="number"
-              step="0.01"
-              min="0"
+              type="text"
+              inputMode="decimal"
               value={formData.paid_amount_cents}
-              onChange={(e) => setFormData({ ...formData, paid_amount_cents: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, paid_amount_cents: processCurrencyInput(e.target.value) })}
               className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder="0.00"
+              placeholder="0,00"
             />
           </div>
 
@@ -379,18 +379,17 @@ export default function NewDebtPage() {
                       <div>
                         <label className="block text-sm font-medium mb-2">Valor (R$)</label>
                         <input
-                          type="number"
-                          step="0.01"
-                          min="0"
+                          type="text"
+                          inputMode="decimal"
                           value={entry.amount}
                           onChange={(e) => {
-                            const value = e.target.value;
+                            const value = processCurrencyInput(e.target.value);
                             setPlanEntries((prev) =>
                               prev.map((item, idx) => idx === index ? { ...item, amount: value } : item)
                             );
                           }}
                           className="w-full px-4 py-2 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                          placeholder="0.00"
+                          placeholder="0,00"
                         />
                       </div>
                       <div className="flex gap-2">
@@ -442,13 +441,12 @@ export default function NewDebtPage() {
                   <div>
                     <label className="block text-sm font-medium mb-2">Valor Mensal do Pagamento (R$)</label>
                     <input
-                      type="number"
-                      step="0.01"
-                      min="0"
+                      type="text"
+                      inputMode="decimal"
                       value={formData.monthly_payment_cents}
-                      onChange={(e) => setFormData({ ...formData, monthly_payment_cents: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, monthly_payment_cents: processCurrencyInput(e.target.value) })}
                       className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                      placeholder="0.00"
+                      placeholder="0,00"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
                       Valor mensal calculado automaticamente baseado na frequência, ou defina manualmente

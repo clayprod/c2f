@@ -22,6 +22,7 @@ import { formatMonthYear, formatCurrency } from '@/lib/utils';
 import { InfoIcon } from '@/components/ui/InfoIcon';
 import { useAccountContext } from '@/hooks/useAccountContext';
 import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
+import { buildBrandfetchLogoProxyUrl, getCardBrandDomain } from '@/lib/brandfetch';
 
 interface CreditCard {
   id: string;
@@ -641,6 +642,17 @@ export default function CreditCardsPage() {
     return 'bg-green-500';
   };
 
+  const getCardBrandLogoUrl = (brand: string | null) => {
+    const identifier = getCardBrandDomain(brand || undefined);
+    if (!identifier) return null;
+    return buildBrandfetchLogoProxyUrl({
+      identifier,
+      size: 72,
+      theme: 'light',
+      type: 'logo',
+    });
+  };
+
   const totalLimit = cards.reduce((sum, card) => sum + card.credit_limit_cents, 0);
   const totalUsed = cards.reduce((sum, card) => sum + card.used_limit_cents, 0);
   const totalAvailable = cards.reduce((sum, card) => sum + card.available_limit_cents, 0);
@@ -673,330 +685,6 @@ export default function CreditCardsPage() {
           Novo Cartão
         </Button>
       </div>
-
-      {/* Consolidated Bills */}
-      {cards.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Faturas Consolidadas Card */}
-          <div className="glass-card p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-medium flex items-center gap-2">
-                <i className='bx bx-receipt text-xl'></i>
-                Faturas Consolidadas
-              </h2>
-              <InfoIcon
-                content={
-                  <div className="space-y-2">
-                    <p className="font-semibold">Sobre esta seção:</p>
-                    <ul className="space-y-1.5 text-xs list-disc list-inside">
-                      <li><strong>Total a Pagar:</strong> Soma de todas as faturas dos cartões no mês selecionado.</li>
-                      <li><strong>Total Pago:</strong> Valor já pago das faturas do mês selecionado.</li>
-                      <li><strong>Restante:</strong> Valor que ainda precisa ser pago.</li>
-                      <li><strong>Barra de progresso:</strong> Mostra o percentual já pago da fatura.</li>
-                      <li><strong>Gastos por Categoria:</strong> Distribuição dos gastos do mês selecionado por categoria.</li>
-                      <li>Use o seletor de mês e cartão para visualizar diferentes períodos.</li>
-                    </ul>
-                  </div>
-                }
-              />
-            </div>
-            
-            {/* Filtros compactos lado a lado */}
-            <div className="mb-4 flex gap-2">
-              <div className="flex-1">
-                <MonthYearPicker
-                  value={selectedMonth}
-                  onChange={(value) => {
-                    setSelectedMonth(value);
-                    fetchCurrentMonthBills(cards, value);
-                  }}
-                  className="w-full"
-                />
-              </div>
-              <div className="flex-1">
-                <select
-                  value={selectedCardId}
-                  onChange={(e) => setSelectedCardId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
-                >
-                  <option value="">Todos os cartões</option>
-                  {cards.map((card) => (
-                    <option key={card.id} value={card.id}>
-                      {card.name} {card.last_four_digits ? `**** ${card.last_four_digits}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {currentMonthBills.length > 0 ? (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Total a Pagar</p>
-                    <p className="text-2xl font-bold">{formatCurrency(currentMonthSummary.totalToPay)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Total Pago</p>
-                    <p className="text-2xl font-bold text-positive">{formatCurrency(currentMonthSummary.totalPaid)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Restante</p>
-                    <p className={`text-2xl font-bold ${currentMonthSummary.remaining > 0 ? 'text-orange-500' : 'text-positive'}`}>
-                      {formatCurrency(currentMonthSummary.remaining)}
-                    </p>
-                  </div>
-                </div>
-                {currentMonthSummary.totalToPay > 0 && (
-                  <div className="mb-6">
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-muted-foreground">Progresso de Pagamento</span>
-                      <span className="font-medium">
-                        {Math.round((currentMonthSummary.totalPaid / currentMonthSummary.totalToPay) * 100)}%
-                      </span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-green-500 transition-all"
-                        style={{ width: `${Math.min(100, (currentMonthSummary.totalPaid / currentMonthSummary.totalToPay) * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <i className='bx bx-info-circle text-3xl mb-2'></i>
-                <p>Nenhuma fatura encontrada para o mês selecionado</p>
-              </div>
-            )}
-
-            {/* Gastos por Categoria */}
-            <div className="border-t border-border pt-6">
-              <h3 className="font-medium flex items-center gap-2 mb-4 text-sm">
-                <i className='bx bx-pie-chart text-lg'></i>
-                Gastos por Categoria
-              </h3>
-              {categorySpending.length > 0 ? (
-                <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
-                    <Pie
-                      data={categorySpending}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={70}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {categorySpending.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color || cardColors[index % cardColors.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value: number) => formatCurrency(value)}
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
-                      }}
-                    />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-[250px] text-muted-foreground">
-                  <div className="text-center">
-                    <i className='bx bx-info-circle text-3xl mb-2'></i>
-                    <p className="text-sm">Nenhum gasto por categoria encontrado</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Histórico e Projeção Card */}
-          <div className="glass-card p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-medium flex items-center gap-2">
-                <i className='bx bx-line-chart text-xl'></i>
-                Histórico e Projeção
-              </h2>
-              <InfoIcon
-                content={
-                  <div className="space-y-2">
-                    <p className="font-semibold">Sobre esta seção:</p>
-                    <ul className="space-y-1.5 text-xs list-disc list-inside">
-                      <li><strong>Gráfico de Linha:</strong> Mostra histórico dos últimos meses e projeção dos próximos meses.</li>
-                      <li>As projeções são baseadas em transações parceladas futuras.</li>
-                      <li>A linha tracejada representa valores projetados.</li>
-                    </ul>
-                  </div>
-                }
-              />
-            </div>
-
-            {/* Line Chart - Histórico e Projeção */}
-            <div>
-                {chartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={250}>
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis 
-                        dataKey="month" 
-                        stroke="hsl(var(--muted-foreground))"
-                        style={{ fontSize: '12px' }}
-                      />
-                      <YAxis 
-                        stroke="hsl(var(--muted-foreground))"
-                        style={{ fontSize: '12px' }}
-                        tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
-                      />
-                      <Tooltip
-                        formatter={(value: number) => {
-                          if (value === null || value === undefined || isNaN(value)) {
-                            return 'N/A';
-                          }
-                          return formatCurrency(value * 100);
-                        }}
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--card))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px',
-                        }}
-                      />
-                      <Legend />
-                      
-                      {/* Barra azul transparente para mês corrente */}
-                      {currentMonthIndex >= 0 && currentMonthIndex < chartData.length && (
-                        <ReferenceArea
-                          x1={chartData[currentMonthIndex]?.month}
-                          x2={chartData[currentMonthIndex]?.month}
-                          y1="dataMin"
-                          y2="dataMax"
-                          fill="hsl(var(--primary))"
-                          fillOpacity={0.1}
-                          stroke="none"
-                          ifOverflow="extendDomain"
-                        />
-                      )}
-                      
-                      {/* Linha histórica de Total a Pagar */}
-                      <Line 
-                        type="monotone" 
-                        dataKey="total" 
-                        name="Total a Pagar"
-                        stroke="hsl(var(--primary))" 
-                        strokeWidth={2}
-                        dot={(props: any) => {
-                          const { payload } = props;
-                          if (!payload || payload.total === null || payload.total === undefined) {
-                            // Return an empty SVG element instead of null
-                            return <g />;
-                          }
-                          return (
-                            <circle
-                              cx={props.cx}
-                              cy={props.cy}
-                              r={3}
-                              fill="hsl(var(--primary))"
-                            />
-                          );
-                        }}
-                        connectNulls={true}
-                      />
-                      {/* Linha projetada de Total a Pagar (continuação tracejada) */}
-                      <Line 
-                        type="monotone" 
-                        dataKey="totalProj" 
-                        name="Total a Pagar"
-                        stroke="hsl(var(--primary))" 
-                        strokeWidth={2}
-                        strokeDasharray="5 5"
-                        dot={(props: any) => {
-                          const { payload } = props;
-                          if (!payload || payload.totalProj === null || payload.totalProj === undefined) {
-                            // Return an empty SVG element instead of null
-                            return <g />;
-                          }
-                          return (
-                            <circle
-                              cx={props.cx}
-                              cy={props.cy}
-                              r={3}
-                              fill="hsl(var(--primary))"
-                              fillOpacity={0.5}
-                            />
-                          );
-                        }}
-                        connectNulls={true}
-                        opacity={0.5}
-                        legendType="none"
-                      />
-                      {/* Linha histórica de Total Pago */}
-                      <Line 
-                        type="monotone" 
-                        dataKey="pago" 
-                        name="Total Pago"
-                        stroke="hsl(142, 71%, 45%)" 
-                        strokeWidth={2}
-                        dot={(props: any) => {
-                          const { payload } = props;
-                          if (!payload || payload.pago === null || payload.pago === undefined) {
-                            // Return an empty SVG element instead of null
-                            return <g />;
-                          }
-                          return (
-                            <circle
-                              cx={props.cx}
-                              cy={props.cy}
-                              r={3}
-                              fill="hsl(142, 71%, 45%)"
-                            />
-                          );
-                        }}
-                        connectNulls={true}
-                      />
-                      {/* Linha projetada de Total Pago (continuação tracejada) */}
-                      <Line 
-                        type="monotone" 
-                        dataKey="pagoProj" 
-                        name="Total Pago"
-                        stroke="hsl(142, 71%, 45%)" 
-                        strokeWidth={2}
-                        strokeDasharray="5 5"
-                        dot={(props: any) => {
-                          const { payload } = props;
-                          if (!payload || payload.pagoProj === null || payload.pagoProj === undefined) {
-                            // Return an empty SVG element instead of null
-                            return <g />;
-                          }
-                          return (
-                            <circle
-                              cx={props.cx}
-                              cy={props.cy}
-                              r={3}
-                              fill="hsl(142, 71%, 45%)"
-                              fillOpacity={0.5}
-                            />
-                          );
-                        }}
-                        connectNulls={true}
-                        opacity={0.5}
-                        legendType="none"
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-[250px] text-muted-foreground">
-                    <p className="text-sm">Carregando dados do gráfico...</p>
-                  </div>
-                )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Summary Cards */}
       {cards.length > 0 && (
@@ -1036,7 +724,6 @@ export default function CreditCardsPage() {
           </div>
         </div>
       )}
-
 
       {/* Search */}
       <div className="glass-card p-4">
@@ -1184,42 +871,23 @@ export default function CreditCardsPage() {
 
                     {/* Card Brand Logo */}
                     <div className="flex items-center">
-                      {card.card_brand === 'visa' && (
-                        <div className="text-white font-bold text-base italic tracking-tight" style={{ fontFamily: 'Arial, sans-serif' }}>
-                          VISA
-                        </div>
-                      )}
-                      {card.card_brand === 'mastercard' && (
-                        <div className="flex items-center">
-                          <div className="w-4 h-4 rounded-full bg-red-500 -mr-1.5" />
-                          <div className="w-4 h-4 rounded-full bg-yellow-500 opacity-90" />
-                        </div>
-                      )}
-                      {card.card_brand === 'elo' && (
-                        <div className="flex items-center">
-                          <div className="w-3 h-3 rounded-full bg-yellow-400 -mr-1" />
-                          <div className="w-3 h-3 rounded-full bg-red-500 -mr-1" />
-                          <div className="w-3 h-3 rounded-full bg-blue-500" />
-                        </div>
-                      )}
-                      {card.card_brand === 'amex' && (
-                        <div className="text-white font-bold text-[10px] tracking-wider">
-                          AMEX
-                        </div>
-                      )}
-                      {card.card_brand === 'hipercard' && (
-                        <div className="text-white font-bold text-[10px] tracking-wider text-red-400">
-                          HIPER
-                        </div>
-                      )}
-                      {card.card_brand === 'diners' && (
-                        <div className="text-white font-bold text-[10px] tracking-wider">
-                          DINERS
-                        </div>
-                      )}
-                      {(!card.card_brand || card.card_brand === 'other') && (
-                        <span className="text-lg">{card.icon || '💳'}</span>
-                      )}
+                      {(() => {
+                        const brandLogo = getCardBrandLogoUrl(card.card_brand);
+                        if (brandLogo) {
+                          return (
+                            <img
+                              src={brandLogo}
+                              alt={card.card_brand || 'Bandeira'}
+                              className="h-5 w-auto object-contain"
+                            />
+                          );
+                        }
+                        return (
+                          <span className="text-[10px] font-semibold tracking-wider text-white/80">
+                            {(card.card_brand || 'CARD').toUpperCase()}
+                          </span>
+                        );
+                      })()}
                     </div>
                   </div>
 
@@ -1398,6 +1066,320 @@ export default function CreditCardsPage() {
             </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Faturas Consolidadas e Histórico */}
+      {cards.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Faturas Consolidadas Card - 1/3 da largura */}
+          <div className="glass-card p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-medium flex items-center gap-2">
+                <i className='bx bx-receipt text-xl'></i>
+                Faturas Consolidadas
+              </h2>
+              <InfoIcon
+                content={
+                  <div className="space-y-2">
+                    <p className="font-semibold">Sobre esta seção:</p>
+                    <ul className="space-y-1.5 text-xs list-disc list-inside">
+                      <li><strong>Total a Pagar:</strong> Soma de todas as faturas dos cartões no mês selecionado.</li>
+                      <li><strong>Total Pago:</strong> Valor já pago das faturas do mês selecionado.</li>
+                      <li><strong>Restante:</strong> Valor que ainda precisa ser pago.</li>
+                      <li><strong>Barra de progresso:</strong> Mostra o percentual já pago da fatura.</li>
+                      <li><strong>Gastos por Categoria:</strong> Distribuição dos gastos do mês selecionado por categoria.</li>
+                      <li>Use o seletor de mês e cartão para visualizar diferentes períodos.</li>
+                    </ul>
+                  </div>
+                }
+              />
+            </div>
+
+            {/* Filtros compactos empilhados */}
+            <div className="mb-4 space-y-2">
+              <MonthYearPicker
+                value={selectedMonth}
+                onChange={(value) => {
+                  setSelectedMonth(value);
+                  fetchCurrentMonthBills(cards, value);
+                }}
+                className="w-full"
+              />
+              <select
+                value={selectedCardId}
+                onChange={(e) => setSelectedCardId(e.target.value)}
+                className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+              >
+                <option value="">Todos os cartões</option>
+                {cards.map((card) => (
+                  <option key={card.id} value={card.id}>
+                    {card.name} {card.last_four_digits ? `**** ${card.last_four_digits}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {currentMonthBills.length > 0 ? (
+              <>
+                <div className="space-y-3 mb-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Total a Pagar</p>
+                    <p className="text-2xl font-bold">{formatCurrency(currentMonthSummary.totalToPay)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Total Pago</p>
+                    <p className="text-xl font-bold text-positive">{formatCurrency(currentMonthSummary.totalPaid)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Restante</p>
+                    <p className={`text-xl font-bold ${currentMonthSummary.remaining > 0 ? 'text-orange-500' : 'text-positive'}`}>
+                      {formatCurrency(currentMonthSummary.remaining)}
+                    </p>
+                  </div>
+                </div>
+                {currentMonthSummary.totalToPay > 0 && (
+                  <div className="mb-4">
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="text-muted-foreground">Progresso</span>
+                      <span className="font-medium">
+                        {Math.round((currentMonthSummary.totalPaid / currentMonthSummary.totalToPay) * 100)}%
+                      </span>
+                    </div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-green-500 transition-all"
+                        style={{ width: `${Math.min(100, (currentMonthSummary.totalPaid / currentMonthSummary.totalToPay) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                <i className='bx bx-info-circle text-2xl mb-2'></i>
+                <p className="text-sm">Nenhuma fatura para o mês selecionado</p>
+              </div>
+            )}
+
+            {/* Gastos por Categoria - Compacto */}
+            <div className="border-t border-border pt-4">
+              <h3 className="font-medium flex items-center gap-2 mb-3 text-sm">
+                <i className='bx bx-pie-chart text-lg'></i>
+                Por Categoria
+              </h3>
+              {categorySpending.length > 0 ? (
+                <ResponsiveContainer width="100%" height={180}>
+                  <PieChart>
+                    <Pie
+                      data={categorySpending}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={60}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {categorySpending.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color || cardColors[index % cardColors.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: number) => formatCurrency(value)}
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[180px] text-muted-foreground">
+                  <div className="text-center">
+                    <i className='bx bx-info-circle text-2xl mb-2'></i>
+                    <p className="text-xs">Sem gastos por categoria</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Histórico e Projeção Card - 2/3 da largura */}
+          <div className="glass-card p-6 lg:col-span-2">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-medium flex items-center gap-2">
+                <i className='bx bx-line-chart text-xl'></i>
+                Histórico e Projeção
+              </h2>
+              <InfoIcon
+                content={
+                  <div className="space-y-2">
+                    <p className="font-semibold">Sobre esta seção:</p>
+                    <ul className="space-y-1.5 text-xs list-disc list-inside">
+                      <li><strong>Gráfico de Linha:</strong> Mostra histórico dos últimos meses e projeção dos próximos meses.</li>
+                      <li>As projeções são baseadas em transações parceladas futuras.</li>
+                      <li>A linha tracejada representa valores projetados.</li>
+                    </ul>
+                  </div>
+                }
+              />
+            </div>
+
+            {/* Line Chart - Histórico e Projeção */}
+            <div>
+                {chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis
+                        dataKey="month"
+                        stroke="hsl(var(--muted-foreground))"
+                        style={{ fontSize: '12px' }}
+                      />
+                      <YAxis
+                        stroke="hsl(var(--muted-foreground))"
+                        style={{ fontSize: '12px' }}
+                        tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                      />
+                      <Tooltip
+                        formatter={(value: number) => {
+                          if (value === null || value === undefined || isNaN(value)) {
+                            return 'N/A';
+                          }
+                          return formatCurrency(value * 100);
+                        }}
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px',
+                        }}
+                      />
+                      <Legend />
+
+                      {/* Barra azul transparente para mês corrente */}
+                      {currentMonthIndex >= 0 && currentMonthIndex < chartData.length && (
+                        <ReferenceArea
+                          x1={chartData[currentMonthIndex]?.month}
+                          x2={chartData[currentMonthIndex]?.month}
+                          y1="dataMin"
+                          y2="dataMax"
+                          fill="hsl(var(--primary))"
+                          fillOpacity={0.1}
+                          stroke="none"
+                          ifOverflow="extendDomain"
+                        />
+                      )}
+
+                      {/* Linha histórica de Total a Pagar */}
+                      <Line
+                        type="monotone"
+                        dataKey="total"
+                        name="Total a Pagar"
+                        stroke="hsl(var(--primary))"
+                        strokeWidth={2}
+                        dot={(props: any) => {
+                          const { payload } = props;
+                          if (!payload || payload.total === null || payload.total === undefined) {
+                            return <g />;
+                          }
+                          return (
+                            <circle
+                              cx={props.cx}
+                              cy={props.cy}
+                              r={3}
+                              fill="hsl(var(--primary))"
+                            />
+                          );
+                        }}
+                        connectNulls={true}
+                      />
+                      {/* Linha projetada de Total a Pagar (continuação tracejada) */}
+                      <Line
+                        type="monotone"
+                        dataKey="totalProj"
+                        name="Total a Pagar"
+                        stroke="hsl(var(--primary))"
+                        strokeWidth={2}
+                        strokeDasharray="5 5"
+                        dot={(props: any) => {
+                          const { payload } = props;
+                          if (!payload || payload.totalProj === null || payload.totalProj === undefined) {
+                            return <g />;
+                          }
+                          return (
+                            <circle
+                              cx={props.cx}
+                              cy={props.cy}
+                              r={3}
+                              fill="hsl(var(--primary))"
+                              fillOpacity={0.5}
+                            />
+                          );
+                        }}
+                        connectNulls={true}
+                        opacity={0.5}
+                        legendType="none"
+                      />
+                      {/* Linha histórica de Total Pago */}
+                      <Line
+                        type="monotone"
+                        dataKey="pago"
+                        name="Total Pago"
+                        stroke="hsl(142, 71%, 45%)"
+                        strokeWidth={2}
+                        dot={(props: any) => {
+                          const { payload } = props;
+                          if (!payload || payload.pago === null || payload.pago === undefined) {
+                            return <g />;
+                          }
+                          return (
+                            <circle
+                              cx={props.cx}
+                              cy={props.cy}
+                              r={3}
+                              fill="hsl(142, 71%, 45%)"
+                            />
+                          );
+                        }}
+                        connectNulls={true}
+                      />
+                      {/* Linha projetada de Total Pago (continuação tracejada) */}
+                      <Line
+                        type="monotone"
+                        dataKey="pagoProj"
+                        name="Total Pago"
+                        stroke="hsl(142, 71%, 45%)"
+                        strokeWidth={2}
+                        strokeDasharray="5 5"
+                        dot={(props: any) => {
+                          const { payload } = props;
+                          if (!payload || payload.pagoProj === null || payload.pagoProj === undefined) {
+                            return <g />;
+                          }
+                          return (
+                            <circle
+                              cx={props.cx}
+                              cy={props.cy}
+                              r={3}
+                              fill="hsl(142, 71%, 45%)"
+                              fillOpacity={0.5}
+                            />
+                          );
+                        }}
+                        connectNulls={true}
+                        opacity={0.5}
+                        legendType="none"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                    <p className="text-sm">Carregando dados do gráfico...</p>
+                  </div>
+                )}
+            </div>
+          </div>
         </div>
       )}
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -82,6 +82,7 @@ export default function BudgetsPage() {
   const [filterSource, setFilterSource] = useState<'all' | 'general' | 'credit_card' | 'investment' | 'goal' | 'debt'>('all');
   const [showMissingBudgetAlert, setShowMissingBudgetAlert] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
+  const fetchCounterRef = useRef(0);
   const { toast } = useToast();
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const { context: accountContext, activeAccountId } = useAccountContext();
@@ -128,7 +129,7 @@ export default function BudgetsPage() {
   useRealtimeCashflowUpdates({
     ownerId,
     onRefresh: () => {
-      fetchBudgets();
+      fetchBudgets({ forceRefresh: true });
       fetchCategories();
     },
     tables: [
@@ -211,13 +212,19 @@ export default function BudgetsPage() {
     }
   };
 
-  const fetchBudgets = async () => {
+  const fetchBudgets = async (options?: { forceRefresh?: boolean }) => {
+    const fetchId = ++fetchCounterRef.current;
     try {
       setLoading(true);
+      const refreshParam = options?.forceRefresh ? '&refresh=true' : '';
       // Always include projections to get automatic budgets (goals, debts, investments, credit cards, receivables)
-      const url = `/api/budgets?month=${selectedMonth}&include_projections=true&start_month=${selectedMonth}&end_month=${selectedMonth}`;
+      const url = `/api/budgets?month=${selectedMonth}&include_projections=true&start_month=${selectedMonth}&end_month=${selectedMonth}${refreshParam}`;
       const res = await fetch(url);
       const data = await res.json();
+
+      if (fetchId !== fetchCounterRef.current) {
+        return;
+      }
 
       // The API returns { budgets: [...], monthly_totals: {...} } when include_projections=true
       if (data.data?.budgets) {
@@ -228,7 +235,9 @@ export default function BudgetsPage() {
     } catch (error) {
       console.error('Error fetching budgets:', error);
     } finally {
-      setLoading(false);
+      if (fetchId === fetchCounterRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -264,7 +273,7 @@ export default function BudgetsPage() {
       description: 'Orçamento criado com sucesso',
     });
     // Refresh budgets to update the UI
-    await fetchBudgets();
+    await fetchBudgets({ forceRefresh: true });
   };
 
   const handleCreateBudgetWithBreakdown = async (
@@ -295,7 +304,7 @@ export default function BudgetsPage() {
       title: 'Sucesso',
       description: 'Orçamento criado com sucesso',
     });
-    await fetchBudgets();
+    await fetchBudgets({ forceRefresh: true });
   };
 
   const handleUpdateBudget = async (budgetId: string, value: number) => {
@@ -316,7 +325,7 @@ export default function BudgetsPage() {
       throw error;
     }
 
-    await fetchBudgets();
+    await fetchBudgets({ forceRefresh: true });
     toast({
       title: 'Sucesso',
       description: 'Orçamento atualizado com sucesso',
@@ -349,7 +358,7 @@ export default function BudgetsPage() {
       throw error;
     }
 
-    await fetchBudgets();
+    await fetchBudgets({ forceRefresh: true });
     toast({
       title: 'Sucesso',
       description: 'Orçamento atualizado com sucesso',
@@ -384,7 +393,7 @@ export default function BudgetsPage() {
         description: 'Orçamento excluído com sucesso',
       });
 
-      await fetchBudgets();
+      await fetchBudgets({ forceRefresh: true });
     } catch (error: any) {
       toast({
         title: 'Falha ao excluir orçamento',
@@ -445,7 +454,7 @@ export default function BudgetsPage() {
         description: `${data.deleted_count || manualBudgets.length} orçamento(s) do mês de ${getMonthLabel(selectedMonth)} excluído(s) com sucesso`,
       });
 
-      await fetchBudgets();
+      await fetchBudgets({ forceRefresh: true });
     } catch (error: any) {
       toast({
         title: 'Falha ao excluir orçamentos',

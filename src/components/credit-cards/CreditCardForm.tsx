@@ -17,11 +17,15 @@ import { MonthYearPicker } from '@/components/ui/month-year-picker';
 import { useToast } from '@/hooks/use-toast';
 import { useMembers } from '@/hooks/useMembers';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import InstitutionSelect, { type InstitutionSelection } from '@/components/brandfetch/InstitutionSelect';
 
 interface CreditCard {
   id: string;
   name: string;
   institution: string | null;
+  institution_domain?: string | null;
+  institution_brand_id?: string | null;
+  institution_primary_color?: string | null;
   last_four_digits: string | null;
   card_brand: string | null;
   credit_limit_cents: number;
@@ -61,10 +65,14 @@ export default function CreditCardForm({
   cardBrands,
   cardColors,
 }: CreditCardFormProps) {
+  const defaultCardColor = cardColors[0] || '#1a1a2e';
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     institution: '',
+    institution_domain: '',
+    institution_brand_id: '',
+    institution_primary_color: '',
     last_four_digits: '',
     card_brand: 'visa',
     credit_limit: '',
@@ -74,7 +82,7 @@ export default function CreditCardForm({
     expiration_month: '', // Display format YYYY-MM for month input
     interest_rate_monthly: '',
     interest_rate_annual: '',
-    color: '#1a1a2e',
+    color: defaultCardColor,
     is_default: false,
   });
   const { toast } = useToast();
@@ -93,6 +101,9 @@ export default function CreditCardForm({
       setFormData({
         name: card.name,
         institution: card.institution || '',
+        institution_domain: card.institution_domain || '',
+        institution_brand_id: card.institution_brand_id || '',
+        institution_primary_color: card.institution_primary_color || '',
         last_four_digits: card.last_four_digits || '',
         card_brand: card.card_brand || 'visa',
         credit_limit: (card.credit_limit_cents / 100).toFixed(2),
@@ -102,13 +113,16 @@ export default function CreditCardForm({
         expiration_month: expirationMonth,
         interest_rate_monthly: card.interest_rate_monthly ? String(card.interest_rate_monthly) : '',
         interest_rate_annual: card.interest_rate_annual ? String(card.interest_rate_annual) : '',
-        color: card.color || '#1a1a2e',
+        color: card.color || card.institution_primary_color || defaultCardColor,
         is_default: card.is_default,
       });
     } else {
       setFormData({
         name: '',
         institution: '',
+        institution_domain: '',
+        institution_brand_id: '',
+        institution_primary_color: '',
         last_four_digits: '',
         card_brand: 'visa',
         credit_limit: '',
@@ -118,12 +132,23 @@ export default function CreditCardForm({
         expiration_month: '',
         interest_rate_monthly: '',
         interest_rate_annual: '',
-        color: '#1a1a2e',
+        color: defaultCardColor,
         is_default: false,
       });
       setAssignedTo('');
     }
   }, [card, open]);
+
+  const handleInstitutionChange = (selection: InstitutionSelection) => {
+    setFormData((prev) => ({
+      ...prev,
+      institution: selection.name,
+      institution_domain: selection.domain || '',
+      institution_brand_id: selection.brandId || '',
+      institution_primary_color: selection.primaryColor || '',
+      color: selection.primaryColor || prev.color || defaultCardColor,
+    }));
+  };
 
   const handleSubmit = async () => {
     if (!formData.name.trim()) {
@@ -185,6 +210,9 @@ export default function CreditCardForm({
       const payload = {
         name: formData.name.trim(),
         institution: formData.institution.trim() || null,
+        institution_domain: formData.institution_domain || null,
+        institution_brand_id: formData.institution_brand_id || null,
+        institution_primary_color: formData.institution_primary_color || null,
         last_four_digits: formData.last_four_digits || null,
         card_brand: formData.card_brand,
         credit_limit_cents: Math.round(parseFloat(formData.credit_limit) * 100),
@@ -249,12 +277,17 @@ export default function CreditCardForm({
               />
             </div>
             <div className="col-span-2 sm:col-span-1">
-              <Label htmlFor="institution">Instituicao</Label>
-              <Input
-                id="institution"
-                value={formData.institution}
-                onChange={(e) => setFormData({ ...formData, institution: e.target.value })}
-                placeholder="Ex: Nubank, Banco do Brasil..."
+              <InstitutionSelect
+                label="Instituição"
+                placeholder="Busque a instituição"
+                value={{
+                  name: formData.institution,
+                  domain: formData.institution_domain || undefined,
+                  brandId: formData.institution_brand_id || undefined,
+                  primaryColor: formData.institution_primary_color || undefined,
+                  isManual: !formData.institution_domain && !!formData.institution,
+                }}
+                onChange={handleInstitutionChange}
               />
             </div>
           </div>
@@ -402,7 +435,6 @@ export default function CreditCardForm({
                 ))}
               </div>
             </div>
-
           </div>
 
           {/* Preview */}

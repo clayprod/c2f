@@ -72,6 +72,11 @@ export async function POST(request: NextRequest) {
       current_balance: initialBalanceCents / 100, // Convert cents to NUMERIC (reais)
       currency: validated.currency,
       institution: validated.institution,
+      institution_domain: validated.institution_domain,
+      institution_brand_id: validated.institution_brand_id,
+      institution_primary_color: validated.institution_primary_color,
+      color: validated.color,
+      icon: validated.icon,
       user_id: ownerId,
     };
 

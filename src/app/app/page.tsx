@@ -298,8 +298,9 @@ export default function DashboardPage() {
       const currentMonth = brazilDate.getMonth();
 
       // Buscar mais dados baseado no agrupamento
-      const monthsBack = groupBy === 'year' ? 180 : (groupBy === 'quarter' ? 48 : 24);
-      const monthsForward = groupBy === 'year' ? 180 : (groupBy === 'quarter' ? 48 : 24);
+      // Reduzido para melhorar performance (antes: year=180, quarter=48)
+      const monthsBack = groupBy === 'year' ? 36 : (groupBy === 'quarter' ? 24 : 12);
+      const monthsForward = groupBy === 'year' ? 12 : (groupBy === 'quarter' ? 12 : 12);
 
       // Start: monthsBack months back from current
       const startDate = new Date(currentYear, currentMonth - monthsBack, 1);
@@ -322,10 +323,16 @@ export default function DashboardPage() {
 
       const result = await res.json();
       if (result.data?.monthly_totals) {
-        setCashFlowData(result.data.monthly_totals);
+        const totals = result.data.monthly_totals;
+        const keys = Object.keys(totals);
+        console.log('[DASHBOARD] Received monthly_totals:', keys.length, 'months, sample:',
+          keys.slice(0, 2).map(k => ({ month: k, ...totals[k] })));
+        setCashFlowData(totals);
+      } else {
+        console.warn('[DASHBOARD] No monthly_totals in response:', result);
       }
     } catch (error) {
-      console.error('Error fetching cash flow data:', error);
+      console.error('[DASHBOARD] Error fetching cash flow data:', error);
     } finally {
       setCashFlowLoading(false);
     }
@@ -373,6 +380,10 @@ export default function DashboardPage() {
   });
 
   const chartData = useMemo(() => {
+    const cashFlowKeys = Object.keys(cashFlowData);
+    console.log('[DASHBOARD] chartData useMemo recalculating, groupBy:', groupBy,
+      'cashFlowData keys:', cashFlowKeys.length);
+
     // Usar timezone do Brasil (UTC-3) para determinar o mês atual
     const today = new Date();
     const brazilDate = new Date(today.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
@@ -381,9 +392,9 @@ export default function DashboardPage() {
     const currentQuarter = Math.ceil(currentMonth / 3);
 
     // Buscar mais dados para permitir navegação
-    // Para anos, precisamos de mais dados
-    const totalMonthsBack = groupBy === 'year' ? 180 : (groupBy === 'quarter' ? 48 : 24);
-    const totalMonthsForward = groupBy === 'year' ? 180 : (groupBy === 'quarter' ? 48 : 24);
+    // Range de dados (deve corresponder ao fetch)
+    const totalMonthsBack = groupBy === 'year' ? 36 : (groupBy === 'quarter' ? 24 : 12);
+    const totalMonthsForward = groupBy === 'year' ? 12 : (groupBy === 'quarter' ? 12 : 12);
 
     const startDate = new Date(currentYear, currentMonth - 1 - totalMonthsBack, 1);
     const endDate = new Date(currentYear, currentMonth - 1 + totalMonthsForward, 1);
@@ -429,9 +440,21 @@ export default function DashboardPage() {
       let income: number;
       let expenses: number;
 
+      let plannedIncomeCents = totals.planned_income || 0;
+      let plannedExpensesCents = totals.planned_expenses || 0;
+      const actualIncomeCents = totals.actual_income || 0;
+      const actualExpensesCents = totals.actual_expenses || 0;
+
       if (isCurrentMonth) {
-        income = totals.actual_income > 0 ? totals.actual_income : totals.planned_income;
-        expenses = totals.actual_expenses > 0 ? totals.actual_expenses : totals.planned_expenses;
+        plannedIncomeCents = Math.max(plannedIncomeCents, actualIncomeCents) - actualIncomeCents;
+        plannedExpensesCents = Math.max(plannedExpensesCents, actualExpensesCents) - actualExpensesCents;
+        plannedIncomeCents = Math.max(0, plannedIncomeCents);
+        plannedExpensesCents = Math.max(0, plannedExpensesCents);
+      }
+
+      if (isCurrentMonth) {
+        income = actualIncomeCents > 0 ? actualIncomeCents : (totals.planned_income || 0);
+        expenses = actualExpensesCents > 0 ? actualExpensesCents : (totals.planned_expenses || 0);
       } else if (isProjected) {
         income = totals.planned_income;
         expenses = totals.planned_expenses;
@@ -448,10 +471,10 @@ export default function DashboardPage() {
         balance: (income - expenses) / 100,
         isCurrentMonth,
         isProjected: isProjected && !isCurrentMonth,
-        income_actual: totals.actual_income / 100,
-        income_planned: totals.planned_income / 100,
-        expenses_actual: totals.actual_expenses / 100,
-        expenses_planned: totals.planned_expenses / 100,
+        income_actual: actualIncomeCents / 100,
+        income_planned: plannedIncomeCents / 100,
+        expenses_actual: actualExpensesCents / 100,
+        expenses_planned: plannedExpensesCents / 100,
         year,
         monthNum: month,
         quarter,
@@ -527,7 +550,10 @@ export default function DashboardPage() {
       group.balance = group.income - group.expenses;
     }
 
-    return Array.from(groupedData.values());
+    const result = Array.from(groupedData.values());
+    console.log('[DASHBOARD] chartData result:', result.length, 'items, sample:',
+      result.slice(0, 2).map(r => ({ month: r.month, income: r.income, expenses: r.expenses })));
+    return result;
   }, [cashFlowData, groupBy]);
 
   const projectedBalance = useMemo(() => {

@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { PLAN_PRICE_IDS } from './client';
 import { getOrCreateStripeCustomer } from './customer';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { AppError } from '@/lib/errors';
 
 export async function getUserPlan(userId: string): Promise<{
   plan: 'free' | 'pro' | 'premium';
@@ -149,14 +150,21 @@ export async function createPortalSession(
     .from('billing_customers')
     .select('stripe_customer_id')
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
 
-  if (!customer) {
-    throw new Error('Customer not found');
+  let stripeCustomerId = customer?.stripe_customer_id || null;
+
+  if (!stripeCustomerId) {
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData?.user?.email) {
+      throw new AppError('User email not found', 400, 'user_email_not_found');
+    }
+
+    stripeCustomerId = await getOrCreateStripeCustomer(userId, authData.user.email);
   }
 
   const session = await stripe.billingPortal.sessions.create({
-    customer: customer.stripe_customer_id,
+    customer: stripeCustomerId,
     return_url: returnUrl,
   });
 

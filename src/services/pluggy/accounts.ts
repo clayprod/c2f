@@ -1,3 +1,4 @@
+import { buildBrandfetchLogoProxyUrl } from '@/lib/brandfetch';
 import { pluggyClient } from './client';
 
 export interface PluggyAccount {
@@ -44,19 +45,48 @@ export function getAccountBalance(balance: PluggyAccount['balance']): number {
  * This is important when using MeuPluggy aggregator, as the item connector is always 200,
  * but the account connector contains the real institution info
  */
+function normalizeDomainFromUrl(url?: string | null): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+}
+
+function isMeuPluggyConnector(connector?: PluggyAccount['connector']): boolean {
+  const name = connector?.name?.toLowerCase() || '';
+  const url = connector?.institutionUrl?.toLowerCase() || '';
+  return name.includes('meupluggy') || url.includes('meupluggy');
+}
+
 export function getAccountLogoUrl(account: PluggyAccount): string | null {
-  // First try to get imageUrl directly from connector (may be CDN URL)
-  if (account.connector?.imageUrl) {
-    // If it's a CDN URL, convert to local if we have the connector ID
-    if (account.connector.imageUrl.includes('cdn.pluggy.ai') && account.connector.id) {
-      return `/assets/connector-icons/${account.connector.id}.svg`;
+  const connector = account.connector;
+  const domain = normalizeDomainFromUrl(connector?.institutionUrl);
+
+  if (domain && !isMeuPluggyConnector(connector)) {
+    return buildBrandfetchLogoProxyUrl({
+      identifier: `domain/${domain}`,
+      size: 64,
+      theme: 'dark',
+      type: 'icon',
+    });
+  }
+
+  // Fallback to imageUrl directly from connector (may be CDN URL)
+  if (connector?.imageUrl) {
+    if (connector.imageUrl.includes('cdn.pluggy.ai') && connector.id) {
+      return `/assets/connector-icons/${connector.id}.svg`;
     }
-    return account.connector.imageUrl;
+    return connector.imageUrl;
   }
+
   // Then try to build from connector id (use local assets)
-  if (account.connector?.id) {
-    return `/assets/connector-icons/${account.connector.id}.svg`;
+  if (connector?.id) {
+    return `/assets/connector-icons/${connector.id}.svg`;
   }
+
   return null;
 }
 

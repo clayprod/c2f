@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { pluggyClient } from '@/services/pluggy/client';
+import { getAccountLogoUrl } from '@/services/pluggy/accounts';
 import { getInstitutionLogoUrl, extractBankCode, getConnectorIdFromBankCode, getConnectorIdFromName } from '@/services/pluggy/bankMapping';
 
 /**
@@ -45,20 +46,8 @@ export async function POST(request: NextRequest) {
           const transferNumber = apiAccount.bankData?.transferNumber;
           const bankCode = extractBankCode(transferNumber);
           
-          // Try to get logo URL using bank code mapping or name matching
-          let logoUrl = getInstitutionLogoUrl(apiAccount.name, transferNumber);
-          
-          // Fallback: if API returns connector info, use it (convert to local if CDN)
-          if (!logoUrl && apiAccount.connector?.imageUrl) {
-            // Convert CDN URL to local if possible
-            if (apiAccount.connector.imageUrl.includes('cdn.pluggy.ai') && apiAccount.connector.id) {
-              logoUrl = `/assets/connector-icons/${apiAccount.connector.id}.svg`;
-            } else {
-              logoUrl = apiAccount.connector.imageUrl;
-            }
-          } else if (!logoUrl && apiAccount.connector?.id) {
-            logoUrl = `/assets/connector-icons/${apiAccount.connector.id}.svg`;
-          }
+          // Try Brandfetch via connector institutionUrl (skips MeuPluggy), then fallback to mapping
+          let logoUrl = getAccountLogoUrl(apiAccount) || getInstitutionLogoUrl(apiAccount.name, transferNumber);
           
           const connectorIdFromBank = getConnectorIdFromBankCode(bankCode);
           const connectorIdFromName = getConnectorIdFromName(apiAccount.name);

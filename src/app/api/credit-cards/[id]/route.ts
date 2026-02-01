@@ -94,6 +94,9 @@ export async function PATCH(
     const updateData: Record<string, unknown> = {};
     if (validated.name !== undefined) updateData.name = validated.name;
     if (validated.institution !== undefined) updateData.institution = validated.institution;
+    if (validated.institution_domain !== undefined) updateData.institution_domain = validated.institution_domain;
+    if (validated.institution_brand_id !== undefined) updateData.institution_brand_id = validated.institution_brand_id;
+    if (validated.institution_primary_color !== undefined) updateData.institution_primary_color = validated.institution_primary_color;
     if (validated.last_four_digits !== undefined) {
       updateData.last_four_digits = validated.last_four_digits && validated.last_four_digits.trim() !== '' 
         ? validated.last_four_digits 

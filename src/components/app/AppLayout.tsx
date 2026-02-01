@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { PremiumUpgradeTooltip } from '@/components/ui/PremiumUpgradeTooltip';
+import { buildBrandfetchLogoProxyUrl } from '@/lib/brandfetch';
 
 
 interface AppLayoutProps {
@@ -46,6 +47,8 @@ interface BankAccount {
   icon?: string | null;
   color?: string | null;
   institution?: string | null;
+  institution_domain?: string | null;
+  institution_primary_color?: string | null;
 }
 
 interface CreditCard {
@@ -55,6 +58,8 @@ interface CreditCard {
   credit_limit: number;
   icon?: string | null;
   color?: string | null;
+  institution_domain?: string | null;
+  institution_primary_color?: string | null;
 }
 
 interface CreditCardBill {
@@ -391,17 +396,17 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
       const { data: bankAccounts } = await supabase
         .from('accounts')
-        .select('id, name, current_balance, type, icon, color, institution')
+        .select('id, name, current_balance, type, icon, color, institution, institution_domain, institution_primary_color')
         .eq('user_id', ownerId)
         .neq('type', 'credit_card')
-        .order('name');
+        .order('current_balance', { ascending: false });
 
       const { data: creditCards } = await supabase
         .from('accounts')
-        .select('id, name, current_balance, credit_limit, icon, color')
+        .select('id, name, current_balance, credit_limit, icon, color, institution_domain, institution_primary_color')
         .eq('user_id', ownerId)
         .eq('type', 'credit_card')
-        .order('name');
+        .order('current_balance', { ascending: false });
 
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -415,9 +420,26 @@ export default function AppLayout({ children }: AppLayoutProps) {
         .lte('closing_date', endOfMonth)
         .not('status', 'eq', 'paid');
 
+      const bankAccountsSorted = [...(bankAccounts || [])].sort(
+        (a, b) => (b.current_balance ?? 0) - (a.current_balance ?? 0)
+      );
+
+      const billAmountByAccountId = new Map(
+        (bills || []).map((bill) => [
+          bill.account_id,
+          (bill.total_cents ?? 0) - (bill.paid_cents ?? 0),
+        ])
+      );
+
+      const creditCardsSorted = [...(creditCards || [])].sort(
+        (a, b) =>
+          (billAmountByAccountId.get(b.id) ?? 0) -
+          (billAmountByAccountId.get(a.id) ?? 0)
+      );
+
       setAccountSummary({
-        bankAccounts: bankAccounts || [],
-        creditCards: creditCards || [],
+        bankAccounts: bankAccountsSorted,
+        creditCards: creditCardsSorted,
         creditCardBills: bills || [],
       });
     } catch (error) {
@@ -628,12 +650,35 @@ export default function AppLayout({ children }: AppLayoutProps) {
                       onClick={() => setSidebarOpen(false)}
                       className="flex items-center gap-3 px-4 py-2 hover:bg-muted/50 transition-colors"
                     >
-                      <div
-                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                        style={{ backgroundColor: (account.color || '#10b981') + '20' }}
-                      >
-                        <span className="text-sm">{account.icon || '🏦'}</span>
-                      </div>
+                      {(() => {
+                        const logo = account.institution_domain
+                          ? buildBrandfetchLogoProxyUrl({
+                              identifier: `domain/${account.institution_domain}`,
+                              size: 28,
+                              theme: 'dark',
+                              type: 'icon',
+                            })
+                          : null;
+                        const hasLogo = !!logo;
+                        return (
+                          <div
+                            className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
+                              hasLogo ? 'overflow-hidden' : ''
+                            }`}
+                            style={{
+                              backgroundColor: hasLogo
+                                ? 'transparent'
+                                : `${account.institution_primary_color || account.color || '#10b981'}20`,
+                            }}
+                          >
+                            {logo ? (
+                              <img src={logo} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-sm">{account.icon || '🏦'}</span>
+                            )}
+                          </div>
+                        );
+                      })()}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{account.name}</p>
                         {account.institution && (
@@ -670,12 +715,35 @@ export default function AppLayout({ children }: AppLayoutProps) {
                         onClick={() => setSidebarOpen(false)}
                         className="flex items-center gap-3 px-4 py-2 hover:bg-muted/50 transition-colors"
                       >
-                        <div
-                          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                          style={{ backgroundColor: (card.color || '#ef4444') + '20' }}
-                        >
-                          <span className="text-sm">{card.icon || '💳'}</span>
-                        </div>
+                        {(() => {
+                          const logo = card.institution_domain
+                            ? buildBrandfetchLogoProxyUrl({
+                                identifier: `domain/${card.institution_domain}`,
+                                size: 28,
+                                theme: 'dark',
+                                type: 'icon',
+                              })
+                            : null;
+                          const hasLogo = !!logo;
+                          return (
+                            <div
+                              className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                hasLogo ? 'overflow-hidden' : ''
+                              }`}
+                              style={{
+                                backgroundColor: hasLogo
+                                  ? 'transparent'
+                                  : `${card.institution_primary_color || card.color || '#ef4444'}20`,
+                              }}
+                            >
+                              {logo ? (
+                                <img src={logo} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="text-sm">{card.icon || '💳'}</span>
+                              )}
+                            </div>
+                          );
+                        })()}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{card.name}</p>
                           <p className={`text-xs ${billAmount > 0 ? 'text-rose-500' : 'text-muted-foreground'}`}>

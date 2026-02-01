@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { pluggyClient } from '@/services/pluggy/client';
+import { getAccountLogoUrl } from '@/services/pluggy/accounts';
+import { getInstitutionLogoUrl } from '@/services/pluggy/bankMapping';
 
 /**
  * Get Pluggy accounts that are not yet linked to internal accounts
@@ -40,6 +43,45 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch accounts', details: pluggyError.message }, { status: 500 });
     }
 
+    // Refresh logos using Pluggy API (Brandfetch when available)
+    const accountByExternalId = new Map(
+      (pluggyAccounts || []).map((acc: any) => [acc.pluggy_account_id, acc])
+    );
+    const logoByAccountId = new Map<string, string>();
+    const itemIds = [
+      ...new Set((pluggyAccounts || []).map((acc: any) => acc.item_id).filter(Boolean)),
+    ];
+
+    for (const itemId of itemIds) {
+      try {
+        const response = await pluggyClient.get<{ results: any[] }>(`/accounts?itemId=${itemId}`);
+        for (const apiAccount of response.results || []) {
+          const dbAccount = accountByExternalId.get(apiAccount.id);
+          if (!dbAccount) continue;
+
+          const transferNumber = apiAccount.bankData?.transferNumber;
+          const logoUrl =
+            getAccountLogoUrl(apiAccount) ||
+            getInstitutionLogoUrl(apiAccount.name, transferNumber);
+
+          if (!logoUrl) continue;
+
+          logoByAccountId.set(dbAccount.id, logoUrl);
+
+          const { error: updateError } = await supabase
+            .from('pluggy_accounts')
+            .update({ institution_logo: logoUrl })
+            .eq('id', dbAccount.id);
+
+          if (updateError) {
+            console.error('[Pluggy Unlinked] Error updating logo:', updateError);
+          }
+        }
+      } catch (error) {
+        console.error(`[Pluggy Unlinked] Error fetching accounts for item ${itemId}:`, error);
+      }
+    }
+
     // Get existing links
     const { data: links, error: linksError } = await supabase
       .from('account_links')
@@ -66,7 +108,7 @@ export async function GET(request: NextRequest) {
         currency: acc.currency,
         number: acc.number,
         institution_name: acc.pluggy_items?.connector_name || 'Open Finance',
-        institution_logo: acc.institution_logo || null,
+        institution_logo: logoByAccountId.get(acc.id) || acc.institution_logo || null,
         status: acc.pluggy_items?.status,
       }));
 

@@ -41,6 +41,9 @@ const applyMissingColumnFallback = (payload: Record<string, any>, column: string
     'contribution_day',
     'start_date',
     'assigned_to',
+    'institution_domain',
+    'institution_brand_id',
+    'institution_primary_color',
   ];
 
   if (optionalColumns.includes(column)) {

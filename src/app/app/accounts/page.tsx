@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -15,12 +15,17 @@ import { useToast } from '@/hooks/use-toast';
 import { useAccountContext } from '@/hooks/useAccountContext';
 import { useRealtimeCashflowUpdates } from '@/hooks/useRealtimeCashflowUpdates';
 import { formatCurrencyValue, formatCurrencyInput } from '@/lib/utils';
+import InstitutionSelect, { type InstitutionSelection } from '@/components/brandfetch/InstitutionSelect';
+import { buildBrandfetchLogoProxyUrl } from '@/lib/brandfetch';
 
 interface Account {
   id: string;
   name: string;
   type: string;
   institution: string | null;
+  institution_domain?: string | null;
+  institution_brand_id?: string | null;
+  institution_primary_color?: string | null;
   currency: string;
   current_balance: number;
   initial_balance?: number;
@@ -240,6 +245,12 @@ const accountIcons = [
   '🌊',
 ];
 
+const DEFAULT_ACCOUNT_COLOR = accountColors[0] || '#3b82f6';
+const DEFAULT_ACCOUNT_ICON = accountIcons[0] || '🏦';
+
+const getAccountTypeIcon = (type: string) =>
+  accountTypes.find((accountType) => accountType.value === type)?.icon || DEFAULT_ACCOUNT_ICON;
+
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
@@ -251,14 +262,18 @@ export default function AccountsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [pluggyLogos, setPluggyLogos] = useState<Record<string, string | null>>({});
+  const backfillInFlight = useRef(new Set<string>());
   const [formData, setFormData] = useState({
     name: '',
     type: 'checking',
     institution: '',
+    institution_domain: '',
+    institution_brand_id: '',
+    institution_primary_color: '',
     currency: 'BRL',
     initial_balance: '',
-    color: '#3b82f6',
-    icon: '🏦',
+    color: DEFAULT_ACCOUNT_COLOR,
+    icon: DEFAULT_ACCOUNT_ICON,
     has_overdraft: false,
     overdraft_limit: '',
     overdraft_interest_rate: '',
@@ -375,6 +390,9 @@ export default function AccountsPage() {
         name: formData.name.trim(),
         type: formData.type,
         institution: formData.institution.trim() || undefined,
+        institution_domain: formData.institution_domain || undefined,
+        institution_brand_id: formData.institution_brand_id || undefined,
+        institution_primary_color: formData.institution_primary_color || undefined,
         currency: formData.currency,
         color: formData.color,
         icon: formData.icon,
@@ -484,10 +502,13 @@ export default function AccountsPage() {
       name: account.name,
       type: account.type,
       institution: account.institution || '',
+      institution_domain: account.institution_domain || '',
+      institution_brand_id: account.institution_brand_id || '',
+      institution_primary_color: account.institution_primary_color || '',
       currency: account.currency,
       initial_balance: initialBalanceValue.toString(),
-      color: account.color || '#3b82f6',
-      icon: account.icon || '🏦',
+      color: account.color || account.institution_primary_color || DEFAULT_ACCOUNT_COLOR,
+      icon: account.icon || getAccountTypeIcon(account.type),
       has_overdraft: (account.overdraft_limit_cents || 0) > 0,
       overdraft_limit: account.overdraft_limit_cents ? formatCurrencyInput(account.overdraft_limit_cents / 100) : '',
       overdraft_interest_rate: account.overdraft_interest_rate_monthly ? account.overdraft_interest_rate_monthly.toString() : '',
@@ -508,10 +529,13 @@ export default function AccountsPage() {
       name: '',
       type: 'checking',
       institution: '',
+      institution_domain: '',
+      institution_brand_id: '',
+      institution_primary_color: '',
       currency: 'BRL',
       initial_balance: '',
-      color: '#3b82f6',
-      icon: '🏦',
+      color: DEFAULT_ACCOUNT_COLOR,
+      icon: getAccountTypeIcon('checking'),
       has_overdraft: false,
       overdraft_limit: '',
       overdraft_interest_rate: '',
@@ -527,6 +551,98 @@ export default function AccountsPage() {
     setDialogOpen(false);
     setEditingAccount(null);
     setOriginalInitialBalanceCents(null);
+  };
+
+  useEffect(() => {
+    const backfillInstitutionDomains = async () => {
+      const candidates = accounts.filter(
+        (account) =>
+          account.institution &&
+          !account.institution_domain &&
+          !backfillInFlight.current.has(account.id)
+      );
+
+      for (const account of candidates) {
+        if (!account.institution) continue;
+        const query = account.institution.trim();
+        if (query.length < 2) continue;
+
+        backfillInFlight.current.add(account.id);
+        try {
+          const searchRes = await fetch(`/api/brandfetch/search?query=${encodeURIComponent(query)}`);
+          const searchData = await searchRes.json();
+          const firstResult = Array.isArray(searchData?.results)
+            ? searchData.results.find((result: any) => result.domain)
+            : null;
+
+          if (!firstResult?.domain) {
+            continue;
+          }
+
+          let primaryColor: string | null = null;
+          let brandId: string | null = firstResult.brandId || null;
+
+          const brandRes = await fetch(
+            `/api/brandfetch/brand?domain=${encodeURIComponent(firstResult.domain)}`
+          );
+          if (brandRes.ok) {
+            const brandData = await brandRes.json();
+            primaryColor = brandData?.primaryColor || null;
+            brandId = brandData?.brandId || brandId;
+          }
+
+          const patchRes = await fetch(`/api/accounts/${account.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              institution_domain: firstResult.domain,
+              institution_brand_id: brandId,
+              institution_primary_color: primaryColor,
+            }),
+          });
+
+          if (patchRes.ok) {
+            setAccounts((prev) =>
+              prev.map((item) =>
+                item.id === account.id
+                  ? {
+                      ...item,
+                      institution_domain: firstResult.domain,
+                      institution_brand_id: brandId || undefined,
+                      institution_primary_color: primaryColor || undefined,
+                    }
+                  : item
+              )
+            );
+          }
+        } catch (error) {
+          console.error('[Accounts] Failed to backfill brand domain:', error);
+        }
+      }
+    };
+
+    if (accounts.length > 0) {
+      backfillInstitutionDomains();
+    }
+  }, [accounts]);
+
+  const handleTypeChange = (nextType: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      type: nextType,
+      icon: getAccountTypeIcon(nextType),
+    }));
+  };
+
+  const handleInstitutionChange = (selection: InstitutionSelection) => {
+    setFormData((prev) => ({
+      ...prev,
+      institution: selection.name,
+      institution_domain: selection.domain || '',
+      institution_brand_id: selection.brandId || '',
+      institution_primary_color: selection.primaryColor || '',
+      color: selection.primaryColor || prev.color || DEFAULT_ACCOUNT_COLOR,
+    }));
   };
 
   const filteredAccounts = accounts.filter(account => {
@@ -602,39 +718,47 @@ export default function AccountsPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-full">
           {filteredAccounts.map((account) => {
-            const institutionLogo = pluggyLogos[account.id];
-            if (institutionLogo) {
-              console.log(`[Accounts] Account ${account.name} (${account.id}) has logo:`, institutionLogo);
-            }
+            const pluggyLogo = pluggyLogos[account.id];
+            const brandLogo = account.institution_domain
+              ? buildBrandfetchLogoProxyUrl({
+                  identifier: `domain/${account.institution_domain}`,
+                  size: 32,
+                  theme: 'dark',
+                  type: 'icon',
+                })
+              : null;
+            const displayLogo = pluggyLogo || brandLogo;
+            const hasLogo = !!displayLogo;
             return (
               <div key={account.id} className="glass-card p-4 hover:shadow-lg transition-shadow relative">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div
-                      className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
-                      style={{ backgroundColor: (account.color || '#3b82f6') + '20' }}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center text-xl flex-shrink-0 ${
+                        hasLogo ? 'overflow-hidden' : ''
+                      }`}
+                      style={{
+                        backgroundColor: hasLogo
+                          ? 'transparent'
+                          : `${account.institution_primary_color || account.color || DEFAULT_ACCOUNT_COLOR}20`,
+                      }}
                     >
-                      {account.icon || '🏦'}
+                      {displayLogo ? (
+                        <img
+                          src={displayLogo}
+                          alt=""
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        account.icon || DEFAULT_ACCOUNT_ICON
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <h3 className="font-semibold truncate">{account.name}</h3>
-                        {/* Pluggy institution logo badge - next to account name */}
-                        {institutionLogo && (
-                          <div className="flex-shrink-0">
-                            <div className="w-6 h-6 rounded-full bg-background border border-primary/20 flex items-center justify-center overflow-hidden shadow-sm">
-                              <img
-                                src={institutionLogo}
-                                alt=""
-                                className="w-5 h-5 object-contain"
-                                onError={(e) => {
-                                  // Hide badge if image fails to load
-                                  (e.target as HTMLElement).style.display = 'none';
-                                }}
-                              />
-                            </div>
-                          </div>
-                        )}
                       </div>
                       <p className="text-sm text-muted-foreground">
                         {account.institution || accountTypes.find(t => t.value === account.type)?.label}
@@ -702,11 +826,11 @@ export default function AccountsPage() {
 
             <div>
               <label className="text-sm font-medium">Tipo</label>
-              <select
-                value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                className="w-full px-3 py-2 rounded-md border border-input bg-background"
-              >
+                <select
+                  value={formData.type}
+                  onChange={(e) => handleTypeChange(e.target.value)}
+                  className="w-full px-3 py-2 rounded-md border border-input bg-background"
+                >
                 {accountTypes.map((type) => (
                   <option key={type.value} value={type.value}>
                     {type.icon} {type.label}
@@ -716,11 +840,17 @@ export default function AccountsPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium">Instituição</label>
-              <Input
-                value={formData.institution}
-                onChange={(e) => setFormData({ ...formData, institution: e.target.value })}
-                placeholder="Nome do banco"
+              <InstitutionSelect
+                label="Instituição"
+                placeholder="Busque o banco"
+                value={{
+                  name: formData.institution,
+                  domain: formData.institution_domain || undefined,
+                  brandId: formData.institution_brand_id || undefined,
+                  primaryColor: formData.institution_primary_color || undefined,
+                  isManual: !formData.institution_domain && !!formData.institution,
+                }}
+                onChange={handleInstitutionChange}
               />
             </div>
 
@@ -919,40 +1049,6 @@ export default function AccountsPage() {
               )}
             </div>
 
-            <div>
-              <label className="text-sm font-medium">Cor</label>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {accountColors.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    className={`w-10 h-10 rounded-lg border-2 transition-all ${
-                      formData.color === color ? 'border-foreground scale-110' : 'border-transparent'
-                    }`}
-                    style={{ backgroundColor: color }}
-                    onClick={() => setFormData({ ...formData, color })}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium">Ícone</label>
-              <div className="flex flex-wrap gap-2 mt-2 max-h-24 overflow-y-auto">
-                {accountIcons.map((icon) => (
-                  <button
-                    key={icon}
-                    type="button"
-                    className={`w-8 h-8 rounded border-2 text-lg transition-transform ${
-                      formData.icon === icon ? 'border-foreground scale-110' : 'border-muted'
-                    }`}
-                    onClick={() => setFormData({ ...formData, icon })}
-                  >
-                    {icon}
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
 
           <DialogFooter>

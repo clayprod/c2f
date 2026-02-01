@@ -171,6 +171,13 @@ export function CashFlowChart({ data, periodCount = 12, groupBy = 'month', curre
   }, [periodCount, groupBy]);
 
   const { chartData, currentMonthIndex, hasProjections } = useMemo(() => {
+    console.log('[CashFlowChart] Processing data, items:', data.length, 'groupBy:', groupBy);
+    if (data.length > 0) {
+      console.log('[CashFlowChart] First item:', data[0]);
+      const currentItem = data.find(d => d.isCurrentMonth);
+      console.log('[CashFlowChart] Current period item:', currentItem?.month || 'NOT FOUND');
+    }
+
     // Primeiro, processar e formatar os dados
     const processedData = data.map((item) => {
       // Usar o monthLabel já formatado (vem da página)
@@ -306,10 +313,15 @@ export function CashFlowChart({ data, periodCount = 12, groupBy = 'month', curre
       const isCurrentMonth = item.isCurrentMonth;
       const isProjected = item.isProjectedMonth;
 
-      if (isProjected && hasProjectionValues) {
-        const incomePlanned = item.income_planned ?? 0;
-        const expensesPlanned = item.expenses_planned ?? 0;
-        cumulativeBalanceProjected += incomePlanned - expensesPlanned;
+      const incomePlanned = item.income_planned ?? 0;
+      const expensesPlanned = item.expenses_planned ?? 0;
+
+      if (hasProjectionValues) {
+        if (isCurrentMonth) {
+          cumulativeBalanceProjected = projectedStartBalance + (incomePlanned - expensesPlanned);
+        } else if (isProjected) {
+          cumulativeBalanceProjected += incomePlanned - expensesPlanned;
+        }
       }
 
       // Linha sólida (histórica) deve parar no mês corrente
@@ -324,9 +336,6 @@ export function CashFlowChart({ data, periodCount = 12, groupBy = 'month', curre
       const expensesActual = item.expenses_actual !== undefined ? item.expenses_actual : 0;
 
       // Valores projetados (planned)
-      const incomePlanned = item.income_planned !== undefined ? item.income_planned : 0;
-      const expensesPlanned = item.expenses_planned !== undefined ? item.expenses_planned : 0;
-
       // Lógica para mostrar barras:
       // - Meses passados (não projetados, não atual): só realizados
       // - Mês/período atual: ambos (realizados e projetados)
@@ -371,7 +380,7 @@ export function CashFlowChart({ data, periodCount = 12, groupBy = 'month', curre
         // No mês corrente, a linha projetada começa no saldo real do mês corrente
         // Nos meses futuros, continua com as projeções somadas
         cumulativeBalanceProjected: shouldIncludeInProjected
-          ? (isCurrentMonth ? projectedStartBalance : cumulativeBalanceProjected)
+          ? cumulativeBalanceProjected
           : null,
         // Campos separados para barras reais e projetadas
         income_real,

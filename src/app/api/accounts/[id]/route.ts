@@ -74,6 +74,9 @@ export async function PATCH(
     if (body.name !== undefined) updateData.name = body.name;
     if (body.type !== undefined) updateData.type = body.type;
     if (body.institution !== undefined) updateData.institution = body.institution;
+    if (body.institution_domain !== undefined) updateData.institution_domain = body.institution_domain;
+    if (body.institution_brand_id !== undefined) updateData.institution_brand_id = body.institution_brand_id;
+    if (body.institution_primary_color !== undefined) updateData.institution_primary_color = body.institution_primary_color;
     if (body.currency !== undefined) updateData.currency = body.currency;
     if (hasInitialBalanceUpdate) {
       const { data: accountData, error: accountError } = await supabase
